@@ -21,6 +21,9 @@ args = parser.parse_args()
 audio_file = args.dataFile
 fn = audio_file.split('/')[-1]
 
+fg = {}
+axes = {}
+
 if args.test != 'no':
     sampling_rate = 44100
     duration = 10
@@ -30,13 +33,15 @@ else:
 
     with PdfPages(args.output) as pdf:
 
-        fig, ax = plt.subplots()
-        ax.set_yscale('log')
+        fig = plt.figure('all')
+        ax = fig.add_subplot(111)
+        ax.set_ylabel('log')
         ax.axvline(260., color='r')
         ax.axvline(440., color='r')
         plt.xlabel('Frequency (Hz)')
         plt.suptitle(' Audio FFT ')
 
+        plot_num = 0
         with open(args.infile) as f:
             for line in f:
                 (who, avfile) = line.split()
@@ -68,7 +73,21 @@ else:
 
                 print max_freq, second_freq, third_freq, r12, r13
 
+                plot_num += 1
+                fg[who] = plt.figure(plot_num)
+                axes[who] = fg[who].add_subplot(111)
+                axes[who].set_yscale('log')
+                axes[who].axvline(260., color='r')
+                axes[who].axvline(440., color='r')
+                plt.xlabel('Frequency (Hz)')
+                plt.suptitle(' Audio FFT: ' + who)
+
+                axes[who].hist(f,weights=Pxx_den, bins=np.arange(0.,1000.,20), histtype='step',label=who)
+
+                plt.figure("all")
                 ax.hist(f,weights=Pxx_den, bins=np.arange(0.,1000.,20), histtype='step',label=who)
+
+
 
         plt.legend()
         pdf.savefig()
