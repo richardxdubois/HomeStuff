@@ -33,9 +33,9 @@ else:
 
     with PdfPages(args.output) as pdf:
 
-        fig = plt.figure('all')
+        fig = plt.figure(0)
         ax = fig.add_subplot(111)
-        ax.set_ylabel('log')
+        ax.set_yscale('log')
         ax.axvline(260., color='r')
         ax.axvline(440., color='r')
         plt.xlabel('Frequency (Hz)')
@@ -82,11 +82,11 @@ else:
                 plt.xlabel('Frequency (Hz)')
                 plt.suptitle(' Audio FFT: ' + who)
 
-                axes[who].hist(f,weights=Pxx_den, bins=np.arange(0.,1000.,20), histtype='step',label=who)
+                axes[who].hist(f,weights=Pxx_den, bins=np.arange(0.,1000.,20), histtype='step')
+                pdf.savefig()
 
-                plt.figure("all")
+                plt.figure(0)
                 ax.hist(f,weights=Pxx_den, bins=np.arange(0.,1000.,20), histtype='step',label=who)
-
 
 
         plt.legend()
