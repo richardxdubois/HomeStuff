@@ -12,17 +12,26 @@ def parse_file(infile):
     with open(infile) as f:
         for line in f:
             (mtu, tstamp, powerStr, cost, volts) = line.split(',')
+            (tdate, ttime) = tstamp.split()
             if mtu == "mtu":
                 continue
 
             power = -1. * float(powerStr)
 
-            datestamp = datetime.datetime.strptime(tstamp, '%m/%d/%Y %H:%M:%S')
+            datestamp = datetime.datetime.strptime(ttime, '%H:%M:%S')
             timeList.append(datestamp)
             powerList.append(power)
 
     return timeList, np.array(powerList)
 
+def sum_power(t,p, min, max):
+
+    sums = 0.
+    for i in range(len(t)):
+        if t[i] >= min and t[i] <= max:
+            sums += p[i]
+
+    return sums
 
 ## Command line arguments
 parser = argparse.ArgumentParser(
@@ -30,8 +39,8 @@ parser = argparse.ArgumentParser(
 
 ##   The following are 'convenience options' which could also be specified in the filter string
 parser.add_argument('-f', '--dataFile', default="", help="name of data file (default=%(default)s)")
-parser.add_argument('-m', '--tmin', default="", help="start timestamp (default=%(default)s)")
-parser.add_argument('-x', '--tmax', default="", help="end timestamp (default=%(default)s)")
+parser.add_argument('-m', '--tmin', default="09:01:00", help="start timestamp (default=%(default)s)")
+parser.add_argument('-x', '--tmax', default="11:21:00", help="end timestamp (default=%(default)s)")
 parser.add_argument('-o', '--output', default="power.pdf", help="output file name (default=%(default)s)")
 parser.add_argument('-i', '--infile', default="", help="input file name for list of power files (default=%(default)s)")
 
@@ -49,7 +58,18 @@ with PdfPages(args.output) as pdf:
             (t, p) = parse_file(fspec)
             powerDict[period] = p
 
-    signal = powerDict['eclipse'] - (powerDict['before'] + powerDict['after'])/2.
+    normal_shape = (powerDict['before'] + powerDict['after'])/2.
+    signal = powerDict['eclipse'] - normal_shape
+
+    startStamp = datetime.datetime.strptime(args.tmin, '%H:%M:%S')
+    endStamp = datetime.datetime.strptime(args.tmax, '%H:%M:%S')
+
+    sigSum = sum_power(t,signal, startStamp, endStamp)
+    normalSum = sum_power(t,normal_shape, startStamp, endStamp)
+
+    frac_left = sigSum/normalSum
+
+    print 'Fraction of power left in ', args.tmin, ' and ', args.tmax, ' : ', frac_left, ' for ', sigSum, normalSum
 
     plt.figure(0)
     plt.plot(t,signal)
