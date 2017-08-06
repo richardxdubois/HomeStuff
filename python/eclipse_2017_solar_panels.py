@@ -64,17 +64,21 @@ with PdfPages(args.output) as pdf:
     startStamp = datetime.datetime.strptime(args.tmin, '%H:%M:%S')
     endStamp = datetime.datetime.strptime(args.tmax, '%H:%M:%S')
 
-    sigSum = sum_power(t,signal, startStamp, endStamp)
-    normalSum = sum_power(t,normal_shape, startStamp, endStamp)
+    tdiff = (endStamp-startStamp).seconds/3600.
+    sigSum = sum_power(t,signal, startStamp, endStamp)/60.
+    normalPower = sum_power(t,normal_shape, startStamp, endStamp)
+    normalSum = normalPower/60.
 
     frac_left = sigSum/normalSum
 
-    print 'Fraction of power left in ', args.tmin, ' and ', args.tmax, ' : ', frac_left, ' for ', sigSum, normalSum
+    print 'Fraction of power left in ', args.tmin, ' and ', args.tmax, ' : ', frac_left, ' for ', sigSum, normalSum, ' kW-hrs'
 
     plt.figure(0)
-    plt.plot(t,signal)
+    plt.plot(t,signal,label='signal')
+    plt.plot(t,normal_shape,label='normal')
     plt.xticks(rotation=30)
     plt.tight_layout()
+    plt.legend()
 
     pdf.savefig()
     plt.close()
