@@ -397,14 +397,26 @@ r.patches('xs', 'ys', source=geosource, fill_color={'field': 'counts', 'transfor
 # Specify figure layout.
 r.add_layout(color_bar, 'below')
 
+# histogram of start dates
+
+actual_starts = [xt for xt in h_start if xt > datetime.strptime("1/1/20", '%m/%d/%y').timestamp()*1000.]
+
+hist, edges = np.histogram(actual_starts, bins=15)
+
+p_hist = figure(tools=TOOLS, title="Start Dates of outbreak", x_axis_label='date', y_axis_label='counts',
+                width=750, x_axis_type="datetime",)
+
+p_hist.vbar(top=hist, x=edges[:-1], width=0.25e9, fill_color='red', fill_alpha=0.2, bottom=0.001)
+
+
 # world map of start dates
 
 # Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
 palette2 = palette2[::-1]
 
 t_color_mapper = LinearColorMapper(palette=palette2,
-                                low=int(datetime.strptime("1/10/20", '%m/%d/%y').timestamp()) * 1000.,
-                                high=int(datetime.today().timestamp()) * 1000.)
+                                   low=int(datetime.strptime("1/10/20", '%m/%d/%y').timestamp()) * 1000.,
+                                   high=int(datetime.today().timestamp()) * 1000.)
 
 # Create color bar.
 t_color_bar = ColorBar(color_mapper=t_color_mapper, label_standoff=8, width=500, height=20,
@@ -412,7 +424,7 @@ t_color_bar = ColorBar(color_mapper=t_color_mapper, label_standoff=8, width=500,
                        formatter=DatetimeTickFormatter())
 
 # Create figure object.
-t = figure(title = 'World Map: Start dates', plot_height = 600 , plot_width = 950, tools=TOOLS)
+t = figure(title='World Map: Start dates (yellow = not started yet)', plot_height=600, plot_width=950, tools=TOOLS)
 t.xgrid.grid_line_color = None
 t.ygrid.grid_line_color = None
 
@@ -420,7 +432,7 @@ t_hover_tool = HoverTool(tooltips=[("country", "@country"), ("Date", "@date")])
 t.add_tools(t_hover_tool)
 # Add patch renderer to figure.
 t.patches('xs', 'ys', source=geosource, fill_color={'field': 'start', 'transform': t_color_mapper},
-          line_color = 'black', line_width = 0.25, fill_alpha = 1)
+          line_color='black', line_width=0.25, fill_alpha=1)
 # Specify figure layout.
 t.add_layout(t_color_bar, 'below')
 
@@ -510,6 +522,6 @@ header_text = "Run on: " + datetime.now().strftime("%Y-%m-%d") +  "  " + \
             >'Data source - Johns Hopkins'</a>"
 att_div = Div(text=header_text)
 
-l = layout(att_div, row(target, overlay), row(a, r), t, row(sa, sf))
+l = layout(att_div, row(target, overlay), row(a, r), row(p_hist, t), row(sa, sf))
 output_file(args.output)
 save(l, title="JHU Analysis")
