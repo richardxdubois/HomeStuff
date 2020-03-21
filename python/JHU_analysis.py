@@ -19,12 +19,15 @@ from bokeh.models import ColumnDataSource, Span, Label, HoverTool, DatetimeTickF
 import numpy as np
 from bokeh.palettes import Viridis256 as palette
 from bokeh.palettes import Plasma256 as palette2
-from bokeh.palettes import Paired as palette3
 
 """
 Analysis of Johns Hopkins U covid-19 data:
 
-Read a csv file of CV-19 data
+Read a csv file of CV-19 data:
+
+eg.
+
+python JHU_analysis.py --files /Users/richarddubois/Code/Home/jhu_covid_data.txt -t Deaths --country Italy
 
 """
 
