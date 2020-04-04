@@ -13,7 +13,7 @@ from scipy import stats
 from scipy.interpolate import interp1d
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
-from bokeh.models import GeoJSONDataSource, LinearColorMapper, ColorBar, LogColorMapper
+from bokeh.models import GeoJSONDataSource, LinearColorMapper, ColorBar, LogColorMapper, Range1d
 from bokeh.models.widgets import Tabs, Panel, DataTable, TableColumn, DateFormatter, \
     NumberFormatter, Div
 from bokeh.models import ColumnDataSource, Span, Label, HoverTool, DatetimeTickFormatter
@@ -30,6 +30,11 @@ Read a csv file of CV-19 data:
 eg.
 
 python JHU_analysis.py --files /Users/richarddubois/Code/Home/jhu_covid_data.txt -t Deaths --country Italy
+
+Imports notes:
+
+ - us package obtained by pip install
+
 
 """
 
@@ -142,7 +147,7 @@ def find_start(t_array=None, c_array=None, thresh=5.):
     return t_start
 
 
-def make_time_plot(place_1, place_dict, place_2=None):
+def make_time_plot(place_1, place_dict, place_2=None, window_len=11):
 
     x_1 = np.array(list(place_dict[place_1].keys()))
     y_1 = np.array(list(place_dict[place_1].values()))
@@ -152,7 +157,7 @@ def make_time_plot(place_1, place_dict, place_2=None):
     x_sorted = np.array(x_1)[order]
     y_sorted = np.array(y_1)[order]
 
-    y_smooth = smooth(y_sorted)
+    y_smooth = smooth(y_sorted, window_len=window_len)
 
     if place_2 is not None:
         x_2 = np.array(list(place_dict[place_2].keys()))
@@ -190,7 +195,7 @@ def make_time_plot(place_1, place_dict, place_2=None):
     return m
 
 
-def overlay_smooths(place_list, place_dict):
+def overlay_smooths(place_list, place_dict, window_len=11):
 
     m_title = "Smoothed counts/day vs Day from first: " + args.type
     m = figure(tools=TOOLS, title=m_title, x_axis_label='Days from first',
@@ -218,8 +223,9 @@ def overlay_smooths(place_list, place_dict):
         order = np.argsort(np.array(x))
         x_sorted = np.array(x)[order]
         y_sorted = np.array(y)[order]
+        print(place, len(x), x_sorted[0])
 
-        y_smooth = smooth(y_sorted)
+        y_smooth = smooth(y_sorted, window_len=window_len)
 
         len_diff = max_len - len(y_smooth)
         if len_diff > 0:
@@ -232,10 +238,148 @@ def overlay_smooths(place_list, place_dict):
     return m
 
 
+def make_start_hist(t_array, title=None):
+
+    # histogram of start dates
+
+    actual_starts = [xt for xt in t_array if xt > datetime.strptime("1/1/20", '%m/%d/%y').timestamp() * 1000.]
+
+    hist, edges = np.histogram(actual_starts, bins=15)
+
+    p_hist = figure(tools=TOOLS, title="Start Dates of outbreak (running sum exceeds 5)",
+                    x_axis_label='date', y_axis_label='counts',
+                    width=750, x_axis_type="datetime", )
+
+    p_hist.vbar(top=hist, x=edges[:-1], width=0.5e8, fill_color='red', fill_alpha=0.2, bottom=0.001)
+
+    return p_hist
+
+
+def make_starts_map(s_x_state, s_starts, s_st_hover):
+
+    # US state heatmap
+
+    shapefile = '/Users/richarddubois/Code/Home/ne_110m_admin_1_states_provinces/ne_110m_admin_1_states_provinces.shp'
+    # Read shapefile using Geopandas
+    gdf = gpd.read_file(shapefile)[['name', 'geometry']]
+
+    # Rename columns.
+    gdf.columns = ['state', 'geometry']
+    gdf.head()
+    gdf_frame = gdf.set_index('state', drop=False)
+    gdf_col = gdf_frame["state"]
+
+    st_source = pandas.DataFrame(dict({"state": s_x_state,  "date": s_st_hover, "start": s_starts}))
+
+    # Merge dataframes gdf and pd_source.
+    # https://stackoverflow.com/questions/53645882/pandas-merging-101
+
+    merged = gdf.merge(st_source, on = 'state')
+    # Read data to json.
+    merged_json = json.loads(merged.to_json())
+    # Convert to String like object.
+    json_data = json.dumps(merged_json)
+    # Input GeoJSON source that contains features for plotting.
+    geosource = GeoJSONDataSource(geojson=json_data)
+
+    # Create figure object.
+
+    high_state = max(s_starts)
+
+    t_color_mapper = LinearColorMapper(palette=palette2,
+                                       low=int(datetime.strptime("3/01/20", '%m/%d/%y').timestamp()) * 1000.,
+                                       high=int(datetime.today().timestamp()) * 1000.)
+    t_color_bar = ColorBar(color_mapper=t_color_mapper, label_standoff=8, width=500, height=20,
+                           border_line_color=None, location=(0, 0), orientation='horizontal',
+                           formatter=DatetimeTickFormatter())
+
+    sf = figure(title = 'States Map: Start dates (yellow = not started yet)', plot_height = 600 , plot_width = 950,
+                tools=TOOLS)
+    sf.xgrid.grid_line_color = None
+    sf.ygrid.grid_line_color = None
+
+    sf_hover_tool = HoverTool(tooltips=[("state", "@state"), ("Start", "@date")])
+    sf.add_tools(sf_hover_tool)
+    # Add patch renderer to figure.
+    sf.patches('xs', 'ys', source=geosource, fill_color={'field': 'start', 'transform': t_color_mapper},
+               line_color='black', line_width=0.25, fill_alpha=1)
+    # Specify figure layout.
+
+    sf.add_layout(t_color_bar, 'below')
+
+    return sf
+
+
+def parse_counties(csv_files=None):
+
+    county_counts = OrderedDict()
+    county_dates_counts = OrderedDict()
+    county_dates_counts_inv = OrderedDict()
+
+    n_dates = 0
+
+    bay_area_counties = ["San Mateo", "West Santa Clara", "San Francisco", "Alameda", "San Jose", "Oakland",
+                         "South San Francisco", "Half Moon Bay", "Fremont", "Berkeley", "Hayward"]
+
+    today = datetime.today()
+
+    for cats in csv_files:
+        print("Using file ", cats)
+        csv_final = pandas.read_csv(cats, header=0, skipinitialspace=True)
+
+        # loop over dates per state
+        n_dates = 0
+
+        for index, c_row in csv_final.iterrows():
+
+            state = c_row["state"]
+            county = c_row["county"]
+            if county == "Santa Clara":
+                county = "West Santa Clara"
+
+            if state != "California" or county not in bay_area_counties:
+                continue
+
+            if args.type == "Deaths":
+                day_count = c_row["deaths"]
+            else:
+                day_count = c_row["cases"]
+
+            if day_count == 0:
+                continue
+
+            c_date = str(c_row["date"])
+            dt_date = datetime.strptime(c_date, '%Y-%m-%d')
+
+            s = county_dates_counts_inv.setdefault(county, OrderedDict())
+            county_dates_counts_inv[county][dt_date] = day_count
+
+        # post process the dates to reverse the order of getting per day quantities
+
+    for county in county_dates_counts_inv:
+        s_x = list(county_dates_counts_inv[county].keys())
+        s_y = list(county_dates_counts_inv[county].values())
+        s_order = np.argsort(np.array(s_x))
+        s_y_sorted = np.array(s_y)[s_order]
+        s_x_sorted = np.array(s_x)[s_order]
+        county_counts[county] = s_y_sorted[-1]  # last date is the sum
+
+        for it, dt in enumerate(s_x_sorted):
+            s = county_dates_counts.setdefault(county, OrderedDict())
+            t = county_dates_counts[county].setdefault(dt, s_y_sorted[it])
+            if it > 0:
+                diff = county_dates_counts[county][dt] - s_y_sorted[it - 1]
+                if diff > 0:
+                    county_dates_counts[county][dt] -= s_y_sorted[it - 1]
+
+    return n_dates, county_counts, county_dates_counts
+
+
 def parse_states(csv_files=None):
 
     state_counts = OrderedDict()
     state_dates_counts = OrderedDict()
+    state_dates_counts_inv = OrderedDict()
 
     n_dates = 0
 
@@ -247,7 +391,7 @@ def parse_states(csv_files=None):
 #        csv_drop_cols = csv_assign.dropna(axis="columns", how="all")
 #        csv_final = csv_drop_cols.fillna(0.)
 
-        # loop over dates per state
+        # loop over dates per state  - unpack for post processing since data is reverse ordered, summed
         n_dates = 0
 
         for index, c_row in csv_final.iterrows():
@@ -255,6 +399,7 @@ def parse_states(csv_files=None):
             state_abbrev = unidecode(c_row["state"])
             if state_abbrev == "State":  # ignore header line
                 continue
+
             state = str(us.states.lookup(state_abbrev))
 
             if args.type == "Deaths":
@@ -268,12 +413,26 @@ def parse_states(csv_files=None):
             ecdc_date = str(c_row["date"])
             dt_date = datetime.strptime(ecdc_date, '%Y%m%d')
 
-            s = state_dates_counts.setdefault(state, OrderedDict())
-            t = state_dates_counts[state].setdefault(dt_date, 0)
-            state_dates_counts[state][dt_date] += day_count
+            s = state_dates_counts_inv.setdefault(state, OrderedDict())
+            state_dates_counts_inv[state][dt_date] = day_count
 
-            sc = state_counts.setdefault(state, 0)
-            state_counts[state] += day_count
+# post process the dates to reverse the order of getting per day quantities
+
+    for state in state_dates_counts_inv:
+        s_x = list(state_dates_counts_inv[state].keys())
+        s_y = list(state_dates_counts_inv[state].values())
+        s_order = np.argsort(np.array(s_x))
+        s_y_sorted = np.array(s_y)[s_order]
+        s_x_sorted = np.array(s_x)[s_order]
+        state_counts[state] = s_y_sorted[-1]   # last date is the sum
+
+        for it, dt in enumerate(s_x_sorted):
+            s = state_dates_counts.setdefault(state, OrderedDict())
+            t = state_dates_counts[state].setdefault(dt, s_y_sorted[it])
+            if it > 0:
+                diff = state_dates_counts[state][dt] - s_y_sorted[it - 1]
+                if diff > 0:
+                    state_dates_counts[state][dt] -= s_y_sorted[it-1]
 
     state_counts_sorted = OrderedDict({k: v for k, v in sorted(state_counts.items(), key=lambda item: item[1],
                                                                  reverse=True)})
@@ -302,24 +461,24 @@ def parse_ECDC(csv_files=None):
 #        csv_drop_cols = csv_assign.dropna(axis="columns", how="all")
 #       csv_final = csv_drop_cols.fillna(0.)
 
-        # loop over dates per country
+        # loop over dates per state
         n_dates = 0
 
         for index, c_row in csv_final.iterrows():
 
-            country_region = unidecode(c_row["Countries and territories"])
-            if country_region == "Countries and territories":  # ignore header line
+            country_region = unidecode(c_row["countriesAndTerritories"])
+            if country_region == "countriesAndTerritories":  # ignore header line
                 continue
             country_region = country_region.replace("_", " ").strip()
             if args.type == "Deaths":
-                day_count = c_row["Deaths"]
+                day_count = c_row["deaths"]
             else:
-                day_count = c_row["Cases"]
+                day_count = c_row["cases"]
 
             if day_count == 0:
                 continue
 
-            ecdc_date = c_row["DateRep"]
+            ecdc_date = c_row["dateRep"]
             dt_date = ecdc_date.to_pydatetime()
 
             try:
@@ -432,8 +591,6 @@ def parse_JHU(csv_files=None):
     print(country_counts)
     print(dates_counts)
 
-    state_counts_sorted = OrderedDict({k: v for k, v in sorted(state_counts.items(), key=lambda item: item[1],
-                                                               reverse=True)})
     return n_dates, country_counts_sorted, country_dates_counts,  \
         dates_counts, country_counts, state_counts
 
@@ -445,8 +602,12 @@ parser.add_argument('--source', default='ECDC', help="type of source data [ECDC 
 parser.add_argument('--files', default='jhu_files.txt', help="lists of files (default=%(default)s)")
 parser.add_argument('-o', '--output', default='jhu_analysis.html',
                     help="output bokeh html file (default=%(default)s)")
-parser.add_argument('-c', '--country', default=None,
+parser.add_argument('-c', '--country', default="Italy",
                     help="select country (default=%(default)s)")
+parser.add_argument('--comp_country', default="China",
+                    help="select country to overlay (default=%(default)s)")
+parser.add_argument('-s', '--state', default="New York",
+                    help="select state (default=%(default)s)")
 parser.add_argument('-t', '--type', default="Deaths",
                     help="select country (default=%(default)s)")
 
@@ -461,6 +622,105 @@ with open(args.files) as f:
         jhu_files.setdefault(key, [])
         jhu_files[key].append(val)
 
+TOOLS = "reset,save"
+
+#  County data
+
+n_dates, county_counts, county_dates_counts = parse_counties(jhu_files["Counties"])
+
+#  county data
+
+# create plot of counts per county. Reverse sort x axis (names) by count - ie most to least
+
+c_x = list(county_counts.keys())
+c_y = list(county_counts.values())
+c_order = np.argsort(-np.array(c_y))
+c_y_sorted = np.array(c_y)[c_order]
+c_x_sorted = np.array(c_x)[c_order]
+c_x_grid = [0.5+x for x in range(len(c_x))]
+
+c_hover = ColumnDataSource(dict({"county": c_x_sorted, "counts": c_y_sorted}))
+
+ca = figure(tools=TOOLS, title="counts per county", x_axis_label='county', y_axis_label='counts',
+           x_range=c_x_sorted, width=750, tooltips=[("county", "@county"), ("Count", "@counts")])
+
+ca.vbar(top="counts", x="county", width=0.5, fill_color='red', fill_alpha=0.2, source=c_hover, bottom=0.001)
+ca.xaxis.major_label_orientation = math.pi/2
+
+# US county heatmap
+
+#shapefile = '/Users/richarddubois/Code/Home/CA_Counties/CA_Counties_TIGER2016.shp'
+shapefile = '/Users/richarddubois/Code/Home/cb_2018_06_cousub_500k/cb_2018_06_cousub_500k.shp'
+#shapefile = '/Users/richarddubois/Code/Home/cb_2018_us_county_5m/cb_2018_us_county_5m.shp'
+
+# Read shapefile using Geopandas
+#gdf = gpd.read_file(shapefile)
+gdf = gpd.read_file(shapefile)[['NAME', 'STATEFP', 'geometry']]
+
+# Rename columns.
+gdf.columns = ['county', 'state_fips', 'geometry']
+gdf.head()
+gdf_frame = gdf.set_index('county', drop=False)
+gdf_col = gdf_frame["county"]
+
+c_x_county = []
+c_y_counts = []
+c_starts = []
+c_st_hover = []
+
+for county in gdf_col:
+    try:
+        state_fips = str(gdf_frame.loc[county, "state_fips"])
+        if state_fips != "06":  # California
+            continue
+        chk = county_counts[county]
+        c_x_county.append(county)
+        c_y_counts.append(county_counts[county])
+        c_start = find_start(list(county_dates_counts[county].keys()),
+                             list(county_dates_counts[county].values()))
+        c_starts.append(int(c_start.timestamp())*1000.)
+        c_st_hover.append(c_start.strftime('%m/%d/%y'))
+    except KeyError:
+        c_x_county.append(county)
+        c_y_counts.append(0.)
+        c_starts.append(datetime.strptime("1/1/20", '%m/%d/%y').timestamp()*1000.)
+        c_st_hover.append("1/1/20")
+
+st_source = pandas.DataFrame(dict({"county": c_x_county,  "counts": c_y_counts}))
+
+# Merge dataframes gdf and pd_source.
+# https://stackoverflow.com/questions/53645882/pandas-merging-101
+
+merged = gdf.merge(st_source, on = 'county')
+# Read data to json.
+merged_json = json.loads(merged.to_json())
+# Convert to String like object.
+json_data = json.dumps(merged_json)
+# Input GeoJSON source that contains features for plotting.
+geosource = GeoJSONDataSource(geojson=json_data)
+
+# Create figure object.
+
+high_county = max(c_y_counts)
+
+c_color_mapper = LinearColorMapper(palette=palette, low = 0, high=high_county)
+c_color_bar = ColorBar(color_mapper=c_color_mapper, label_standoff=8, width=500, height=20,
+                       border_line_color=None, location=(0, 0), orientation='horizontal')
+
+cf = figure(title = 'Bay Area County Map', plot_height = 600 , plot_width = 600, tools=TOOLS, x_range=(-122.75, -121.75),
+            y_range=(37, 38.5))
+cf.xgrid.grid_line_color = None
+cf.ygrid.grid_line_color = None
+
+cf_hover_tool = HoverTool(tooltips=[("county", "@county"), ("Count", "@counts")])
+cf.add_tools(cf_hover_tool)
+# Add patch renderer to figure.
+cf.patches('xs', 'ys', source=geosource, fill_color={'field': 'counts', 'transform': c_color_mapper},
+           line_color='black', line_width=0.25, fill_alpha=1)
+# Specify figure layout.
+
+cf.add_layout(c_color_bar, 'below')
+
 if args.source == "JHU":
     n_dates, country_counts_sorted, country_dates_counts, dates_counts, \
         country_counts, state_counts = parse_JHU(jhu_files[args.type])
@@ -468,7 +728,6 @@ else:
     n_dates, country_counts_sorted, country_dates_counts, dates_counts, \
         country_counts, state_counts = parse_ECDC(jhu_files[args.type])
 
-TOOLS = "reset,save"
 x = []
 y = []
 
@@ -481,7 +740,7 @@ else:
 
 
 target = make_time_plot(place_1=args.country, place_dict=country_dates_counts)
-overlay = make_time_plot(place_1="China", place_dict=country_dates_counts, place_2=args.country)
+overlay = make_time_plot(place_1=args.comp_country, place_dict=country_dates_counts, place_2=args.country)
 
 tops = list(country_counts_sorted.keys())[0:8]
 over_smooths = overlay_smooths(place_list=tops, place_dict=country_dates_counts)
@@ -500,10 +759,35 @@ a_hover = ColumnDataSource(dict({"country": a_x_sorted[0:cutoff-1], "counts": a_
 
 
 a = figure(tools=TOOLS, title="counts per country", x_axis_label='country', y_axis_label='counts', y_axis_type="log",
-           x_range=a_x_sorted[0:cutoff-1], width=750, tooltips=[("country", "@country"), ("Count", "@counts")])
+           x_range=a_x_sorted[0:cutoff-1], width=750, y_range=Range1d(1., 1.2*a_y_sorted[0]),
+           tooltips=[("country", "@country"), ("Count", "@counts")])
 
 a.vbar(top="counts", x="country", width=0.5, fill_color='red', fill_alpha=0.2, source=a_hover, bottom=0.001)
 a.xaxis.major_label_orientation = math.pi/2
+
+# create plot of last count per country. Reverse sort x axis (names) by count - ie most to least
+
+ac_y = []
+for c in a_x_sorted[0:cutoff-1]:
+    c_dt_dict = country_dates_counts[c]
+    c_x = list(country_dates_counts[c].keys())
+    c_y = list(country_dates_counts[c].values())
+    c_a_order = np.argsort(np.array(c_x))
+    c_y_sorted = np.array(c_y)[c_a_order]
+    ac_y.append(c_y_sorted[-1])
+
+c_hover = ColumnDataSource(dict({"country": a_x_sorted[0:cutoff-1], "counts": ac_y}))
+
+
+cta = figure(tools=TOOLS, title="most recent count per country", x_axis_label='country', y_axis_label='counts',
+            y_axis_type="log",
+           x_range=a_x_sorted[0:cutoff-1], width=750, y_range=Range1d(1., 1.2*max(ac_y)),
+           tooltips=[("country", "@country"), ("Count", "@counts")])
+
+cta.vbar(top="counts", x="country", width=0.5, fill_color='red', fill_alpha=0.2, source=c_hover, bottom=0.001)
+cta.xaxis.major_label_orientation = math.pi/2
+
+
 
 # World heatmap - guided by -
 # https://towardsdatascience.com/a-complete-guide-to-an-interactive-geographical-map-using-python-f4c5197e23e0
@@ -656,7 +940,8 @@ if len(state_counts_sorted) != 0:
     s_hover = ColumnDataSource(dict({"state": s_x_sorted[0:cutoff-1], "counts": s_y_sorted[0:cutoff-1]}))
 
     sa = figure(tools=TOOLS, title="counts per state", x_axis_label='state', y_axis_label='counts', y_axis_type="log",
-               x_range=s_x_sorted[0:cutoff-1], width=750, tooltips=[("state", "@state"), ("Count", "@counts")])
+               x_range=s_x_sorted[0:cutoff-1], width=750, y_range=Range1d(1., 1.2*s_y_sorted[0]),
+                tooltips=[("state", "@state"), ("Count", "@counts")])
 
     sa.vbar(top="counts", x="state", width=0.5, fill_color='red', fill_alpha=0.2, source=s_hover, bottom=0.001)
     sa.xaxis.major_label_orientation = math.pi/2
@@ -675,15 +960,23 @@ if len(state_counts_sorted) != 0:
 
     s_x_state = []
     s_y_counts = []
+    s_starts = []
+    s_st_hover = []
 
     for state in gdf_col:
         try:
             chk_s = state_counts_sorted[state]
             s_x_state.append(state)
             s_y_counts.append(state_counts_sorted[state])
+            c_start = find_start(list(state_dates_counts[state].keys()),
+                                 list(state_dates_counts[state].values()))
+            s_starts.append(int(c_start.timestamp())*1000.)
+            s_st_hover.append(c_start.strftime('%m/%d/%y'))
         except KeyError:
             s_x_state.append(state)
             s_y_counts.append(0.)
+            s_starts.append(datetime.strptime("1/1/20", '%m/%d/%y').timestamp()*1000.)
+            s_st_hover.append("1/1/20")
 
     st_source = pandas.DataFrame(dict({"state": s_x_state,  "counts": s_y_counts}))
 
@@ -719,6 +1012,14 @@ if len(state_counts_sorted) != 0:
 
     sf.add_layout(s_color_bar, 'below')
 
+    ps = make_start_hist(s_starts)
+    sf_st = make_starts_map(s_x_state, s_starts, s_st_hover)
+
+    st_tops = list(state_counts_sorted.keys())[0:6]
+    st_over_smooths = overlay_smooths(place_list=st_tops, place_dict=state_dates_counts)
+    st_target = make_time_plot(place_1=args.state, place_dict=state_dates_counts, window_len=7)
+
+
 # header
 
 source_url = "https://www.ecdc.europa.eu/en/publications-data/download-todays-data-geographic-distribution" \
@@ -727,17 +1028,22 @@ source_url = "https://www.ecdc.europa.eu/en/publications-data/download-todays-da
 if args.source == "JHU":
     source_url = "https://www.arcgis.com/apps/opsdashboard/index.html#/bda7594740fd40299423467b48e9ecf6"
 
+states_url = "https://covidtracking.com/"
+counties_url = "https://github.com/nytimes/covid-19-data"
 
 header_text = "Run on: " + datetime.now().strftime("%Y-%m-%d") + "  " + \
-            "<a href= " + source_url + " >Data source - " + args.source + "</a>"
+            "<a href= " + source_url + " > Global Data source - " + args.source + "</a></p>" + \
+            "<a href= " + states_url + " > States Data source </a></p>" + \
+            "<a href= " + counties_url + " > Counties Data source </a>"
+
 att_div = Div(text=header_text)
 
-base_layout = layout(att_div, row(target, overlay), over_smooths, row(a, r), row(p_hist, t))
+base_layout = layout(att_div, row(target, overlay), row(over_smooths, cta), row(a, r), row(p_hist, t))
 
 if len(state_counts_sorted) == 0:
     l = base_layout
 else:
-    l = layout(base_layout, row(sa, sf))
+    l = layout(base_layout, row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), row(ca))
 
 output_file(args.output)
-save(l, title=args.source + " Analysis")
+save(l, title=args.source + " Analysis: " + args.type)
