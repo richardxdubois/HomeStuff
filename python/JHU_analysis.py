@@ -987,6 +987,7 @@ if len(state_counts_sorted) != 0:
     sa.xaxis.major_label_orientation = math.pi/2
 
     doubling_state = []
+    sc_y = []
 
     for s in s_x_sorted[0:cutoff-1]:
         s_dt_dict = state_dates_counts[s]
@@ -994,10 +995,23 @@ if len(state_counts_sorted) != 0:
         sd_y = list(state_dates_counts[s].values())
         sd_a_order = np.argsort(np.array(sd_x))
         sd_y_sorted = np.array(sd_y)[sd_a_order]
-        if s == "Washington":
-            print("Washington")
+        sc_y.append(sd_y_sorted[-1])
         doubling_time_state = calculate_doubling(sd_y_sorted)
         doubling_state.append(doubling_time_state)
+
+# plot most recent
+
+    sr_hover = ColumnDataSource(dict({"state": s_x_sorted[0:cutoff - 1], "counts": sc_y}))
+
+    sr = figure(tools=TOOLS, title="most recent count per state", x_axis_label='state', y_axis_label='counts',
+                 y_axis_type="log",
+                 x_range=s_x_sorted[0:cutoff - 1], width=750,
+                 tooltips=[("state", "@state"), ("Count", "@counts")])
+
+    sr.vbar(top="counts", x="state", width=0.5, fill_color='red', fill_alpha=0.2, source=sr_hover, bottom=0.001)
+    sr.xaxis.major_label_orientation = math.pi / 2
+
+# plot doubling time
 
     doub_state_hover = ColumnDataSource(dict({"state": s_x_sorted[0:cutoff - 1], "time": doubling_state}))
 
@@ -1105,7 +1119,7 @@ base_layout = layout(att_div, row(target, overlay), row(over_smooths, cta), doub
 if len(state_counts_sorted) == 0:
     l = base_layout
 else:
-    l = layout(base_layout, row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), doub_state, row(ca))
+    l = layout(base_layout, row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), row(doub_state, sr), row(ca))
 
 output_file(args.output)
 save(l, title=args.source + " Analysis: " + args.type)
