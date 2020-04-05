@@ -10,7 +10,7 @@ import itertools
 from collections import OrderedDict
 from unidecode import unidecode
 from scipy import stats
-from scipy.interpolate import interp1d
+from scipy.stats import linregress
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.models import GeoJSONDataSource, LinearColorMapper, ColorBar, LogColorMapper, Range1d
@@ -145,6 +145,30 @@ def find_start(t_array=None, c_array=None, thresh=5.):
             break
 
     return t_start
+
+
+def calculate_doubling(in_array, window=7):
+
+    # fit in_array to semi-log, assuming 1 day binning
+    # doubling time is dt = ln2/b   for the fit c = a*exp(bt)
+
+    running = []
+    running_sum = 0.
+    l_array = len(in_array)
+
+    for i in range(l_array):
+        running_sum += in_array[i]
+        if i > l_array - 8:
+            running.append(running_sum)
+
+    y = np.log(np.array(running))
+    t = [x for x in range(len(y))]
+
+    slope, intercept, r_value, p_value, std_err = stats.linregress(t, y)
+
+    doubling_time = math.log(2.)/slope
+
+    return doubling_time
 
 
 def make_time_plot(place_1, place_dict, place_2=None, window_len=11):
@@ -768,6 +792,7 @@ a.xaxis.major_label_orientation = math.pi/2
 # create plot of last count per country. Reverse sort x axis (names) by count - ie most to least
 
 ac_y = []
+doubling_country = []
 for c in a_x_sorted[0:cutoff-1]:
     c_dt_dict = country_dates_counts[c]
     c_x = list(country_dates_counts[c].keys())
@@ -775,6 +800,9 @@ for c in a_x_sorted[0:cutoff-1]:
     c_a_order = np.argsort(np.array(c_x))
     c_y_sorted = np.array(c_y)[c_a_order]
     ac_y.append(c_y_sorted[-1])
+    doubling_time = calculate_doubling(c_y_sorted)
+    doubling_country.append(doubling_time)
+
 
 c_hover = ColumnDataSource(dict({"country": a_x_sorted[0:cutoff-1], "counts": ac_y}))
 
@@ -786,6 +814,18 @@ cta = figure(tools=TOOLS, title="most recent count per country", x_axis_label='c
 
 cta.vbar(top="counts", x="country", width=0.5, fill_color='red', fill_alpha=0.2, source=c_hover, bottom=0.001)
 cta.xaxis.major_label_orientation = math.pi/2
+
+# plot doubling time
+
+doub_hover = ColumnDataSource(dict({"country": a_x_sorted[0:cutoff-1], "time": doubling_country}))
+
+
+doub = figure(tools=TOOLS, title="doubling time per country", x_axis_label='country', y_axis_label='time (days)',
+           x_range=a_x_sorted[0:cutoff-1], width=750, y_axis_type="log",
+           tooltips=[("country", "@country"), ("Days", "@time")])
+
+doub.vbar(top="time", x="country", width=1., fill_color='red', fill_alpha=0.2, source=doub_hover, bottom=0.001)
+doub.xaxis.major_label_orientation = math.pi/2
 
 
 
@@ -946,6 +986,28 @@ if len(state_counts_sorted) != 0:
     sa.vbar(top="counts", x="state", width=0.5, fill_color='red', fill_alpha=0.2, source=s_hover, bottom=0.001)
     sa.xaxis.major_label_orientation = math.pi/2
 
+    doubling_state = []
+
+    for s in s_x_sorted[0:cutoff-1]:
+        s_dt_dict = state_dates_counts[s]
+        sd_x = list(state_dates_counts[s].keys())
+        sd_y = list(state_dates_counts[s].values())
+        sd_a_order = np.argsort(np.array(sd_x))
+        sd_y_sorted = np.array(sd_y)[sd_a_order]
+        if s == "Washington":
+            print("Washington")
+        doubling_time_state = calculate_doubling(sd_y_sorted)
+        doubling_state.append(doubling_time_state)
+
+    doub_state_hover = ColumnDataSource(dict({"state": s_x_sorted[0:cutoff - 1], "time": doubling_state}))
+
+    doub_state = figure(tools=TOOLS, title="doubling time per state", x_axis_label='state', y_axis_label='time (days)',
+                  x_range=s_x_sorted[0:cutoff - 1], width=750,
+                  tooltips=[("state", "@state"), ("Days", "@time")])
+
+    doub_state.vbar(top="time", x="state", width=1., fill_color='red', fill_alpha=0.2, source=doub_state_hover)
+    doub_state.xaxis.major_label_orientation = math.pi / 2
+
     # US state heatmap
 
     shapefile = '/Users/richarddubois/Code/Home/ne_110m_admin_1_states_provinces/ne_110m_admin_1_states_provinces.shp'
@@ -1038,12 +1100,12 @@ header_text = "Run on: " + datetime.now().strftime("%Y-%m-%d") + "  " + \
 
 att_div = Div(text=header_text)
 
-base_layout = layout(att_div, row(target, overlay), row(over_smooths, cta), row(a, r), row(p_hist, t))
+base_layout = layout(att_div, row(target, overlay), row(over_smooths, cta), doub, row(a, r), row(p_hist, t))
 
 if len(state_counts_sorted) == 0:
     l = base_layout
 else:
-    l = layout(base_layout, row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), row(ca))
+    l = layout(base_layout, row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), doub_state, row(ca))
 
 output_file(args.output)
 save(l, title=args.source + " Analysis: " + args.type)
