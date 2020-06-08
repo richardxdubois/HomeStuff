@@ -124,6 +124,22 @@ def substitute_name(name):
             new_name = "Moldova"
         elif name == "Iran (Islamic Republic of)":
             new_name = "Iran"
+        elif name == "Russian Federation":
+            new_name = "Russia"
+        elif name == "Viet Nam":
+            new_name = "Vietnam"
+        elif name == "Lao People's Democratic Republic":
+            new_name = "Laos"
+        elif name == "Democratic Republic of the Congo":
+            new_name = "Congo"
+        elif "Ivoire" in name:
+            new_name = "Ivory Coast"
+        elif name == "Syrian Arab Republic":
+            new_name = "Syria"
+        elif name == "Bolivia (Plurinational State of)":
+            new_name = "Bolivia"
+        elif name == "Venezuela (Bolivarian Republic of)":
+            new_name = "Venezuala"
 
     return new_name
 
@@ -171,7 +187,7 @@ def calculate_doubling(in_array, window=7):
     return doubling_time
 
 
-def make_time_plot(place_1, place_dict, place_2=None, window_len=11):
+def make_time_plot(place_1, place_dict, place_2=None, window_len=11, y_axis="log"):
 
     x_1 = np.array(list(place_dict[place_1].keys()))
     y_1 = np.array(list(place_dict[place_1].values()))
@@ -205,7 +221,7 @@ def make_time_plot(place_1, place_dict, place_2=None, window_len=11):
         m_title = "counts vs Date: " + args.type + " : " + place_1
 
     m = figure(tools=TOOLS, title=m_title, x_axis_type="datetime", x_axis_label='Date',
-               y_axis_label='counts', width=750, y_axis_type="log")
+               y_axis_label='counts', width=750, y_axis_type=y_axis)
 
     m_hover_tool = HoverTool(tooltips=[("date", "@date{%F}"), ("counts", "@counts")])
     m_hover_tool.formatters = {"date": "datetime"}
@@ -253,11 +269,13 @@ def overlay_smooths(place_list, place_dict, window_len=11):
 
         len_diff = max_len - len(y_smooth)
         if len_diff > 0:
-            y_smooth = np.append(y_smooth, np.zeros(len_diff))
+            y_smooth = np.append(y_smooth, np.zeros(len_diff), axis=None)
 
         m.line(x=x_days, y=y_smooth, line_color=next(colors), line_width=2, legend_label=place)
 
         ic += 1
+
+    m.legend.location = "bottom_right"
 
     return m
 
@@ -279,7 +297,7 @@ def make_start_hist(t_array, title=None):
     return p_hist
 
 
-def make_starts_map(s_x_state, s_starts, s_st_hover):
+def make_starts_map(s_x_state, s_starts, s_st_hover, maxed_out=False):
 
     # US state heatmap
 
@@ -308,11 +326,13 @@ def make_starts_map(s_x_state, s_starts, s_st_hover):
 
     # Create figure object.
 
-    high_state = max(s_starts)
+    high_state = int(datetime.today().timestamp()) * 1000.
+    if maxed_out:
+        high_state = max(s_starts)
 
     t_color_mapper = LinearColorMapper(palette=palette2,
                                        low=int(datetime.strptime("3/01/20", '%m/%d/%y').timestamp()) * 1000.,
-                                       high=int(datetime.today().timestamp()) * 1000.)
+                                       high=high_state)
     t_color_bar = ColorBar(color_mapper=t_color_mapper, label_standoff=8, width=500, height=20,
                            border_line_color=None, location=(0, 0), orientation='horizontal',
                            formatter=DatetimeTickFormatter())
@@ -343,7 +363,8 @@ def parse_counties(csv_files=None):
     n_dates = 0
 
     bay_area_counties = ["San Mateo", "West Santa Clara", "San Francisco", "Alameda", "San Jose", "Oakland",
-                         "South San Francisco", "Half Moon Bay", "Fremont", "Berkeley", "Hayward"]
+                         "South San Francisco", "Half Moon Bay", "Fremont", "Berkeley", "Hayward", "Santa Cruz",
+                         "Los Angeles", "Orange", "San Diego"]
 
     today = datetime.today()
 
@@ -421,11 +442,10 @@ def parse_states(csv_files=None):
         for index, c_row in csv_final.iterrows():
 
             state_abbrev = unidecode(c_row["state"])
-            if state_abbrev == "State":  # ignore header line
+            if state_abbrev == "state":  # ignore header line
                 continue
 
             state = str(us.states.lookup(state_abbrev))
-
             if args.type == "Deaths":
                 day_count = c_row["death"]
             else:
@@ -455,8 +475,9 @@ def parse_states(csv_files=None):
             t = state_dates_counts[state].setdefault(dt, s_y_sorted[it])
             if it > 0:
                 diff = state_dates_counts[state][dt] - s_y_sorted[it - 1]
-                if diff > 0:
-                    state_dates_counts[state][dt] -= s_y_sorted[it-1]
+#                if diff > 0:
+#                state_dates_counts[state][dt] -= s_y_sorted[it-1]
+                state_dates_counts[state][dt] = diff
 
     state_counts_sorted = OrderedDict({k: v for k, v in sorted(state_counts.items(), key=lambda item: item[1],
                                                                  reverse=True)})
@@ -619,11 +640,26 @@ def parse_JHU(csv_files=None):
         dates_counts, country_counts, state_counts
 
 
+def parse_iso_order_dates(list_file):
+
+    csv_assign = pandas.read_csv(list_file, header=0, skipinitialspace=True)
+
+    start_by_place = {}
+    for index, c_row in csv_assign.iterrows():
+        place = c_row["placeLabel"]
+        dt = c_row["isoStartDate"]
+        start_by_place[place] = dt
+
+    return start_by_place
+
+
 # Command line arguments
 parser = argparse.ArgumentParser(description='Analyze the SRM-derived WBS information')
 
 parser.add_argument('--source', default='ECDC', help="type of source data [ECDC or JHU] (default=%(default)s)")
 parser.add_argument('--files', default='jhu_files.txt', help="lists of files (default=%(default)s)")
+parser.add_argument('--isoDate', default='/Users/richarddubois/Code/Home/US-isolation-dates.csv',
+                    help="file with isolation order dates (default=%(default)s)")
 parser.add_argument('-o', '--output', default='jhu_analysis.html',
                     help="output bokeh html file (default=%(default)s)")
 parser.add_argument('-c', '--country', default="Italy",
@@ -632,6 +668,8 @@ parser.add_argument('--comp_country', default="China",
                     help="select country to overlay (default=%(default)s)")
 parser.add_argument('-s', '--state', default="New York",
                     help="select state (default=%(default)s)")
+parser.add_argument('--county', default="Los Angeles",
+                    help="select CA county (default=%(default)s)")
 parser.add_argument('-t', '--type', default="Deaths",
                     help="select country (default=%(default)s)")
 
@@ -653,6 +691,8 @@ TOOLS = "reset,save"
 n_dates, county_counts, county_dates_counts = parse_counties(jhu_files["Counties"])
 
 #  county data
+
+la_target = make_time_plot(place_1=args.county, place_dict=county_dates_counts, y_axis="linear")
 
 # create plot of counts per county. Reverse sort x axis (names) by count - ie most to least
 
@@ -988,6 +1028,9 @@ if len(state_counts_sorted) != 0:
 
     doubling_state = []
     sc_y = []
+    iso_dates_all = parse_iso_order_dates(list_file=args.isoDate)
+    iso_dates = []
+    iso_dates_str = []
 
     for s in s_x_sorted[0:cutoff-1]:
         s_dt_dict = state_dates_counts[s]
@@ -998,6 +1041,14 @@ if len(state_counts_sorted) != 0:
         sc_y.append(sd_y_sorted[-1])
         doubling_time_state = calculate_doubling(sd_y_sorted)
         doubling_state.append(doubling_time_state)
+        try:   # not in list
+            id = iso_dates_all[s]
+        except KeyError:
+            id = "2020-03-15T00:00:00Z"
+        id_dt = datetime.strptime(id, "%Y-%m-%dT00:00:00Z").timestamp()*1000.
+        iso_dates.append(id_dt)
+        iso_dates_str.append(id)
+
 
 # plot most recent
 
@@ -1089,12 +1140,23 @@ if len(state_counts_sorted) != 0:
     sf.add_layout(s_color_bar, 'below')
 
     ps = make_start_hist(s_starts)
-    sf_st = make_starts_map(s_x_state, s_starts, s_st_hover)
+    sf_st = make_starts_map(s_x_state, s_starts, s_st_hover, maxed_out=True)
 
-    st_tops = list(state_counts_sorted.keys())[0:6]
+    st_tops = list(state_counts_sorted.keys())[0:7]
     st_over_smooths = overlay_smooths(place_list=st_tops, place_dict=state_dates_counts)
     st_target = make_time_plot(place_1=args.state, place_dict=state_dates_counts, window_len=7)
 
+# doubling rate vs isolation order date
+
+    iso_state_hover = ColumnDataSource(dict({"state": s_x_sorted[0:cutoff - 1], "double": doubling_state,
+                                             "iso_date": iso_dates, "iso_str": iso_dates_str}))
+
+    iso_state = figure(tools=TOOLS, title="doubling time vs isol date", x_axis_label='date',
+                       y_axis_label='doubling rate', width=750,  x_axis_type="datetime",
+                  tooltips=[("state", "@state"), ("Date", "@iso_str"), ("Rate", "@double")])
+
+    iso_state.circle(x="iso_date", y="double", fill_color='blue', fill_alpha=0.2, source=iso_state_hover, size=10)
+    iso_state.xaxis.major_label_orientation = math.pi / 2
 
 # header
 
@@ -1114,12 +1176,20 @@ header_text = "Run on: " + datetime.now().strftime("%Y-%m-%d") + "  " + \
 
 att_div = Div(text=header_text)
 
-base_layout = layout(att_div, row(target, overlay), row(over_smooths, cta), doub, row(a, r), row(p_hist, t))
+global_layout = layout(row(target, overlay), row(over_smooths, cta), doub, row(a, r), row(p_hist, t))
 
-if len(state_counts_sorted) == 0:
-    l = base_layout
-else:
-    l = layout(base_layout, row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), row(doub_state, sr), row(ca))
+
+state_layout = layout(row(sa, sf), row(ps, sf_st), row(st_over_smooths, st_target), row(doub_state, sr),
+               iso_state)
+
+county_layout = row(ca, la_target)
+
+tab1 = Panel(child=global_layout, title="World")
+tab2 = Panel(child=state_layout, title="US States")
+tab3 = Panel(child=county_layout, title="CA Counties")
+tabs = Tabs(tabs=[tab1, tab2, tab3])
+
+full_layout = layout(att_div, tabs)
 
 output_file(args.output)
-save(l, title=args.source + " Analysis: " + args.type)
+save(full_layout, title=args.source + " Analysis: " + args.type)

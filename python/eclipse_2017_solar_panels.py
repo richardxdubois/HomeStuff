@@ -42,7 +42,8 @@ parser.add_argument('-f', '--dataFile', default="", help="name of data file (def
 parser.add_argument('-m', '--tmin', default="09:01:00", help="start timestamp (default=%(default)s)")
 parser.add_argument('-x', '--tmax', default="11:21:00", help="end timestamp (default=%(default)s)")
 parser.add_argument('-o', '--output', default="power.pdf", help="output file name (default=%(default)s)")
-parser.add_argument('-i', '--infile', default="", help="input file name for list of power files (default=%(default)s)")
+parser.add_argument('-i', '--infile', default="", help="input file name for list of eclipse files (default=%(default)s)")
+parser.add_argument('-a', '--allfile', default="", help="input file name for list of all power files (default=%(default)s)")
 
 args = parser.parse_args()
 
@@ -74,11 +75,31 @@ with PdfPages(args.output) as pdf:
     print 'Fraction of power left in ', args.tmin, ' and ', args.tmax, ' : ', frac_left, ' for ', sigSum, normalSum, ' kW-hrs'
 
     plt.figure(0)
-    plt.plot(t,signal,label='signal')
-    plt.plot(t,normal_shape,label='normal')
+    plt.plot(t,signal,label='signal', color='r')
+    plt.plot(t,normal_shape,label='normal', color='b')
+    plt.plot(t,powerDict['eclipse'],label='eclipse',color='g')
     plt.xticks(rotation=30)
     plt.tight_layout()
     plt.legend()
 
     pdf.savefig()
     plt.close()
+
+
+    plt.figure(1)
+    with open(args.allfile) as f:
+
+        for line in f:
+            fspec = line.strip('\n')
+
+            (t, p) = parse_file(fspec)
+            plt.plot(t,p,label=fspec)
+        plt.xticks(rotation=30)
+        plt.tight_layout()
+        plt.legend()
+
+        pdf.savefig()
+        plt.close()
+
+
+
