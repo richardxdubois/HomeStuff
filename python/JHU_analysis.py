@@ -942,7 +942,7 @@ json_data = json.dumps(merged_json)
 geosource = GeoJSONDataSource(geojson=json_data)
 
 # Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
-color_mapper = LogColorMapper(palette = palette, low = 0, high = np.max(a_y_sorted))
+color_mapper = LogColorMapper(palette = palette, low = 1., high = np.max(a_y_sorted))
 
 # Create color bar.
 color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8, width=500, height=20,
@@ -1122,7 +1122,7 @@ if len(state_counts_sorted) != 0:
 
     high_state = max(s_y_counts)
 
-    s_color_mapper = LogColorMapper(palette=palette, low = 0, high=high_state)
+    s_color_mapper = LogColorMapper(palette=palette, low = 1., high=high_state)
     s_color_bar = ColorBar(color_mapper=s_color_mapper, label_standoff=8, width=500, height=20,
                            border_line_color=None, location=(0, 0), orientation='horizontal')
 
