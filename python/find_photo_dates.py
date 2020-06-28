@@ -27,8 +27,11 @@ pix_file_list = os.listdir(pix_dir)
 pix_originals_dir = pix_dir + "/.picasaoriginals/"
 output_csv = args.output
 
-# make map of date stamps for the originals
-pix_originals_list = os.listdir(pix_originals_dir)
+# make map of date stamps for the originals, if any were edited/saved
+try:
+    pix_originals_list = os.listdir(pix_originals_dir)
+except FileNotFoundError:
+    pix_originals_list = []
 
 orig_map = {}
 print("files in " + pix_originals_dir + ": ", len(pix_originals_list))
