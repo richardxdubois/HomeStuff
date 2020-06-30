@@ -230,7 +230,7 @@ def make_time_plot(place_1, place_dict, place_2=None, window_len=11, y_axis="log
     m.line(x=x_sorted, y=y_smooth, line_color="red")
 
     if place_2 is not None:
-        m.line(x=x_sorted, y=y_2_smooth, line_color="black")
+        m.line(x=x_2_sorted, y=y_2_smooth, line_color="black")
 
     return m
 
