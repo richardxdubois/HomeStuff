@@ -502,7 +502,7 @@ def parse_ECDC(csv_files=None):
 
     for cats in csv_files:
         print("Using file ", cats)
-        csv_final = pandas.read_excel(cats, header=0, skipinitialspace=True)
+        csv_final = pandas.read_csv(cats, header=0, skipinitialspace=True, infer_datetime_format=True)
 #        csv_drop_cols = csv_assign.dropna(axis="columns", how="all")
 #       csv_final = csv_drop_cols.fillna(0.)
 
@@ -524,7 +524,7 @@ def parse_ECDC(csv_files=None):
                 continue
 
             ecdc_date = c_row["dateRep"]
-            dt_date = ecdc_date.to_pydatetime()
+            dt_date = datetime.strptime(ecdc_date, "%d/%m/%Y")
 
             try:
                 country_counts[country_region] += day_count
