@@ -69,6 +69,20 @@ def update_button(who):
 
 
 qjs1 = """
+    function get_offset(name) {
+        var offset = 0
+
+        if (name.indexOf("Switch") != -1) {
+         offset = 4
+        }
+        if (name.indexOf("Outlet") != -1) {
+            offset = 0
+            }
+        if (name.indexOf("Room") != -1) {
+            offset = 2
+            }
+        return offset
+        }
     var h1 = hub + "devices" + "/" + device
     var h2 = "?access_token=" + token
     var h3 = h1 + h2
@@ -82,17 +96,8 @@ qjs1 = """
        var r = JSON.parse(qhttp.response)
        var dev = r.name
        //console.log(dev, r.name, r)
-       var offset = 0
-        if (dev.indexOf("Switch") != -1) {
-            offset = 4
-            }
-        if (dev.indexOf("Outlet") != -1) {
-            offset = 0
-            }
-        if (dev.indexOf("Room") != -1) {
-            offset = 2
-            }
 
+       var offset = get_offset(dev)
        var switch_value = r.attributes[offset].currentValue
        if (switch_value == 'on') {
          button.button_type = "danger"
@@ -141,6 +146,20 @@ def refresh_cb():
 
 
 js_refresh = """
+    function get_offset(name) {
+        var offset = 0
+
+        if (name.indexOf("Switch") != -1) {
+         offset = 4
+        }
+        if (name.indexOf("Outlet") != -1) {
+            offset = 0
+            }
+        if (name.indexOf("Room") != -1) {
+            offset = 2
+            }
+        return offset
+        }
     var h1 = hub + "/devices/"
     var h2 = "?access_token=" + token
     const rhttp = []
@@ -157,16 +176,7 @@ js_refresh = """
          var r = JSON.parse(rhttp[i].response)
          //console.log(r)
          var dev = r.name
-         var offset = 0
-         if (dev.indexOf("Switch") != -1) {
-            offset = 4
-            }
-         if (dev.indexOf("Outlet") != -1) {
-            offset = 0
-            }
-        if (dev.indexOf("Room") != -1) {
-            offset = 2
-            }
+         var offset = get_offset(dev)
         var switch_value = r.attributes[offset].currentValue
         //console.log(dev, switch_value)
          if (switch_value == 'on') {
