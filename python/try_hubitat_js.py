@@ -78,7 +78,7 @@ qjs1 = """
     qhttp.overrideMimeType('json');
     qhttp.onreadystatechange = function () {
       if (qhttp.readyState === qhttp.DONE && qhttp.status === 200) {
-       console.log(qhttp.response);
+       //console.log(qhttp.response);
        var r = JSON.parse(qhttp.response)
        var dev = r.name
        //console.log(dev, r.name, r)
@@ -89,6 +89,9 @@ qjs1 = """
         if (dev.indexOf("Outlet") != -1) {
             offset = 0
             }
+        if (dev.indexOf("Room") != -1) {
+            offset = 2
+            }
 
        var switch_value = r.attributes[offset].currentValue
        if (switch_value == 'on') {
@@ -98,19 +101,20 @@ qjs1 = """
          button.button_type = "success"
         }
        //console.log(cb_obj.origin.properties.button_type.spec)
-      }
-    }
-    qhttp.send()
-    var xhttp = new XMLHttpRequest();
-    var set_state = "off"
+           var xhttp = new XMLHttpRequest();
+     var set_state = "on"
     // for some reason the button_type doesn't seem to refresh, so assume it will change state
-    if (button.button_type == "danger") {
-        set_state = "on"
+     if (button.button_type == "danger") {
+        set_state = "off"
     }
     var command = h1 + '/' + set_state + h2
     //console.log(command)
     xhttp.open("GET", command, true)
     xhttp.send()
+
+      }
+    }
+    qhttp.send()
 """
 
 
@@ -143,7 +147,7 @@ js_refresh = """
     for (let i in b_map) {
       var id = b_map[i]
       var h3 = h1 + id + h2
-      console.log(h3)
+      //console.log(h3)
       rhttp.push(new XMLHttpRequest());
       rhttp[i].open("GET",h3)
       rhttp[i].overrideMimeType('json');
@@ -160,7 +164,11 @@ js_refresh = """
          if (dev.indexOf("Outlet") != -1) {
             offset = 0
             }
-         var switch_value = r.attributes[offset].currentValue
+        if (dev.indexOf("Room") != -1) {
+            offset = 2
+            }
+        var switch_value = r.attributes[offset].currentValue
+        //console.log(dev, switch_value)
          if (switch_value == 'on') {
            buttons[i].button_type = "success"
           }
