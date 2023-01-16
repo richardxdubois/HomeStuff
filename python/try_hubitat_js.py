@@ -1,9 +1,11 @@
 from pyhubitat import MakerAPI
-from functools import partial
 from bokeh.layouts import row, layout, column
 from bokeh.models.widgets import TextInput, Dropdown, Slider, Button, Div
 from bokeh.plotting import figure, output_file, show, save, curdoc
 from bokeh.models.callbacks import CustomJS
+from bokeh.resources import Resources
+from bokeh.embed import components
+from jinja2 import Template
 from astral import LocationInfo
 from astral.location import Location
 from astral.sun import sun
@@ -56,19 +58,7 @@ for d in devices:
     incr += 1
 
 
-def update_button(who):
-    id = b_map[who]
-    d_status = ph.device_status(id)
-    switch_val = d_status["switch"]["currentValue"]
-    if switch_val == "off":
-        buttons[who].button_type = "success"
-        ph.send_command(id, "on")
-    else:
-        buttons[who].button_type = "danger"
-        ph.send_command(id, "off")
-
-
-qjs1 = """
+get_offset_js = """
     function get_offset(name) {
         var offset = 0
 
@@ -83,6 +73,13 @@ qjs1 = """
             }
         return offset
         }
+"""
+resources = Resources().render()
+
+# appending your resources to the existing resources
+resources = resources + '''\n<script type='text/javascript'> ''' + get_offset_js + '''</script>'''
+
+qjs1 = """
     var h1 = hub + "devices" + "/" + device
     var h2 = "?access_token=" + token
     var h3 = h1 + h2
@@ -146,20 +143,6 @@ def refresh_cb():
 
 
 js_refresh = """
-    function get_offset(name) {
-        var offset = 0
-
-        if (name.indexOf("Switch") != -1) {
-         offset = 4
-        }
-        if (name.indexOf("Outlet") != -1) {
-            offset = 0
-            }
-        if (name.indexOf("Room") != -1) {
-            offset = 2
-            }
-        return offset
-        }
     var h1 = hub + "/devices/"
     var h2 = "?access_token=" + token
     const rhttp = []
@@ -203,5 +186,35 @@ refresh_button.js_on_click(refresh_cb_js)
 
 m = layout(del_div, column(buttons), refresh_button)
 
-output_file("try_hubitat_js.html")
-save(m, title="Hubitat JS Dashboard")
+#output_file("try_hubitat_js.html")
+#save(m, title="Hubitat JS Dashboard")
+
+script, div = components(m)
+
+# modelled template off the standard bokeh one (i.e. using bokeh.plotting.save)
+
+template = Template('''<!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <title>''' + '''Hubitat JS Dashboard''' + '''</title>
+                {{ resources }}
+                {{ script }}
+            </head>
+            <body>
+                <div>
+                {{ div }}
+                </div>
+            </body>
+        </html>
+        ''')
+resources = Resources().render()
+
+# appending your resources to the existing resources
+resources = resources + '''\n<script type='text/javascript'> ''' + get_offset_js + '''</script>'''
+# put it together and write it
+html = template.render(resources=resources,
+                       script=script,
+                       div=div)
+with open('try_hubitat_js.html', mode="w", encoding="utf-8") as out:
+    out.write(html)
