@@ -176,6 +176,9 @@ js_refresh = """
     }
 """
 
+logo_svg = '<img src="hub-logo.svg" alt="Hubitat" width="128">'
+logo = Div(text=logo_svg)
+
 del_div = Div(text="Run on: " + datetime.datetime.now().strftime("%Y-%m-%d") + " Evening on at " +
                    evening_on.strftime("%H:%M:%S"))
 
@@ -184,10 +187,7 @@ refresh_cb_js = CustomJS(args=(dict(b_map=b_map, buttons=buttons, div=del_div, h
 
 refresh_button.js_on_click(refresh_cb_js)
 
-m = layout(del_div, column(buttons), refresh_button)
-
-#output_file("try_hubitat_js.html")
-#save(m, title="Hubitat JS Dashboard")
+m = layout(logo, del_div, column(buttons), refresh_button)
 
 script, div = components(m)
 
