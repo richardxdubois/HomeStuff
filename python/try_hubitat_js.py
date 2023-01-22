@@ -201,7 +201,7 @@ template = Template('''<!DOCTYPE html>
                 {{ resources }}
                 {{ script }}
             </head>
-            <body>
+            <body bgcolor="#DBF9FC">
                 <div>
                 {{ div }}
                 </div>
@@ -210,7 +210,7 @@ template = Template('''<!DOCTYPE html>
         ''')
 resources = Resources().render()
 
-# appending your resources to the existing resources
+# append resources to the existing resources
 resources = resources + '''\n<script type='text/javascript'> ''' + get_offset_js + '''</script>'''
 # put it together and write it
 html = template.render(resources=resources,
