@@ -158,6 +158,12 @@ class animate_gps_multi_trajectories():
         save(canvas_layout, title="Animate GPS Multi Trajectories")
 
     def latlon_to_mercator(self, lat, lon):
+        """
+        convert latitude and longitudue to mercator projection
+        :param lat:
+        :param lon:
+        :return:
+        """
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857")
         return transformer.transform(lat, lon)
 
