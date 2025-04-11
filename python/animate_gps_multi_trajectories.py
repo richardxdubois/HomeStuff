@@ -1,7 +1,7 @@
 import numpy as np
 from bokeh.io import curdoc
 from bokeh.layouts import column, layout, row
-from bokeh.models import ColumnDataSource, Slider, Button, Toggle, CustomJS, Div
+from bokeh.models import ColumnDataSource, Slider, Button, Toggle, CustomJS, Div, Legend
 from bokeh.plotting import figure, save, show, output_file
 from bokeh.palettes import Viridis256
 
@@ -42,6 +42,13 @@ class animate_gps_multi_trajectories():
         self.refresh_rate = data["refresh_rate"]
         self.slider_start = data["slider_start"]
         self.slider_end = data["slider_end"]
+        self.full_trajectories = data["full_trajectories"]
+        self.animate = data["animate"]
+        self.trajectory_slice = data["trajectory_slice"]
+
+        self.animation_dotsize = data["animation_dotsize"]
+        self.trajectory_dotsize = data["trajectory_dotsize"]
+        self.trajectory_alpha = data["trajectory_alpha"]
 
         self.html_name = self.html_dir + Path(self.infile_list[0]).stem + ".html"
 
@@ -60,6 +67,7 @@ class animate_gps_multi_trajectories():
         self.source = ColumnDataSource()
         self.mercator_x = {}
         self.mercator_y = {}
+        self.total_distance = {}
 
         self.x_min = {}
         self.y_min = {}
@@ -72,7 +80,7 @@ class animate_gps_multi_trajectories():
                                      title="Refresh Rate (ms)")
 
         # Create a Toggle button for start/stop
-        self.toggle = Toggle(label="Start", button_type="success", active=False)
+        self.toggle = Toggle(label="Start Animation", button_type="success", active=False)
 
         for infile in self.infile_list:
             g_file = self.data_dir + "/" + infile
@@ -126,13 +134,14 @@ class animate_gps_multi_trajectories():
                     //console.log('Updated index', index[0]);
                 """)
 
-        div_text, anim = self.setup_figures(name=self.file_stems[0])
+        div_text, anim, legend = self.setup_figures(name=self.file_stems[0])
 
         # Toggle button callback
         self.toggle.js_on_change("active", CustomJS(args=dict(slider=self.refresh_slider,
                                                               toggle=self.toggle, callback=self.callback), code="""
                     if (toggle.active) {
                         toggle.label = "Stop";  // Change button label to Stop
+                        toggle.button_type = "danger";
                         // Start the animation loop
                         let idx = 0
                         const refreshRate = slider.value;  // Get refresh rate from the slider
@@ -147,19 +156,24 @@ class animate_gps_multi_trajectories():
 
                         animate();  // Start the animation sequence
                     } else {
-                        toggle.label = "Start";  // Change button label to Start
+                        toggle.label = "Start Animation";  // Change button label to Start
+                        toggle.button_type = "success";
                     }
                 """))
 
+        if not self.animate:
+            self.toggle.visible = False
+            self.refresh_slider.visible = False
+
         # Layout the application
-        canvas_layout = column(div_text, self.toggle, self.refresh_slider, anim)
+        canvas_layout = column(div_text, row(self.toggle, self.refresh_slider), column(anim))
         output_file(self.html_name)
 
         save(canvas_layout, title="Animate GPS Multi Trajectories")
 
     def latlon_to_mercator(self, lat, lon):
         """
-        convert latitude and longitudue to mercator projection
+        convert latitude and longitude to mercator projection
         :param lat:
         :param lon:
         :return:
@@ -179,7 +193,6 @@ class animate_gps_multi_trajectories():
         self.time = []
         self.speed = []
         self.elev = []
-        self.total_distance = []
 
         self.next_merc_x = []
         self.next_merc_y = []
@@ -219,7 +232,8 @@ class animate_gps_multi_trajectories():
 
                     self.speed.append(p_speed)
                     running_distance += distance
-                    self.total_distance.append(running_distance)
+                    self.total_distance.setdefault(self.current_file_stem, [])
+                    self.total_distance[self.current_file_stem].append(running_distance)
 
                     # line.coords = [(point.longitude, point.latitude, point.elevation) for point in segment.points]
                     coords.append((point.longitude, point.latitude, point.elevation))
@@ -279,7 +293,7 @@ class animate_gps_multi_trajectories():
 
         t_hist = figure(title="Latitude vs Longitude",
                         x_axis_label='Longitude (deg)', y_axis_label='Latitude (deg)',
-                        width=1000,
+                        width=1400,
                         x_range=(x_min, x_max), y_range=(y_min, y_max),
                         x_axis_type="mercator", y_axis_type="mercator")
 
@@ -299,12 +313,25 @@ class animate_gps_multi_trajectories():
             "#17becf",  # Cyan
         ]
 
+        leg = []
         for i, k in enumerate(self.file_stems):
-            t_hist.scatter(x="x_"+k, y="y_"+k, source=self.source_anim, color=unique_colors[i], size=10, legend_label=k)
+            tot_dist = self.total_distance[k][-1]
+            lab = k + f" ({tot_dist:.1f} mi)"
+            leg.append((lab, [t_hist.scatter(x="x_"+k, y="y_"+k, source=self.source_anim, color=unique_colors[i],
+                              size=self.animation_dotsize, legend_label=lab)]))
+            if self.full_trajectories:
+                t_hist.scatter(x=self.mercator_x[k][::self.trajectory_slice],
+                               y=self.mercator_y[k][::self.trajectory_slice],
+                               color=unique_colors[i],
+                               size=self.trajectory_dotsize, alpha=self.trajectory_alpha)
+        legend = Legend(items=leg)
+
+        t_hist.legend.visible = False
+        t_hist.add_layout(legend, 'right')
 
         del_div = Div(text="Multi + " + name + " Run on: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-        return del_div, t_hist
+        return del_div, t_hist, legend
 
 
 if __name__ == "__main__":
