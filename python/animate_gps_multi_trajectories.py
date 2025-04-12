@@ -1,7 +1,7 @@
 import numpy as np
 from bokeh.io import curdoc
 from bokeh.layouts import column, layout, row
-from bokeh.models import ColumnDataSource, Slider, Button, Toggle, CustomJS, Div, Legend
+from bokeh.models import ColumnDataSource, Slider, Button, Toggle, CustomJS, Div, Legend, Span
 from bokeh.plotting import figure, save, show, output_file
 from bokeh.palettes import Viridis256
 
@@ -74,6 +74,8 @@ class animate_gps_multi_trajectories():
         self.x_max = {}
         self.y_max = {}
 
+        self.horizontal_lines = []
+
         # Create a slider for refresh rate
         step = (self.slider_end - self.slider_start)/100.
         self.refresh_slider = Slider(start=self.slider_start, end=self.slider_end, value=self.refresh_rate, step=step,
@@ -96,19 +98,22 @@ class animate_gps_multi_trajectories():
 
         self.anim_kwargs = {}
         for fs in self.file_stems:
-            self.anim_kwargs["x_" + fs] = []
-            self.anim_kwargs["y_" + fs] = []
+            self.anim_kwargs["x_" + fs] = [0., 0.]
+            self.anim_kwargs["y_" + fs] = [0., 0.]
 
         self.source_anim = ColumnDataSource(data=dict(**self.anim_kwargs))
 
        # Create the JavaScript callback for updating the plot
-        self.callback = CustomJS(args=dict(source=self.source_anim, x=self.mercator_x, y=self.mercator_y, index=idx,
+        self.callback = CustomJS(args=dict(source=self.source_anim, x=self.mercator_x, y=self.mercator_y,
+                                           dist=self.total_distance, horiz=self.horizontal_lines, index=idx,
                                            kw=self.anim_kwargs),
                                  code="""
 
                     const data = source.data;
                     const x_dict = x
                     const y_dict = y
+                    const dist_js = dist
+                    
                     //console.log('Entered callback for ', length, index[0]);
                     let length = 0;
 
@@ -126,6 +131,15 @@ class animate_gps_multi_trajectories():
                     for (const keyy in y_dict) {
                         data['y_' + keyy] = [y_dict[keyy][index[0]], y_dict[keyy][(index[0] + 1) % length]];
                     }
+                    let id = 0;
+                    for (const keyd in dist_js) {
+                        //data['dist_' + keyd] = [dist_js[keyd][index[0]], dist_js[keyd][(index[0] + 1) % length]];
+                        dist = dist_js[keyd][index[0]];
+                        if (typeof dist !== 'undefined') {
+                        horiz[id].location = dist;
+                        }
+                        id = id +1
+                    }
                     //console.log('x,y = ', source.data['x'], source.data['y']);
                     source.change.emit();
 
@@ -134,7 +148,7 @@ class animate_gps_multi_trajectories():
                     //console.log('Updated index', index[0]);
                 """)
 
-        div_text, anim, legend = self.setup_figures(name=self.file_stems[0])
+        div_text, anim, d_hist, legend = self.setup_figures(name=self.file_stems[0])
 
         # Toggle button callback
         self.toggle.js_on_change("active", CustomJS(args=dict(slider=self.refresh_slider,
@@ -166,7 +180,7 @@ class animate_gps_multi_trajectories():
             self.refresh_slider.visible = False
 
         # Layout the application
-        canvas_layout = column(div_text, row(self.toggle, self.refresh_slider), column(anim))
+        canvas_layout = column(div_text, row(self.toggle, self.refresh_slider), row(d_hist, anim))
         output_file(self.html_name)
 
         save(canvas_layout, title="Animate GPS Multi Trajectories")
@@ -300,6 +314,16 @@ class animate_gps_multi_trajectories():
         # https://xyzservices.readthedocs.io/en/stable/introduction.html
         t_hist.add_tile(getattr(xyz.Esri, self.map))
 
+        max_dist = 0.
+        for k in self.file_stems:
+            max_dist = max(max_dist, self.total_distance[k][-1])
+        print("max_dist", max_dist)
+
+        d_hist = figure(y_axis_label='Distance (mi)', width=100, height=640, x_range=(0., 1.),
+                        y_range=(0, max_dist*1.1), tools="")
+        d_hist.xaxis.visible = False  # Hide x-axis
+        d_hist.xgrid.grid_line_color = None  # Remove x-grid lines
+
         unique_colors = [
             "#1f77b4",  # Blue
             "#ff7f0e",  # Orange
@@ -319,6 +343,11 @@ class animate_gps_multi_trajectories():
             lab = k + f" ({tot_dist:.1f} mi)"
             leg.append((lab, [t_hist.scatter(x="x_"+k, y="y_"+k, source=self.source_anim, color=unique_colors[i],
                               size=self.animation_dotsize, legend_label=lab)]))
+
+            self.horizontal_lines.append(Span(location=tot_dist, dimension="width",
+                                   line_color=unique_colors[i], line_width=2))
+            d_hist.add_layout(self.horizontal_lines[i])
+
             if self.full_trajectories:
                 t_hist.scatter(x=self.mercator_x[k][::self.trajectory_slice],
                                y=self.mercator_y[k][::self.trajectory_slice],
@@ -331,7 +360,7 @@ class animate_gps_multi_trajectories():
 
         del_div = Div(text="Multi + " + name + " Run on: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-        return del_div, t_hist, legend
+        return del_div, t_hist, d_hist, legend
 
 
 if __name__ == "__main__":
