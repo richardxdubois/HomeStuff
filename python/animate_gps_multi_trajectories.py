@@ -45,6 +45,7 @@ class animate_gps_multi_trajectories():
         self.full_trajectories = data["full_trajectories"]
         self.animate = data["animate"]
         self.trajectory_slice = data["trajectory_slice"]
+        self.altitude = data["altitude"]
 
         self.animation_dotsize = data["animation_dotsize"]
         self.trajectory_dotsize = data["trajectory_dotsize"]
@@ -68,6 +69,7 @@ class animate_gps_multi_trajectories():
         self.mercator_x = {}
         self.mercator_y = {}
         self.total_distance = {}
+        self.elev = {}
 
         self.x_min = {}
         self.y_min = {}
@@ -75,6 +77,7 @@ class animate_gps_multi_trajectories():
         self.y_max = {}
 
         self.horizontal_lines = []
+        self.elev_lines = []
 
         # Create a slider for refresh rate
         step = (self.slider_end - self.slider_start)/100.
@@ -105,6 +108,7 @@ class animate_gps_multi_trajectories():
 
        # Create the JavaScript callback for updating the plot
         self.callback = CustomJS(args=dict(source=self.source_anim, x=self.mercator_x, y=self.mercator_y,
+                                           elev=self.elev, elev_line=self.elev_lines,
                                            dist=self.total_distance, horiz=self.horizontal_lines, index=idx,
                                            kw=self.anim_kwargs),
                                  code="""
@@ -113,6 +117,7 @@ class animate_gps_multi_trajectories():
                     const x_dict = x
                     const y_dict = y
                     const dist_js = dist
+                    const elev_js = elev
                     
                     //console.log('Entered callback for ', length, index[0]);
                     let length = 0;
@@ -134,9 +139,13 @@ class animate_gps_multi_trajectories():
                     let id = 0;
                     for (const keyd in dist_js) {
                         //data['dist_' + keyd] = [dist_js[keyd][index[0]], dist_js[keyd][(index[0] + 1) % length]];
-                        dist = dist_js[keyd][index[0]];
+                        let dist = dist_js[keyd][index[0]];
                         if (typeof dist !== 'undefined') {
                         horiz[id].location = dist;
+                        }
+                        let el = elev_js[keyd][index[0]];
+                        if (typeof el !== 'undefined') {
+                            elev_line[id].location = el;
                         }
                         id = id +1
                     }
@@ -148,7 +157,7 @@ class animate_gps_multi_trajectories():
                     //console.log('Updated index', index[0]);
                 """)
 
-        div_text, anim, d_hist, legend = self.setup_figures(name=self.file_stems[0])
+        div_text, anim, d_hist, e_hist, legend = self.setup_figures(name=self.file_stems[0])
 
         # Toggle button callback
         self.toggle.js_on_change("active", CustomJS(args=dict(slider=self.refresh_slider,
@@ -179,8 +188,11 @@ class animate_gps_multi_trajectories():
             self.toggle.visible = False
             self.refresh_slider.visible = False
 
+        if not self.altitude:
+            e_hist.visible = False
+
         # Layout the application
-        canvas_layout = column(div_text, row(self.toggle, self.refresh_slider), row(d_hist, anim))
+        canvas_layout = column(div_text, row(self.toggle, self.refresh_slider), row(d_hist, column(anim, e_hist)))
         output_file(self.html_name)
 
         save(canvas_layout, title="Animate GPS Multi Trajectories")
@@ -206,7 +218,6 @@ class animate_gps_multi_trajectories():
         self.lon = []
         self.time = []
         self.speed = []
-        self.elev = []
 
         self.next_merc_x = []
         self.next_merc_y = []
@@ -228,7 +239,8 @@ class animate_gps_multi_trajectories():
                     time_tz = point.time.astimezone(timezone)
                     self.time.append(time_tz)
 
-                    self.elev.append(point.elevation * 3.28084)
+                    self.elev.setdefault(self.current_file_stem, [])
+                    self.elev[self.current_file_stem].append(point.elevation * 3.28084)
                     distance = 0.
 
                     if ip > 0:
@@ -315,14 +327,24 @@ class animate_gps_multi_trajectories():
         t_hist.add_tile(getattr(xyz.Esri, self.map))
 
         max_dist = 0.
-        for k in self.file_stems:
+        max_max_elev = 0.
+        max_elev = []
+        for i, k in enumerate(self.file_stems):
             max_dist = max(max_dist, self.total_distance[k][-1])
-        print("max_dist", max_dist)
+            max_elev_k = max(self.elev[k])
+            max_elev.append(max_elev_k)
+            max_max_elev = max(max_max_elev, max_elev_k)
+        print("max_dist", max_dist, "max_elev", max_elev)
 
         d_hist = figure(y_axis_label='Distance (mi)', width=100, height=640, x_range=(0., 1.),
-                        y_range=(0, max_dist*1.1), tools="")
+                        y_range=(0, max_max_elev*1.1), tools="")
         d_hist.xaxis.visible = False  # Hide x-axis
         d_hist.xgrid.grid_line_color = None  # Remove x-grid lines
+
+        e_hist = figure(x_axis_label='Elevation (ft)', width=1400, height=100, y_range=(0., 1.),
+                        x_range=(0, max_elev[i]*1.1), tools="")
+        e_hist.yaxis.visible = False  # Hide y-axis
+        e_hist.ygrid.grid_line_color = None  # Remove x-grid lines
 
         unique_colors = [
             "#1f77b4",  # Blue
@@ -348,6 +370,10 @@ class animate_gps_multi_trajectories():
                                    line_color=unique_colors[i], line_width=2))
             d_hist.add_layout(self.horizontal_lines[i])
 
+            self.elev_lines.append(Span(location=max_elev[i], dimension="height",
+                                   line_color=unique_colors[i], line_width=2))
+            e_hist.add_layout(self.elev_lines[i])
+
             if self.full_trajectories:
                 t_hist.scatter(x=self.mercator_x[k][::self.trajectory_slice],
                                y=self.mercator_y[k][::self.trajectory_slice],
@@ -360,7 +386,7 @@ class animate_gps_multi_trajectories():
 
         del_div = Div(text="Multi + " + name + " Run on: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-        return del_div, t_hist, d_hist, legend
+        return del_div, t_hist, d_hist, e_hist, legend
 
 
 if __name__ == "__main__":
