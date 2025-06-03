@@ -20,6 +20,10 @@ from bokeh.palettes import Greys256  # For grayscale
 
 #   Conda env: pydicom
 #   Requirements:  pydicom (conda); ppylibjpeg[all] (pip install); scikit-image
+#
+#   Invoke: bokeh serve dicom_viewer.py --args --app_config "/Volumes/Data/Home/dicom_viewer.yaml"
+#
+#   View in browser at: http://localhost:5006/dicom_viewer
 
 
 class dicom_viewer():
@@ -48,7 +52,11 @@ class dicom_viewer():
 
         self.current_series = []
 
-        self.gamma = 1.
+        self.gamma_def = data["gamma_def"]
+        self.gamma = self.gamma_def
+
+        self.window_def = data["window_def"]
+        self.window = self.window_def
 
         self.message_log = []
 
@@ -134,7 +142,7 @@ class dicom_viewer():
 
         rc = self.create_widgets()
 
-        CT_layout = row(self.series_toggle_anim, self.CT_text_refresh, self.CT_slider_slice)
+        CT_layout = row(self.series_toggle_anim, self.CT_text_refresh, self.series_slider_slice)
         control_widgets = row(column(row(self.exit_button, self.db_dropdown, column(self.mode_div, self.mode),
                                          self.clip_button,
                                      column(self.gamma_slider, self.window_slider), self.name_dropdown),
@@ -310,9 +318,9 @@ class dicom_viewer():
 
         # Create a slider for CT refresh rate
         step = len(self.images_list)/100.
-        self.CT_slider_slice = Slider(start=0, end=len(self.images_list), value=0, step=step,
+        self.series_slider_slice = Slider(start=0, end=len(self.images_list), value=0, step=step,
                                      title="slice", visible=ct_visible)
-        self.CT_slider_slice.on_change("value_throttled", self.CT_slider_slice_cb)
+        self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
 
         # Create a Toggle button for CT start/stop
         self.series_toggle_anim = Toggle(label="Start Animation", button_type="success", active=False, visible=ct_visible)
@@ -343,7 +351,7 @@ class dicom_viewer():
         self.gamma_slider.on_change('value_throttled', self.gamma_cb)
 
         step = 0.05
-        self.window_slider = Slider(start=0, end=2., value=1., step=step, title="Window")
+        self.window_slider = Slider(start=0, end=2., value=self.window, step=step, title="Window")
         self.window_slider.on_change('value_throttled', self.window_cb)
 
         self.log_div = Div(text="Log:<br>", width=400, height=200)
@@ -388,7 +396,8 @@ class dicom_viewer():
             sel_key_list = list(self.series_map[self.selected_series].keys())
             normal = self.series_map[self.selected_series][i][3]
             try:
-                i_n.append(float(i))
+                #i_n.append(float(i))
+                i_n.append(self.series_map[self.selected_series][i][0])
             except ValueError:
                 i_floated = float(sel_key_list.index(i))
                 i_n.append(i_floated)
@@ -404,7 +413,8 @@ class dicom_viewer():
         z_i = self.series_map[self.selected_series][image_name][1][self.series_pos_index]
         i_n = image_name
         try:
-            i_n = float(image_name)
+            #i_n = float(image_name)
+            i_n = self.series_map[self.selected_series][image_name][0]
         except ValueError:
             i_n = float(sel_key_list.index(image_name))
 
@@ -438,7 +448,14 @@ class dicom_viewer():
         self.fig_image.title.text = image_name + self.title_postfix
 
     def db_dropdown_cb(self, attr, old, new):
+        """
+        Change in dataset means essentially a restart and reset to most things
 
+        :param attr:
+        :param old:
+        :param new:
+        :return:
+        """
         self.data_dir = self.data_db[new]
 
         rc = self.find_images()
@@ -457,6 +474,12 @@ class dicom_viewer():
 
             self.selected_series = self.series[0]
             self.series_pulldown.options = self.series
+            self.current_slice = 0
+
+            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
+            self.series_slider_slice.value = self.current_slice
+            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
+            self.series_slider_slice.end = len(self.current_series)
 
             self.series_pulldown.remove_on_change("value", self.series_cb)
             self.series_pulldown.value = self.current_series[0]
@@ -467,19 +490,28 @@ class dicom_viewer():
         self.series_pulldown.visible = (self.is_series)
         self.series_toggle_anim.button_type = "success"
 
-        xray = self.image_type == "X-Ray"
+        self.gamma_slider.remove_on_change("value_throttled", self.gamma_cb)
+        self.window_slider.remove_on_change("value_throttled", self.window_cb)
 
-        self.CT_text_refresh.visible = not xray
-        self.series_toggle_anim.visible = not xray
-        self.CT_slider_slice.visible = not xray
+        self.gamma_slider.value = self.gamma_def
+        self.window_slider.value = self.window_def
+
+        self.gamma_slider.on_change("value_throttled", self.gamma_cb)
+        self.window_slider.on_change("value_throttled", self.window_cb)
+
+        self.CT_text_refresh.visible = self.is_series
+        self.series_toggle_anim.visible = self.is_series
+        self.series_slider_slice.visible = self.is_series
         self.fig_series_positions.visible = self.is_series
 
         if "X-Ray" in self.sop_class_name:
             self.mode.active = 0
         elif "CT" in self.sop_class_name:
             self.mode.active = 1
-        else:
+        elif "MR" in self.sop_class_name:
             self.mode.active = 2
+        else:  # ultrasound
+            self.mode.active = 3
 
         rc = self.set_image_fig_title(self.image_name)
 
@@ -488,6 +520,14 @@ class dicom_viewer():
         self.generate_log_message(self.log_div, f"Get new imaging {new}")
 
     def series_cb(self, attr, old, new):
+        """
+        Select a new series. Set up for first image in that series.
+
+        :param attr:
+        :param old:
+        :param new:
+        :return:
+        """
         self.selected_series = new
         self.generate_log_message(self.log_div, f"Get new series {self.selected_series}")
 
@@ -512,12 +552,12 @@ class dicom_viewer():
 
         self.source.data["image"] = [self.processed_image]
 
-        self.CT_slider_slice.remove_on_change("value_throttled", self.CT_slider_slice_cb)
+        self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
 
-        self.CT_slider_slice.value = self.current_slice
-        self.CT_slider_slice.end = len(self.current_series)
+        self.series_slider_slice.value = self.current_slice
+        self.series_slider_slice.end = len(self.current_series)
 
-        self.CT_slider_slice.on_change("value_throttled", self.CT_slider_slice_cb)
+        self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
 
         self.generate_log_message(self.log_div, f"select new MRI series {new}")
 
@@ -630,7 +670,7 @@ class dicom_viewer():
             self.generate_log_message(self.log_div, "Hit whitespace! Try again")
             return
 
-    def CT_slider_slice_cb(self, attr, old, new):
+    def series_slider_slice_cb(self, attr, old, new):
 
         self.current_slice = int(new)
 
@@ -671,11 +711,11 @@ class dicom_viewer():
             if self.current_slice >= len(images_list):
                 self.current_slice = 0
 
-            self.CT_slider_slice.remove_on_change("value_throttled", self.CT_slider_slice_cb)
+            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
 
-            self.CT_slider_slice.value = self.current_slice
+            self.series_slider_slice.value = self.current_slice
 
-            self.CT_slider_slice.on_change("value_throttled", self.CT_slider_slice_cb)
+            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
 
             if self.debug:
                 self.generate_log_message(self.log_div, f"Animation image {image_name}")
