@@ -19,7 +19,7 @@ from bokeh.palettes import Greys256  # For grayscale
 # https://pydicom.github.io/pydicom/stable/index.html
 
 #   Conda env: pydicom
-#   Requirements:  pydicom (conda); ppylibjpeg[all] (pip install); scikit-image
+#   Requirements:  pydicom (conda); ppylibjpeg[all] (pip install); scikit-image; bokeh
 #
 #   Invoke: bokeh serve dicom_viewer.py --args --app_config "/Volumes/Data/Home/dicom_viewer.yaml"
 #
@@ -136,13 +136,15 @@ class dicom_viewer():
         self.fig_series_positions.scatter(x="x", y="y", color="blue", source=self.fig_MRI_source)
         self.fig_MRI_source_series = ColumnDataSource(data=dict({"y": [], "x": []}))
         self.fig_series_positions.scatter(x="x", y="y", color="black", source=self.fig_MRI_source_series)
-        self.fig_series_positions_titles = ["x positions", "y positions", "z positions"]
+        self.fig_series_positions_titles = ["x positions vs image instance", "y positions vs image instance",
+                                            "z positions vs image instance"]
 
         self.fig_series_positions.visible = self.is_series
 
         rc = self.create_widgets()
 
-        CT_layout = row(self.series_toggle_anim, self.CT_text_refresh, self.series_slider_slice)
+        CT_layout = row(self.series_toggle_anim, self.CT_text_refresh, self.series_slider_slice,
+                        self.increment_button, self.decrement_button)
         control_widgets = row(column(row(self.exit_button, self.db_dropdown, column(self.mode_div, self.mode),
                                          self.clip_button,
                                      column(self.gamma_slider, self.window_slider), self.name_dropdown),
@@ -157,6 +159,14 @@ class dicom_viewer():
         curdoc().clear()
         curdoc().add_root(canvas_layout)
         curdoc().title = "DICOM viewer"
+
+    def size_figures(self):
+
+        self.fig_image.x_range.end = self.width_scl
+        self.fig_image.y_range.end = self.height_scl
+
+        self.f_img.glyph.dw = self.width_scl
+        self.f_img.glyph.dh = self.height_scl
 
     def prepare_images(self):
 
@@ -221,7 +231,12 @@ class dicom_viewer():
 
             ds = pydicom.dcmread(p)
 
-            series = str(ds[0x0020, 0x0011].value)
+            # some images may not be actual images
+            try:
+                series = str(ds[0x0020, 0x0011].value)
+            except:
+                continue
+
             self.series_map.setdefault(series, {})
 
             instance = str(ds[0x0020, 0x0013].value)
@@ -332,6 +347,12 @@ class dicom_viewer():
         self.series_pulldown = Select(title="Pick series", value=None,
                                           visible=self.is_series)
 
+        self.increment_button = Button(label="Increment", button_type="success", visible=self.is_series)
+        self.increment_button.on_click(self.increment_cb)
+        self.decrement_button = Button(label="Decrement", button_type="danger", visible=self.is_series)
+        self.decrement_button.on_click(self.decrement_cb)
+
+
         self.name_dropdown = Select(title="Pick image", value=self.image_name, options=self.images_list)
 
         if self.is_series:
@@ -428,6 +449,7 @@ class dicom_viewer():
         self.path = self.data_dir + self.image_name
         rc = self.prepare_images()
         self.source.data["image"] = [self.processed_image]
+        self.size_figures()
 
         rc = self.set_image_fig_title(new)
 
@@ -475,6 +497,8 @@ class dicom_viewer():
             self.selected_series = self.series[0]
             self.series_pulldown.options = self.series
             self.current_slice = 0
+            self.histogram_positions()
+            self.series_scatter_pos(self.current_series[0])
 
             self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
             self.series_slider_slice.value = self.current_slice
@@ -486,6 +510,8 @@ class dicom_viewer():
             self.series_pulldown.on_change("value", self.series_cb)
 
             self.name_dropdown.options = self.current_series
+
+        self.size_figures()
 
         self.series_pulldown.visible = (self.is_series)
         self.series_toggle_anim.button_type = "success"
@@ -503,6 +529,8 @@ class dicom_viewer():
         self.series_toggle_anim.visible = self.is_series
         self.series_slider_slice.visible = self.is_series
         self.fig_series_positions.visible = self.is_series
+        self.increment_button.visible = self.is_series
+        self.decrement_button.visible = self.is_series
 
         if "X-Ray" in self.sop_class_name:
             self.mode.active = 0
@@ -547,8 +575,10 @@ class dicom_viewer():
         self.series_toggle_anim.button_type = "success"
 
         rc = self.prepare_images()
+        rc = self.set_image_fig_title(self.current_series[0])
 
         self.current_slice = 0
+        self.size_figures()
 
         self.source.data["image"] = [self.processed_image]
 
@@ -670,9 +700,7 @@ class dicom_viewer():
             self.generate_log_message(self.log_div, "Hit whitespace! Try again")
             return
 
-    def series_slider_slice_cb(self, attr, old, new):
-
-        self.current_slice = int(new)
+    def get_new_image(self):
 
         if not self.is_series:
             images_list = self.images_list
@@ -685,6 +713,40 @@ class dicom_viewer():
         rc = self.set_image_fig_title(images_list[self.current_slice])
 
         self.source.data["image"] = [self.processed_image]
+
+    def increment_cb(self):
+
+        if self.current_slice < len(self.current_series):
+            self.current_slice += 1
+
+            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
+            self.series_slider_slice.value = self.current_slice
+            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
+
+            self.get_new_image()
+            self.generate_log_message(self.log_div, f"Increment image to {self.current_slice}")
+        else:
+            self.generate_log_message(self.log_div, f"No increment. At max image {self.current_slice}")
+
+    def decrement_cb(self):
+
+        if self.current_slice > 0:
+            self.current_slice -= 1
+            self.get_new_image()
+
+            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
+            self.series_slider_slice.value = self.current_slice
+            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
+
+            self.generate_log_message(self.log_div, f"Decrement image to {self.current_slice}")
+        else:
+            self.generate_log_message(self.log_div, f"No decrement. At min image {self.current_slice}")
+
+    def series_slider_slice_cb(self, attr, old, new):
+
+        self.current_slice = int(new)
+
+        self.get_new_image()
 
         self.generate_log_message(self.log_div, f"Slider reset to {self.current_slice}")
 
@@ -839,7 +901,8 @@ class dicom_viewer():
         img_list = list(path.glob('*'))  # '*/' for non-recursive
 
         posix_list = np.sort([Path(file.as_posix()).name for file in img_list])
-        self.images_list = sorted(os.listdir(path), key=self.key_func)
+        files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+        self.images_list = sorted(files, key=self.key_func)
 
 
 d = dicom_viewer()
