@@ -223,7 +223,10 @@ class dicom_viewer():
         self.max_bright = np.max(self.processed_image)
 
     def categorize_series(self):
-
+        """
+        categorize MRI/CT by series and instance. Outcome in self.series_map.
+        :return:
+        """
         self.series_map = {}
 
         for n in self.images_list:
@@ -292,6 +295,12 @@ class dicom_viewer():
         return [min_x, max_x, min_y, max_y, min_z, max_z]
 
     def perform_gamma(self, image):
+        """
+        apply gamma correction to image
+
+        :param image:
+        :return:
+        """
         # Normalize to range 0-1
         image = image.astype(np.float64) / np.max(image)  # Important: Normalize *before* gamma
 
@@ -304,6 +313,11 @@ class dicom_viewer():
         return image
 
     def create_widgets(self):
+        """
+        define all the widgets and declare callbacks
+
+        :return:
+        """
 
         db_list = list(self.data_db.keys())
         self.db_dropdown = Select(title="Pick imaging", value=self.starter_images, options=db_list)
@@ -454,6 +468,11 @@ class dicom_viewer():
         rc = self.set_image_fig_title(new)
 
     def set_image_fig_title(self, image_name):
+        """
+        set the title on the imaging figure using metadata the current image. image_name is provided for the title
+        :param image_name:
+        :return:
+        """
 
         patient = self.ds.PatientName.given_name + " " + self.ds.PatientName.family_name
         try:
@@ -592,14 +611,28 @@ class dicom_viewer():
         self.generate_log_message(self.log_div, f"select new MRI series {new}")
 
     def gamma_cb(self, attr, old, new):
+        """
+        callback for gamma slider
 
+        :param attr:
+        :param old:
+        :param new:
+        :return:
+        """
         self.gamma = new
         self.processed_image = self.perform_gamma(self.clipped_image)
         self.source.data["image"] = [self.processed_image]
         self.generate_log_message(self.log_div, f"set gamma to {self.gamma}")
 
     def window_cb(self, attr, old, new):
+        """
+        callback for window slider
 
+        :param attr:
+        :param old:
+        :param new:
+        :return:
+        """
         self.color_mapper.high = self.max_bright * new
         self.generate_log_message(self.log_div, f"set window scale to {new}")
 
@@ -701,7 +734,10 @@ class dicom_viewer():
             return
 
     def get_new_image(self):
-
+        """
+        does the boilerplate for a new image
+        :return:
+        """
         if not self.is_series:
             images_list = self.images_list
         else:
@@ -715,7 +751,10 @@ class dicom_viewer():
         self.source.data["image"] = [self.processed_image]
 
     def increment_cb(self):
+        """
+        callback to increment the current image slice
 
+        """
         if self.current_slice < len(self.current_series):
             self.current_slice += 1
 
@@ -729,7 +768,10 @@ class dicom_viewer():
             self.generate_log_message(self.log_div, f"No increment. At max image {self.current_slice}")
 
     def decrement_cb(self):
-
+        """
+        callback to decrement the current image slice
+        :return:
+        """
         if self.current_slice > 0:
             self.current_slice -= 1
             self.get_new_image()
@@ -743,7 +785,13 @@ class dicom_viewer():
             self.generate_log_message(self.log_div, f"No decrement. At min image {self.current_slice}")
 
     def series_slider_slice_cb(self, attr, old, new):
-
+        """
+        callback to update the slice slider
+        :param attr:
+        :param old:
+        :param new:
+        :return:
+        """
         self.current_slice = int(new)
 
         self.get_new_image()
@@ -751,6 +799,11 @@ class dicom_viewer():
         self.generate_log_message(self.log_div, f"Slider reset to {self.current_slice}")
 
     def animate_series(self):
+        """
+        callback to instrument the animation
+
+        :return:
+        """
         if self.series_toggle_anim.active:
             if not self.is_series:
                 images_list = self.images_list
@@ -783,7 +836,12 @@ class dicom_viewer():
                 self.generate_log_message(self.log_div, f"Animation image {image_name}")
 
     def series_toggle_anim_cb(self, active):
+        """
+        callback to drive the amimation using curdoc's periodic_callback
 
+        :param active:
+        :return:
+        """
         self.series_toggle_active = active
 
         if self.series_toggle_active:
