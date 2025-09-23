@@ -32,9 +32,9 @@ class gps_photo_trajectories():
 
     Modes:
         - gpx routes only
-            - set correlate_photos_yaml to Null
+            - set photo_dir to Null
         - gpx + photos
-            - set data_dir & correlate_photos_yaml non Null
+            - set data_dir non Null
         - photos only
             - set data_dir to Null and set photo_dir
 
@@ -103,6 +103,8 @@ class gps_photo_trajectories():
         self.total_distance = {}
         self.elev = {}
         self.time = {}
+        self.lon = {}
+        self.lat = {}
 
         self.x_min = {}
         self.y_min = {}
@@ -240,7 +242,7 @@ class gps_photo_trajectories():
 
         output_file(self.html_name)
 
-        save(canvas_layout, title="Animate GPS Multi Trajectories")
+        save(canvas_layout, title=self.title)
 
     def setup_photos(self, t_hist=None):
 
@@ -259,16 +261,25 @@ class gps_photo_trajectories():
 
             if img.latitude is not None:
                 p_m_x, p_m_y = self.latlon_to_mercator(lat=img.latitude, lon=img.longitude)
-            else:
+                if img.latitude == 0.:   # shouldn't be, but seems to happen
+                    print("gps zero!", img.camera, p)
+                    continue
+            # sometimes the Canon gps (obtained from the iPhone) is wrong. See if it is in a gpx route and use that.
+            if img.latitude is None or "Canon" in img.camera:
                 for g in self.file_stems:
 
-                    timezone_name = self.tf.timezone_at(lat=self.lat[0], lng=self.lon[0])
-                    timezone = pytz.timezone("America/Los_Angeles")
-                    time_tz = img.create_date.astimezone(timezone)
+                    timezone_name = self.tf.timezone_at(lat=self.lat[g][0], lng=self.lon[g][0])
+                    # timezone = pytz.timezone("America/Los_Angeles")
+                    # time_tz = img.create_date.astimezone(timezone)
+                    timezone = pytz.timezone(timezone_name)
+                    time_tz = timezone.localize(img.create_date)
+
+                    t_start_route = self.time[g][0]
+                    t_end_route = self.time[g][-1]
 
                     #print("time stamps", p, time_tz, self.time[g][0], self.time[g][-1])
 
-                    if time_tz < self.time[g][0] or time_tz > self.time[g][-1]:
+                    if time_tz < t_start_route or time_tz > t_end_route:
                         #print("Photo not taken during gps route")
                         continue
 
@@ -282,10 +293,12 @@ class gps_photo_trajectories():
                         if t_diff[i] < closest_to_zero:
                             closest_to_zero = t_diff[i]
                             closest_index = i
-                    latitude = self.lat[closest_index]
-                    longitude = self.lon[closest_index]
+                    latitude = self.lat[g][closest_index]
+                    longitude = self.lon[g][closest_index]
 
                     p_m_x, p_m_y = self.latlon_to_mercator(lat=latitude, lon=longitude)
+
+                    break
 
             if p_m_x != -999:
                 p_merc_x.append(p_m_x)
@@ -384,8 +397,6 @@ class gps_photo_trajectories():
         :return:
         """
 
-        self.lat = []
-        self.lon = []
         self.speed = []
 
         self.next_merc_x = []
@@ -400,8 +411,10 @@ class gps_photo_trajectories():
                 coords = []
                 for ip, point in enumerate(segment.points):
                     # print(f'Latitude: {point.latitude}, Longitude: {point.longitude}, Elevation: {point.elevation}')
-                    self.lat.append(point.latitude)
-                    self.lon.append(point.longitude)
+                    self.lat.setdefault(self.current_file_stem, [])
+                    self.lat[self.current_file_stem].append(point.latitude)
+                    self.lon.setdefault(self.current_file_stem, [])
+                    self.lon[self.current_file_stem].append(point.longitude)
 
                     timezone_name = self.tf.timezone_at(lat=point.latitude, lng=point.longitude)
                     timezone = pytz.timezone(timezone_name)
@@ -414,8 +427,10 @@ class gps_photo_trajectories():
                     distance = 0.
 
                     if ip > 0:
-                        distance = great_circle((self.lat[ip - 1], self.lon[ip - 1]),
-                                                (self.lat[ip], self.lon[ip])).miles
+                        distance = great_circle((self.lat[self.current_file_stem][ip - 1],
+                                                 self.lon[self.current_file_stem][ip - 1]),
+                                                (self.lat[self.current_file_stem][ip],
+                                                 self.lon[self.current_file_stem][ip])).miles
 
                         time_diff = (self.time[self.current_file_stem][ip] -
                                      self.time[self.current_file_stem][ip - 1]).total_seconds() / 3600.  # hrs
@@ -440,7 +455,7 @@ class gps_photo_trajectories():
         # Convert the latitude and longitude coordinates to Web Mercator
         self.mercator_x[self.current_file_stem], self.mercator_y[self.current_file_stem] = (
             zip(*(self.latlon_to_mercator(lat_t, lon_t)
-                  for lat_t, lon_t in zip(self.lat, self.lon))))
+                  for lat_t, lon_t in zip(self.lat[self.current_file_stem], self.lon[self.current_file_stem]))))
 
         # Append all but the last element
         for i in range(len(self.mercator_x[self.current_file_stem]) - 1):
@@ -451,9 +466,11 @@ class gps_photo_trajectories():
             self.next_merc_y.append(self.mercator_y[self.current_file_stem][i + 1])
         self.next_merc_y.append(self.mercator_y[self.current_file_stem][-1])
 
-        lat_min, lat_max = min(self.lat), max(self.lat)
+        lat_min, lat_max = (min(self.lat[self.current_file_stem]),
+                            max(self.lat[self.current_file_stem]))
         buffer_lat = 0.05 * (lat_max - lat_min)
-        lon_min, lon_max = min(self.lon), max(self.lon)
+        lon_min, lon_max = (min(self.lon[self.current_file_stem]),
+                            max(self.lon[self.current_file_stem]))
         buffer_lon = 0.05 * (lon_max - lon_min)
 
         # buffer_lon = 0
