@@ -51,6 +51,7 @@ class gps_photo_trajectories():
         self.data_dir = data['data_dir']
         self.html_dir = data['html_dir']
         self.photo_dir = data['photo_dir']
+        self.original_photo_dir = data['original_photo_dir']
         self.infile_list = data["infile_list"]
         self.title = data["title"]
         self.file_stems = []
@@ -244,6 +245,30 @@ class gps_photo_trajectories():
 
         save(canvas_layout, title=self.title)
 
+    def replace_gps_from_edited(self, orig=None):
+
+        edited_file_name = str(Path(orig).name)
+
+        edited_loc = self.original_photo_dir + "Edited/" + edited_file_name
+
+        lon = 0.
+        lat = 0.
+
+        if not Path(edited_loc).exists():
+            return lat, lon
+
+        try:
+            edited_img = photo()
+            edited_img.get_image(file_location=edited_loc)
+
+            if edited_img.latitude != 0:
+                lat = edited_img.latitude
+                lon = edited_img.longitude
+        except:
+            pass
+
+        return lat, lon
+
     def setup_photos(self, t_hist=None):
 
         ph = self.list_files_in_folder(self.photo_dir)
@@ -260,10 +285,18 @@ class gps_photo_trajectories():
             p_m_x = -999   # guard value
 
             if img.latitude is not None:
-                p_m_x, p_m_y = self.latlon_to_mercator(lat=img.latitude, lon=img.longitude)
                 if img.latitude == 0.:   # shouldn't be, but seems to happen
                     print("gps zero!", img.camera, p)
-                    continue
+                    lat, lon = self.replace_gps_from_edited(orig=p)
+                    if lat != 0.:
+                        p_m_x, p_m_y = self.latlon_to_mercator(lat=lat, lon=lon)
+                        print("fixed gps", p, lat, lon)
+                    else:
+                        continue
+                else:
+                    p_m_x, p_m_y = self.latlon_to_mercator(lat=img.latitude, lon=img.longitude)
+                    #continue
+
             # sometimes the Canon gps (obtained from the iPhone) is wrong. See if it is in a gpx route and use that.
             if img.latitude is None or "Canon" in img.camera:
                 for g in self.file_stems:
