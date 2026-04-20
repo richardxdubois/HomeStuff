@@ -1,12 +1,63 @@
+"""
+Stained Glass Pattern Analyzer
+===============================
+
+Analyzes stained glass pattern images to detect pieces, measure their
+properties, and perform quality assurance checks.
+
+Features:
+    - Piece detection from black-line-on-white-background pattern images
+    - Measurement of piece area, width, angles, and complexity
+    - QA warnings for sharp angles, narrow pieces, tiny pieces, etc.
+    - Gap detection in the lead line network
+    - Suspiciously large piece detection (possible merged pieces)
+    - Interactive Bokeh HTML visualization with hover/click/filter
+    - Static annotated images and text reports
+
+Usage:
+    python pattern_analyzer.py pattern.jpg --panel-width 24 -o ./output
+
+    For a pattern image where the actual panel is 24 inches wide.
+    The tool auto-calculates DPI from the panel dimensions.
+
+Dependencies:
+    Required: opencv-python, numpy
+    Optional: bokeh (>=3.8), pillow (for interactive visualization)
+
+    pip install opencv-python numpy bokeh pillow
+
+Author: Collaborative development with Claude
+Date: 2024
+"""
+
 import cv2
 import numpy as np
 from dataclasses import dataclass, field
 from collections import defaultdict
 from pathlib import Path
-import json
+
+
+# =============================================================================
+# Data Classes
+# =============================================================================
 
 @dataclass
 class Piece:
+    """Represents a single piece of glass in the pattern.
+
+    Attributes:
+        id: Unique piece number (1-based)
+        contour: OpenCV contour array defining the piece boundary
+        area: Area in pixels
+        area_sq_inches: Area in square inches (based on DPI)
+        centroid: (x, y) center point of the piece
+        bounding_box: (x, y, width, height) bounding rectangle
+        num_vertices: Number of vertices in simplified polygon
+        min_angle: Smallest interior angle in degrees
+        min_width_inches: Narrowest dimension in inches
+        max_width_inches: Widest dimension in inches
+        warnings: List of QA warning strings
+    """
     id: int
     contour: np.ndarray
     area: float
@@ -19,19 +70,70 @@ class Piece:
     max_width_inches: float
     warnings: list = field(default_factory=list)
 
+
 @dataclass
 class Gap:
+    """Represents a detected gap in the lead line network.
+
+    Attributes:
+        point1: (x, y) first endpoint of the gap
+        point2: (x, y) second endpoint of the gap
+        distance_pixels: Gap distance in pixels
+        distance_inches: Gap distance in inches
+    """
     point1: tuple
     point2: tuple
     distance_pixels: float
     distance_inches: float
 
+
+# =============================================================================
+# Main Analyzer Class
+# =============================================================================
+
 class PatternAnalyzer:
+    """Analyzes a stained glass pattern image.
+
+    The analyzer processes a pattern image (black lines on white background)
+    to detect individual glass pieces, measure their properties, and flag
+    potential quality issues.
+
+    Typical workflow:
+        1. Initialize with image path and scale info
+        2. preprocess() - threshold and clean the image
+        3. detect_pieces() - find closed regions
+        4. detect_line_gaps() - find disconnected lines
+        5. run_qa() - check for quality issues
+        6. generate outputs (images, reports, interactive viz)
+
+    Example:
+        analyzer = PatternAnalyzer("pattern.jpg", panel_width=24)
+        analyzer.preprocess()
+        analyzer.detect_pieces()
+        analyzer.detect_line_gaps()
+        analyzer.run_qa()
+        analyzer.generate_all(prefix="my_pattern")
+    """
+
     def __init__(self, image_path, scale_dpi=150, output_dir=".",
                  panel_width=None, panel_height=None):
+        """Initialize the analyzer with an image.
+
+        Args:
+            image_path: Path to the pattern image file (JPG, PNG, etc.)
+            scale_dpi: Dots per inch for measurements (default 150).
+                       Overridden if panel_width or panel_height is given.
+            output_dir: Directory for output files (created if needed)
+            panel_width: Actual panel width in inches (auto-calculates DPI)
+            panel_height: Actual panel height in inches (auto-calculates DPI)
+
+        Raises:
+            FileNotFoundError: If the image file cannot be loaded
+        """
         self.image = cv2.imread(image_path)
         if self.image is None:
             raise FileNotFoundError(f"Could not load image: {image_path}")
+
         self.gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
         self.pieces = []
         self.gaps = []
@@ -40,80 +142,153 @@ class PatternAnalyzer:
 
         img_h, img_w = self.image.shape[:2]
 
+        # Calculate DPI from panel dimensions if provided
         if panel_width:
             self.scale_dpi = img_w / panel_width
-            print(f"Calculated DPI from panel width ({panel_width}\"): {self.scale_dpi:.1f}")
+            print(f"Calculated DPI from panel width "
+                  f"({panel_width}\"): {self.scale_dpi:.1f}")
         elif panel_height:
             self.scale_dpi = img_h / panel_height
-            print(f"Calculated DPI from panel height ({panel_height}\"): {self.scale_dpi:.1f}")
+            print(f"Calculated DPI from panel height "
+                  f"({panel_height}\"): {self.scale_dpi:.1f}")
         else:
             self.scale_dpi = scale_dpi
 
+        # Set up output directory
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"Loaded image: {img_w}x{img_h} pixels")
         print(f"At {self.scale_dpi:.1f} DPI that's approximately "
-              f"{img_w/self.scale_dpi:.1f}\" x {img_h/self.scale_dpi:.1f}\"")
+              f"{img_w / self.scale_dpi:.1f}\" x "
+              f"{img_h / self.scale_dpi:.1f}\"")
         print(f"Output directory: {self.output_dir.resolve()}")
         print(f"Pixel value range: {self.gray.min()} - {self.gray.max()}")
         print(f"Mean pixel value: {self.gray.mean():.1f}")
 
+    # =========================================================================
+    # Utility Methods
+    # =========================================================================
+
     def _output_path(self, filename):
+        """Build a full output path from a filename.
+
+        Args:
+            filename: Output filename (e.g., "pattern_analyzed.png")
+
+        Returns:
+            Full path string within the output directory
+        """
         return str(self.output_dir / filename)
 
-    def preprocess(self, line_threshold=128, close_kernel_size=3, dilate_iterations=0):
+    # =========================================================================
+    # Image Preprocessing
+    # =========================================================================
+
+    def preprocess(self, line_threshold=128, close_kernel_size=3,
+                   dilate_iterations=0):
+        """Convert the pattern image to a clean binary image.
+
+        Produces a binary image where:
+            - Lead lines = BLACK (0)
+            - Glass regions = WHITE (255)
+
+        Steps:
+            1. Threshold grayscale to separate lines from background
+            2. Morphological closing to seal small gaps in lines
+            3. Optional dilation to thicken lines
+
+        Args:
+            line_threshold: Pixel value threshold (0-255). Pixels darker
+                           than this become lines. Default 128.
+            close_kernel_size: Kernel size for morphological closing.
+                              Seals small gaps from JPG compression.
+                              Set to 0 to disable. Default 3.
+            dilate_iterations: Number of dilation passes to thicken lines.
+                              Helps seal larger gaps. Default 0.
+
+        Returns:
+            The binary image (also stored as self.binary)
+        """
+        # Analyze histogram for diagnostic info
         hist = cv2.calcHist([self.gray], [0], None, [256], [0, 256])
         dark_peak = np.argmax(hist[:128])
         light_peak = np.argmax(hist[128:]) + 128
         print(f"Dark peak at: {dark_peak}, Light peak at: {light_peak}")
 
+        # Otsu's method for reference
         otsu_thresh, _ = cv2.threshold(
             self.gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
         print(f"Otsu's suggested threshold: {otsu_thresh}")
 
-        _, binary = cv2.threshold(self.gray, line_threshold, 255, cv2.THRESH_BINARY)
+        # Apply threshold: dark pixels -> black (lines), light -> white (glass)
+        _, binary = cv2.threshold(
+            self.gray, line_threshold, 255, cv2.THRESH_BINARY
+        )
 
         cv2.imwrite(self._output_path("debug_00_threshold_only.png"), binary)
-        print(f"Saved debug_00_threshold_only.png")
+        print("Saved debug_00_threshold_only.png")
 
+        # Morphological operations to clean up the line network
         if close_kernel_size > 0:
+            # Work on inverted image so lines are white (foreground)
             lines = cv2.bitwise_not(binary)
-            kernel = np.ones((close_kernel_size, close_kernel_size), np.uint8)
+            kernel = np.ones(
+                (close_kernel_size, close_kernel_size), np.uint8
+            )
             lines = cv2.morphologyEx(lines, cv2.MORPH_CLOSE, kernel)
 
             if dilate_iterations > 0:
-                lines = cv2.dilate(lines, kernel, iterations=dilate_iterations)
+                lines = cv2.dilate(
+                    lines, kernel, iterations=dilate_iterations
+                )
 
+            # Invert back: lines=black, glass=white
             binary = cv2.bitwise_not(lines)
 
         self.binary = binary
 
+        # Save debug images
         cv2.imwrite(self._output_path("debug_01_binary.png"), binary)
 
         debug_color = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
-        debug_color[binary == 0] = [0, 0, 255]
-        cv2.imwrite(self._output_path("debug_02_lines_highlighted.png"), debug_color)
+        debug_color[binary == 0] = [0, 0, 255]  # lines in red
+        cv2.imwrite(
+            self._output_path("debug_02_lines_highlighted.png"), debug_color
+        )
 
-        num_labels, labels = cv2.connectedComponents(binary)
+        # Count regions for diagnostic
+        num_labels, _ = cv2.connectedComponents(binary)
         print(f"Connected white regions found: {num_labels - 1}")
         print(f"Saved debug images to {self.output_dir}")
 
         return binary
 
-    def detect_pieces(self, min_area_pixels=200, max_area_ratio=0.5):
-        """
-        Find closed regions between lead lines.
+    # =========================================================================
+    # Piece Detection
+    # =========================================================================
 
-        Uses contour hierarchy to properly handle nested regions:
-        - Outer boundary of the image is excluded
-        - Inner regions (actual glass pieces) are detected
-        - Avoids counting a piece that "contains" other pieces
+    def detect_pieces(self, min_area_pixels=200, max_area_ratio=0.5):
+        """Find individual glass pieces in the preprocessed binary image.
+
+        Each closed white region between lead lines is detected as a piece.
+        Uses contour hierarchy to exclude container regions (e.g., the outer
+        boundary that encloses all pieces).
+
+        Args:
+            min_area_pixels: Minimum area in pixels to count as a piece.
+                            Smaller regions are treated as noise. Default 200.
+            max_area_ratio: Maximum area as fraction of total image area.
+                           Larger regions are treated as background. Default 0.5.
+
+        Returns:
+            List of Piece objects (also stored as self.pieces)
         """
         if self.binary is None:
             self.preprocess()
 
+        # Use RETR_TREE for full hierarchy
         contours, hierarchy = cv2.findContours(
             self.binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
@@ -128,6 +303,7 @@ class PatternAnalyzer:
 
         print(f"Found {len(contours)} raw contours")
 
+        # Diagnostic: area distribution
         areas = [cv2.contourArea(c) for c in contours]
         areas_nonzero = [a for a in areas if a > 0]
         if areas_nonzero:
@@ -142,60 +318,36 @@ class PatternAnalyzer:
         for i, contour in enumerate(contours):
             area = cv2.contourArea(contour)
 
-            # Skip tiny regions (noise, JPG artifacts)
             if area < min_area_pixels:
                 rejected_small += 1
                 continue
 
-            # Skip the outer boundary / huge regions
             if area > max_area:
                 rejected_large += 1
                 continue
 
-            # --- Key fix: use hierarchy to identify actual glass pieces ---
+            # Hierarchy check: reject contours that contain significant
+            # children (these are containers, not glass pieces)
             # hierarchy[i] = [next_sibling, prev_sibling, first_child, parent]
-            #
-            # A "glass piece" is a contour that does NOT contain other
-            # contours of similar size inside it. If a contour has children
-            # that are also valid pieces, it's a "container" not a piece.
-            #
-            # Check if this contour has children that are significant
-            # (not just noise)
-            first_child = hierarchy[i][2]
-            has_significant_children = False
-
-            if first_child >= 0:
-                child_idx = first_child
-                while child_idx >= 0:
-                    child_area = cv2.contourArea(contours[child_idx])
-                    # If a child is more than 5% of parent area, parent
-                    # is a container, not a piece
-                    if child_area > area * 0.05 and child_area > min_area_pixels:
-                        has_significant_children = True
-                        break
-                    child_idx = hierarchy[child_idx][0]  # next sibling
-
-            if has_significant_children:
+            if self._has_significant_children(
+                    i, contours, hierarchy, area, min_area_pixels):
                 rejected_parent += 1
                 continue
 
-            # Calculate centroid
+            # Calculate piece properties
             M = cv2.moments(contour)
             if M["m00"] == 0:
                 continue
+
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
-
-            # Bounding box
             x, y, w, h = cv2.boundingRect(contour)
 
-            # Approximate polygon for angle analysis
             epsilon = 0.015 * cv2.arcLength(contour, True)
             approx = cv2.approxPolyDP(contour, epsilon, True)
 
-            # Measurements
             min_angle = self._min_interior_angle(approx)
-            min_width_inches, max_width_inches = self._piece_widths(contour)
+            min_width, max_width = self._piece_widths(contour)
             area_sq_inches = area / (self.scale_dpi ** 2)
 
             piece_id += 1
@@ -208,19 +360,64 @@ class PatternAnalyzer:
                 bounding_box=(x, y, w, h),
                 num_vertices=len(approx),
                 min_angle=min_angle,
-                min_width_inches=min_width_inches,
-                max_width_inches=max_width_inches,
+                min_width_inches=min_width,
+                max_width_inches=max_width,
             )
-
             self.pieces.append(piece)
 
         print(f"\nDetected {len(self.pieces)} pieces")
-        print(f"Rejected: {rejected_small} too small, {rejected_large} too large, "
+        print(f"Rejected: {rejected_small} too small, "
+              f"{rejected_large} too large, "
               f"{rejected_parent} container contours")
 
         return self.pieces
 
+    def _has_significant_children(self, contour_idx, contours, hierarchy,
+                                  parent_area, min_area):
+        """Check if a contour contains child contours of significant size.
+
+        A contour with large children is likely a "container" that encloses
+        other pieces, not a glass piece itself.
+
+        Args:
+            contour_idx: Index of the contour to check
+            contours: List of all contours
+            hierarchy: Contour hierarchy array
+            parent_area: Area of the parent contour
+            min_area: Minimum area to consider significant
+
+        Returns:
+            True if the contour has significant children
+        """
+        first_child = hierarchy[contour_idx][2]
+        if first_child < 0:
+            return False
+
+        child_idx = first_child
+        while child_idx >= 0:
+            child_area = cv2.contourArea(contours[child_idx])
+            if child_area > parent_area * 0.05 and child_area > min_area:
+                return True
+            child_idx = hierarchy[child_idx][0]  # next sibling
+
+        return False
+
+    # =========================================================================
+    # Geometry Measurements
+    # =========================================================================
+
     def _min_interior_angle(self, approx_contour):
+        """Find the sharpest interior angle in a polygon.
+
+        Sharp interior angles (< 35°) are difficult or impossible to
+        score and break cleanly in glass cutting.
+
+        Args:
+            approx_contour: Simplified polygon contour from approxPolyDP
+
+        Returns:
+            Minimum interior angle in degrees (0-180)
+        """
         points = approx_contour.reshape(-1, 2)
         n = len(points)
 
@@ -247,11 +444,23 @@ class PatternAnalyzer:
         return min_angle
 
     def _piece_widths(self, contour):
+        """Estimate the minimum and maximum width of a piece.
+
+        Uses two strategies:
+            1. Minimum area rotated rectangle (resolution-independent)
+            2. Distance transform with skeleton analysis (for interior
+               narrow passages)
+
+        Args:
+            contour: OpenCV contour defining the piece boundary
+
+        Returns:
+            Tuple of (min_width_inches, max_width_inches)
+        """
         mask = np.zeros(self.gray.shape, dtype=np.uint8)
         cv2.drawContours(mask, [contour], -1, 255, -1)
 
-        dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-
+        # Strategy 1: Rotated rectangle dimensions
         if len(contour) >= 5:
             rect = cv2.minAreaRect(contour)
             rect_w, rect_h = rect[1]
@@ -262,9 +471,11 @@ class PatternAnalyzer:
             min_dim = min(w, h) / self.scale_dpi
             max_dim = max(w, h) / self.scale_dpi
 
+        # Strategy 2: Distance transform for interior analysis
+        dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+
         if dist.max() > 0:
             max_width_dt = dist.max() * 2 / self.scale_dpi
-
             interior_pixels = cv2.countNonZero(mask)
 
             if interior_pixels > 100:
@@ -272,12 +483,16 @@ class PatternAnalyzer:
                 skeleton_distances = dist[skeleton > 0]
 
                 if len(skeleton_distances) > 2:
-                    min_width_dt = np.percentile(skeleton_distances, 10) * 2 / self.scale_dpi
+                    min_width_dt = (
+                            np.percentile(skeleton_distances, 10) * 2
+                            / self.scale_dpi
+                    )
                 else:
                     min_width_dt = min_dim
             else:
                 min_width_dt = min_dim
 
+            # Use the more conservative (larger) estimate for min width
             min_width = max(min_width_dt, min_dim * 0.8)
             max_width = max(max_width_dt, max_dim)
         else:
@@ -287,6 +502,16 @@ class PatternAnalyzer:
         return min_width, max_width
 
     def _skeletonize(self, binary_image):
+        """Reduce a binary region to its single-pixel-wide skeleton.
+
+        Uses iterative erosion and subtraction to find the medial axis.
+
+        Args:
+            binary_image: Binary image (white foreground on black)
+
+        Returns:
+            Skeleton image (single-pixel-wide white lines)
+        """
         skeleton = np.zeros_like(binary_image)
         temp = binary_image.copy()
         kernel = np.ones((3, 3), np.uint8)
@@ -302,139 +527,285 @@ class PatternAnalyzer:
 
         return skeleton
 
-    def _find_endpoints(self, skeleton):
-        endpoints = []
-        h, w = skeleton.shape
-
-        padded = np.pad(skeleton, 1, mode='constant', constant_values=0)
-
-        for y in range(1, h + 1):
-            for x in range(1, w + 1):
-                if padded[y, x] == 0:
-                    continue
-
-                neighborhood = padded[y-1:y+2, x-1:x+2]
-                neighbor_count = np.count_nonzero(neighborhood) - 1
-
-                if neighbor_count == 1:
-                    endpoints.append((x - 1, y - 1))
-
-        return endpoints
+    # =========================================================================
+    # Line Gap Detection
+    # =========================================================================
 
     def detect_line_gaps(self, max_gap_pixels=20, min_gap_pixels=None,
-                         cluster_radius=8):
+                         cluster_radius=8, suspicious_ratio=8.0):
+        """Detect gaps in the lead line network.
+
+        Uses two strategies:
+            1. Analyze suspiciously large pieces — their boundaries are
+               walked to find points near other lines that don't connect
+            2. Progressive dilation — thicken lines incrementally and
+               check if new pieces appear (indicates a gap was bridged)
+
+        Args:
+            max_gap_pixels: Maximum gap distance to search for (pixels)
+            min_gap_pixels: Minimum gap distance (auto-calculated if None)
+            cluster_radius: Radius for clustering nearby gap points
+            suspicious_ratio: Pieces larger than this multiple of the
+                         median area are analyzed for gaps (default 8.0)
+
+        Returns:
+            List of Gap objects (also stored as self.gaps)
         """
-        Detect gaps by progressively dilating lines and checking
-        if new pieces appear. If closing a small gap creates a new
-        piece boundary, that gap was real.
-        """
+        # At the top of detect_line_gaps:
+        self.suspicious_ratio = suspicious_ratio
+
         if self.binary is None:
             self.preprocess()
 
-        print(f"Searching for line gaps by progressive dilation...")
-
-        # Get baseline piece count from current binary
-        baseline_contours, _ = cv2.findContours(
-            self.binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
-        baseline_regions = self._count_significant_regions(self.binary)
-        print(f"Baseline: {baseline_regions} significant regions")
-
-        # Now progressively dilate the lines and see if regions split
-        lines = cv2.bitwise_not(self.binary)  # lines = white
-        kernel = np.ones((3, 3), np.uint8)
-
-        best_new_regions = baseline_regions
-        best_dilation = 0
-        gap_locations = []
-
-        for dilation in range(1, max_gap_pixels // 2 + 1):
-            # Dilate lines to close gaps
-            dilated_lines = cv2.dilate(lines, kernel, iterations=dilation)
-            dilated_binary = cv2.bitwise_not(dilated_lines)
-
-            new_regions = self._count_significant_regions(dilated_binary)
-
-            if new_regions > best_new_regions:
-                print(f"  Dilation {dilation}px: {new_regions} regions "
-                      f"(+{new_regions - best_new_regions} new)")
-
-                # Find WHERE the new regions appeared by comparing
-                # connected components
-                gap_locations.extend(
-                    self._find_new_regions(self.binary, dilated_binary,
-                                           dilation)
-                )
-                best_new_regions = new_regions
-                best_dilation = dilation
-
-            # Save debug image at key dilations
-            if dilation in [1, 2, 3, 5, max_gap_pixels // 2]:
-                cv2.imwrite(
-                    self._output_path(f"debug_dilation_{dilation}.png"),
-                    dilated_binary
-                )
-
-        print(f"Best dilation: {best_dilation}px gave {best_new_regions} regions")
-        print(f"Found {len(gap_locations)} gap locations")
-
-        # Convert gap locations to Gap objects
+        print("Searching for line gaps...")
         self.gaps = []
-        seen_locations = set()
 
-        for loc in gap_locations:
-            # Round to avoid near-duplicates
-            key = (round(loc[0], -1), round(loc[1], -1))
-            if key in seen_locations:
-                continue
-            seen_locations.add(key)
+        # Strategy 1: Analyze suspiciously large pieces
+        if len(self.pieces) > 3:
+            median_area = np.median([p.area for p in self.pieces])
 
-            gap = Gap(
-                point1=(loc[0], loc[1]),
-                point2=(loc[2], loc[3]),
-                distance_pixels=loc[4],
-                distance_inches=loc[4] / self.scale_dpi,
-            )
-            self.gaps.append(gap)
+            for piece in self.pieces:
+                if piece.area <= median_area * suspicious_ratio:
+                    continue
+
+                print(f"  Analyzing suspicious piece #{piece.id} "
+                      f"({piece.area_sq_inches:.1f} sq in)...")
+
+                gaps = self._find_gaps_in_piece(piece, max_gap_pixels)
+                self.gaps.extend(gaps)
+
+        # Strategy 2: Progressive dilation (fallback)
+        if not self.gaps:
+            self._detect_gaps_by_dilation(max_gap_pixels)
+
+        # Save debug visualization
+        self._save_gap_debug_image()
 
         print(f"Detected {len(self.gaps)} unique line gaps")
-
-        # Save endpoints debug (reuse for compatibility)
-        ep_image = cv2.cvtColor(self.gray, cv2.COLOR_GRAY2BGR)
-        for gap in self.gaps:
-            cv2.circle(ep_image, gap.point1, 8, (0, 0, 255), 3)
-            cv2.circle(ep_image, gap.point2, 8, (0, 255, 0), 3)
-            cv2.line(ep_image, gap.point1, gap.point2, (0, 0, 255), 2)
-        cv2.imwrite(self._output_path("debug_04_gaps_found.png"), ep_image)
-
         return self.gaps
 
+    def _find_gaps_in_piece(self, piece, max_gap_pixels):
+        """Find gap locations by analyzing a suspicious piece's boundary.
+
+        Walks the piece contour looking for points that come very close
+        to other lead lines without touching them. These near-misses
+        indicate gaps in the line network.
+
+        Args:
+            piece: Piece object to analyze
+            max_gap_pixels: Maximum gap distance to consider
+
+        Returns:
+            List of Gap objects found
+        """
+        gaps = []
+
+        # Create masks for analysis
+        piece_mask = np.zeros(self.gray.shape, dtype=np.uint8)
+        cv2.drawContours(piece_mask, [piece.contour], -1, 255, -1)
+
+        lines_mask = cv2.bitwise_not(self.binary)
+
+        # Get piece boundary and dilate slightly
+        boundary_mask = np.zeros(self.gray.shape, dtype=np.uint8)
+        cv2.drawContours(boundary_mask, [piece.contour], -1, 255, 2)
+        boundary_dilated = cv2.dilate(
+            boundary_mask, np.ones((5, 5), np.uint8)
+        )
+
+        # Find "other lines" — lines NOT on this piece's boundary
+        other_lines = cv2.bitwise_and(
+            lines_mask, cv2.bitwise_not(boundary_dilated)
+        )
+
+        if cv2.countNonZero(other_lines) == 0:
+            return gaps
+
+        # Distance from each pixel to nearest "other line"
+        other_lines_inv = cv2.bitwise_not(other_lines)
+        dist_to_other = cv2.distanceTransform(
+            other_lines_inv, cv2.DIST_L2, 5
+        )
+
+        # Walk the contour finding near-miss points
+        contour_points = piece.contour.reshape(-1, 2)
+        step = max(1, len(contour_points) // 500)
+
+        near_points = []
+        for idx in range(0, len(contour_points), step):
+            px, py = contour_points[idx]
+            if (0 <= py < dist_to_other.shape[0] and
+                    0 <= px < dist_to_other.shape[1]):
+                dist = dist_to_other[py, px]
+                if 0 < dist < max_gap_pixels:
+                    near_points.append((px, py, dist))
+
+        if not near_points:
+            return gaps
+
+        print(f"    Found {len(near_points)} near-miss points")
+
+        # Cluster nearby points — each cluster = one gap
+        clusters = self._cluster_points(near_points, max_gap_pixels)
+        print(f"    Clustered into {len(clusters)} gap locations")
+
+        # Convert clusters to Gap objects
+        for cluster in clusters:
+            gap = self._cluster_to_gap(cluster, other_lines)
+            if gap:
+                gaps.append(gap)
+
+        return gaps
+
+    def _cluster_points(self, points, cluster_radius):
+        """Group nearby points into clusters.
+
+        Args:
+            points: List of (x, y, distance) tuples
+            cluster_radius: Maximum distance between points in a cluster
+
+        Returns:
+            List of clusters, each a list of (x, y, distance) tuples
+        """
+        clusters = []
+        used = set()
+
+        for i, (px, py, d) in enumerate(points):
+            if i in used:
+                continue
+
+            cluster = [(px, py, d)]
+            used.add(i)
+
+            for j, (ox, oy, od) in enumerate(points):
+                if j in used:
+                    continue
+                if np.sqrt((px - ox) ** 2 + (py - oy) ** 2) < cluster_radius:
+                    cluster.append((ox, oy, od))
+                    used.add(j)
+
+            clusters.append(cluster)
+
+        return clusters
+
+    def _cluster_to_gap(self, cluster, other_lines):
+        """Convert a cluster of near-miss points to a Gap object.
+
+        Finds the closest approach point and the nearest line pixel
+        on the other side of the gap.
+
+        Args:
+            cluster: List of (x, y, distance) tuples
+            other_lines: Binary image of line pixels to gap toward
+
+        Returns:
+            Gap object or None if no valid gap found
+        """
+        # Find the point with minimum distance to other line
+        best = min(cluster, key=lambda p: p[2])
+        bx, by, bdist = best
+
+        # Find nearest "other line" pixel
+        search_radius = int(bdist) + 5
+        min_y = max(0, by - search_radius)
+        max_y = min(other_lines.shape[0], by + search_radius)
+        min_x = max(0, bx - search_radius)
+        max_x = min(other_lines.shape[1], bx + search_radius)
+
+        region = other_lines[min_y:max_y, min_x:max_x]
+        line_points = np.where(region > 0)
+
+        if len(line_points[0]) == 0:
+            return None
+
+        dists = np.sqrt(
+            (line_points[1] + min_x - bx) ** 2 +
+            (line_points[0] + min_y - by) ** 2
+        )
+        closest_idx = np.argmin(dists)
+
+        target_x = int(line_points[1][closest_idx] + min_x)
+        target_y = int(line_points[0][closest_idx] + min_y)
+
+        return Gap(
+            point1=(bx, by),
+            point2=(target_x, target_y),
+            distance_pixels=bdist,
+            distance_inches=bdist / self.scale_dpi,
+        )
+
+    def _detect_gaps_by_dilation(self, max_gap_pixels):
+        """Detect gaps by progressively dilating lines.
+
+        Thickens all lines incrementally. If new pieces appear at
+        some dilation level, a gap was bridged at that point.
+
+        Args:
+            max_gap_pixels: Maximum dilation to attempt
+        """
+        lines = cv2.bitwise_not(self.binary)
+        kernel = np.ones((3, 3), np.uint8)
+        baseline_regions = self._count_significant_regions(self.binary)
+        print(f"  Dilation fallback — Baseline: {baseline_regions} regions")
+
+        for dilation in range(1, max_gap_pixels // 2 + 1):
+            dilated_lines = cv2.dilate(
+                lines, kernel, iterations=dilation
+            )
+            dilated_binary = cv2.bitwise_not(dilated_lines)
+            new_regions = self._count_significant_regions(dilated_binary)
+
+            if new_regions > baseline_regions:
+                print(f"    Dilation {dilation}px: {new_regions} regions "
+                      f"(+{new_regions - baseline_regions} new)")
+
+                gap_locations = self._find_new_regions(
+                    self.binary, dilated_binary, dilation
+                )
+                for loc in gap_locations:
+                    self.gaps.append(Gap(
+                        point1=(loc[0], loc[1]),
+                        point2=(loc[2], loc[3]),
+                        distance_pixels=loc[4],
+                        distance_inches=loc[4] / self.scale_dpi,
+                    ))
+
     def _count_significant_regions(self, binary_image, min_area=200):
-        """Count white regions larger than min_area."""
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        """Count white regions larger than min_area.
+
+        Args:
+            binary_image: Binary image to analyze
+            min_area: Minimum pixel area to count
+
+        Returns:
+            Number of significant regions
+        """
+        num_labels, _, stats, _ = cv2.connectedComponentsWithStats(
             binary_image
         )
         count = 0
-        for i in range(1, num_labels):  # skip background
+        for i in range(1, num_labels):
             if stats[i, cv2.CC_STAT_AREA] >= min_area:
                 count += 1
         return count
 
-    def _find_new_regions(self, original_binary, dilated_binary, dilation_px):
+    def _find_new_regions(self, original_binary, dilated_binary,
+                          dilation_px):
+        """Find where new regions appeared after dilation.
+
+        Args:
+            original_binary: Binary image before dilation
+            dilated_binary: Binary image after dilation
+            dilation_px: Number of dilation iterations applied
+
+        Returns:
+            List of (x1, y1, x2, y2, gap_size) tuples
         """
-        Find where new regions appeared after dilation.
-        Returns list of (x1, y1, x2, y2, gap_size) tuples indicating
-        where gaps were bridged.
-        """
-        # Label regions in both images
-        num_orig, labels_orig, stats_orig, centroids_orig = \
+        _, labels_orig, stats_orig, _ = \
             cv2.connectedComponentsWithStats(original_binary)
         num_new, labels_new, stats_new, centroids_new = \
             cv2.connectedComponentsWithStats(dilated_binary)
 
-        # Find regions in dilated image that don't exist in original
-        # A new region is one whose centroid was part of a LARGER region
-        # in the original image
         gap_locations = []
 
         for i in range(1, num_new):
@@ -445,141 +816,208 @@ class PatternAnalyzer:
             cx = int(centroids_new[i][0])
             cy = int(centroids_new[i][1])
 
-            # What region was this centroid in the original?
-            if 0 <= cy < labels_orig.shape[0] and 0 <= cx < labels_orig.shape[1]:
-                orig_label = labels_orig[cy, cx]
-                if orig_label == 0:
-                    continue
+            if not (0 <= cy < labels_orig.shape[0] and
+                    0 <= cx < labels_orig.shape[1]):
+                continue
 
-                orig_area = stats_orig[orig_label, cv2.CC_STAT_AREA]
+            orig_label = labels_orig[cy, cx]
+            if orig_label == 0:
+                continue
 
-                # If the original region was significantly larger,
-                # this new region was split off by closing a gap
-                if orig_area > area_new * 1.5:
-                    # Find the approximate gap location:
-                    # It's where the dilated lines created a new boundary
-                    # between the old large region and this new piece
+            orig_area = stats_orig[orig_label, cv2.CC_STAT_AREA]
 
-                    # Create mask of just this new region
-                    new_mask = (labels_new == i).astype(np.uint8) * 255
+            if orig_area > area_new * 1.5:
+                # Find gap boundary location
+                new_mask = (labels_new == i).astype(np.uint8) * 255
+                boundary = (
+                        cv2.dilate(new_mask, np.ones((3, 3), np.uint8))
+                        - new_mask
+                )
 
-                    # Find boundary pixels of this new region
-                    boundary = cv2.dilate(new_mask, np.ones((3, 3), np.uint8)) - new_mask
+                orig_lines = cv2.bitwise_not(original_binary)
+                dilated_lines = cv2.bitwise_not(dilated_binary)
+                new_line_pixels = cv2.subtract(dilated_lines, orig_lines)
 
-                    # Find where boundary overlaps with the NEW line pixels
-                    # (pixels that are lines in dilated but not in original)
-                    orig_lines = cv2.bitwise_not(original_binary)
-                    dilated_lines = cv2.bitwise_not(dilated_binary)
-                    new_line_pixels = cv2.subtract(dilated_lines, orig_lines)
+                gap_boundary = cv2.bitwise_and(boundary, new_line_pixels)
+                gap_points = np.where(gap_boundary > 0)
 
-                    # Where boundary meets new line pixels = gap location
-                    gap_boundary = cv2.bitwise_and(boundary, new_line_pixels)
-
-                    gap_points = np.where(gap_boundary > 0)
-                    if len(gap_points[0]) > 0:
-                        # Get centroid of gap boundary pixels
-                        gy = int(np.mean(gap_points[0]))
-                        gx = int(np.mean(gap_points[1]))
-
-                        # Estimate gap size from dilation amount
-                        gap_size = dilation_px * 2
-
-                        # Find the two sides of the gap
-                        # Look along the boundary for the two closest
-                        # original line endpoints
-                        gap_locations.append(
-                            (gx - gap_size // 2, gy,
-                             gx + gap_size // 2, gy,
-                             gap_size)
-                        )
+                if len(gap_points[0]) > 0:
+                    gy = int(np.mean(gap_points[0]))
+                    gx = int(np.mean(gap_points[1]))
+                    gap_size = dilation_px * 2
+                    gap_locations.append((
+                        gx - gap_size // 2, gy,
+                        gx + gap_size // 2, gy,
+                        gap_size
+                    ))
 
         return gap_locations
 
+    def _save_gap_debug_image(self):
+        """Save debug image showing detected gap locations."""
+        ep_image = cv2.cvtColor(self.gray, cv2.COLOR_GRAY2BGR)
+        for gap in self.gaps:
+            cv2.circle(ep_image, gap.point1, 10, (0, 0, 255), 3)
+            cv2.circle(ep_image, gap.point2, 10, (0, 255, 0), 3)
+            cv2.line(ep_image, gap.point1, gap.point2, (0, 0, 255), 2)
+            mid_x = (gap.point1[0] + gap.point2[0]) // 2
+            mid_y = (gap.point1[1] + gap.point2[1]) // 2
+            label = f"{gap.distance_inches:.2f}\""
+            cv2.putText(ep_image, label, (mid_x + 10, mid_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        cv2.imwrite(self._output_path("debug_04_gaps_found.png"), ep_image)
+
+    # =========================================================================
+    # Quality Assurance
+    # =========================================================================
+
     def run_qa(self):
+        """Run all quality assurance checks on detected pieces.
+
+        Checks performed:
+            - TINY: Piece area < 0.25 sq in
+            - SMALL: Piece area < 0.5 sq in
+            - SUSPICIOUSLY LARGE: Area > 8x median (possible merged pieces)
+            - VERY NARROW: Min width < 3/16"
+            - NARROW: Min width < 1/4"
+            - VERY SHARP ANGLE: Min angle < 20°
+            - SHARP ANGLE: Min angle < 35°
+            - COMPLEX: More than 12 vertices
+            - VERY ELONGATED: Aspect ratio > 6:1
+            - ADJACENT TO GAP: Near a detected line gap
+
+        Results are stored as warning strings in each Piece's warnings list.
+        """
         print("\nRunning QA checks...")
 
-        # Calculate median area for suspicious size detection
+        # Calculate median for suspicious size detection
+        median_area = None
         if len(self.pieces) > 3:
-            median_area = np.median([p.area_sq_inches for p in self.pieces])
-        else:
-            median_area = None
+            median_area = np.median(
+                [p.area_sq_inches for p in self.pieces]
+            )
 
         for piece in self.pieces:
-            # Size checks
-            if piece.area_sq_inches < 0.25:
-                piece.warnings.append(
-                    f"TINY: Only {piece.area_sq_inches:.2f} sq in — very difficult to cut"
-                )
-            elif piece.area_sq_inches < 0.5:
-                piece.warnings.append(
-                    f"SMALL: {piece.area_sq_inches:.2f} sq in — challenging to cut"
-                )
+            self._check_piece_size(piece, median_area)
+            self._check_piece_width(piece)
+            self._check_piece_angles(piece)
+            self._check_piece_complexity(piece)
+            self._check_piece_elongation(piece)
 
-            # Suspiciously large (possible merged pieces from gap)
-            if median_area and piece.area_sq_inches > median_area * 8:
-                piece.warnings.append(
-                    f"SUSPICIOUSLY LARGE: {piece.area_sq_inches:.1f} sq in "
-                    f"is {piece.area_sq_inches/median_area:.0f}x the median — "
-                    f"possible merged pieces from line gap"
-                )
+        # Check adjacency to gaps
+        self._check_gap_adjacency()
 
-            # Width checks
-            if piece.min_width_inches < 0.1875:
-                piece.warnings.append(
-                    f"VERY NARROW: Min width ~{piece.min_width_inches:.3f}\" — will likely break"
-                )
-            elif piece.min_width_inches < 0.25:
-                piece.warnings.append(
-                    f"NARROW: Min width ~{piece.min_width_inches:.3f}\" — fragile"
-                )
-
-            # Angle checks
-            if piece.min_angle < 20:
-                piece.warnings.append(
-                    f"VERY SHARP ANGLE: {piece.min_angle:.0f}° — nearly impossible to cut"
-                )
-            elif piece.min_angle < 35:
-                piece.warnings.append(
-                    f"SHARP ANGLE: {piece.min_angle:.0f}° — difficult, may need grinding"
-                )
-
-            # Complexity check
-            if piece.num_vertices > 12:
-                piece.warnings.append(
-                    f"COMPLEX: {piece.num_vertices} vertices — consider simplifying"
-                )
-
-            # Elongation check
-            x, y, w, h = piece.bounding_box
-            if w > 0 and h > 0:
-                aspect = max(w, h) / min(w, h)
-                if aspect > 6:
-                    piece.warnings.append(
-                        f"VERY ELONGATED: {aspect:.1f}:1 aspect ratio — fragile"
-                    )
-
-        # Gap-related warnings
-        if self.gaps:
-            # Find which pieces are adjacent to gaps
-            for gap in self.gaps:
-                # Find pieces whose contours are near the gap endpoints
-                for piece in self.pieces:
-                    for pt in [gap.point1, gap.point2]:
-                        dist = cv2.pointPolygonTest(piece.contour,
-                                                     (float(pt[0]), float(pt[1])), True)
-                        if abs(dist) < 10:  # within 10 pixels of the contour
-                            msg = (f"ADJACENT TO GAP: Line gap of "
-                                   f"{gap.distance_inches:.2f}\" at "
-                                   f"({pt[0]}, {pt[1]}) — "
-                                   f"lead lines may not connect properly")
-                            if msg not in piece.warnings:
-                                piece.warnings.append(msg)
-
+        # Report summary
         warning_count = sum(len(p.warnings) for p in self.pieces)
-        pieces_with_warnings = sum(1 for p in self.pieces if p.warnings)
-        print(f"Found {warning_count} warnings across {pieces_with_warnings} pieces")
+        pieces_with_warnings = sum(
+            1 for p in self.pieces if p.warnings
+        )
+        print(f"Found {warning_count} warnings "
+              f"across {pieces_with_warnings} pieces")
+
+    def _check_piece_size(self, piece, median_area):
+        """Check if a piece is too small or suspiciously large."""
+        if piece.area_sq_inches < 0.25:
+            piece.warnings.append(
+                f"TINY: Only {piece.area_sq_inches:.2f} sq in "
+                f"— very difficult to cut"
+            )
+        elif piece.area_sq_inches < 0.5:
+            piece.warnings.append(
+                f"SMALL: {piece.area_sq_inches:.2f} sq in "
+                f"— challenging to cut"
+            )
+
+        if median_area and piece.area_sq_inches > self.suspicious_ratio:
+            piece.warnings.append(
+                f"SUSPICIOUSLY LARGE: {piece.area_sq_inches:.1f} sq in "
+                f"is {piece.area_sq_inches / median_area:.0f}x the median "
+                f"— possible merged pieces from line gap"
+            )
+
+    def _check_piece_width(self, piece):
+        """Check if a piece has dangerously narrow sections."""
+        if piece.min_width_inches < 0.1875:  # 3/16"
+            piece.warnings.append(
+                f"VERY NARROW: Min width ~{piece.min_width_inches:.3f}\" "
+                f"— will likely break"
+            )
+        elif piece.min_width_inches < 0.25:  # 1/4"
+            piece.warnings.append(
+                f"NARROW: Min width ~{piece.min_width_inches:.3f}\" "
+                f"— fragile"
+            )
+
+    def _check_piece_angles(self, piece):
+        """Check if a piece has sharp interior angles."""
+        if piece.min_angle < 20:
+            piece.warnings.append(
+                f"VERY SHARP ANGLE: {piece.min_angle:.0f}° "
+                f"— nearly impossible to cut"
+            )
+        elif piece.min_angle < 35:
+            piece.warnings.append(
+                f"SHARP ANGLE: {piece.min_angle:.0f}° "
+                f"— difficult, may need grinding"
+            )
+
+    def _check_piece_complexity(self, piece):
+        """Check if a piece has too many vertices."""
+        if piece.num_vertices > 12:
+            piece.warnings.append(
+                f"COMPLEX: {piece.num_vertices} vertices "
+                f"— consider simplifying"
+            )
+
+    def _check_piece_elongation(self, piece):
+        """Check if a piece is dangerously elongated."""
+        x, y, w, h = piece.bounding_box
+        if w > 0 and h > 0:
+            aspect = max(w, h) / min(w, h)
+            if aspect > 6:
+                piece.warnings.append(
+                    f"VERY ELONGATED: {aspect:.1f}:1 aspect ratio "
+                    f"— fragile"
+                )
+
+    def _check_gap_adjacency(self):
+        """Flag pieces that are adjacent to detected line gaps."""
+        for gap in self.gaps:
+            for piece in self.pieces:
+                for pt in [gap.point1, gap.point2]:
+                    dist = cv2.pointPolygonTest(
+                        piece.contour,
+                        (float(pt[0]), float(pt[1])),
+                        True
+                    )
+                    if abs(dist) < 10:
+                        msg = (
+                            f"ADJACENT TO GAP: Line gap of "
+                            f"{gap.distance_inches:.2f}\" at "
+                            f"({pt[0]}, {pt[1]}) — "
+                            f"lead lines may not connect properly"
+                        )
+                        if msg not in piece.warnings:
+                            piece.warnings.append(msg)
+
+    # =========================================================================
+    # Output Generation — Static Images
+    # =========================================================================
 
     def generate_annotated_image(self, prefix="pattern"):
+        """Create an annotated image with piece numbers and QA highlights.
+
+        - Clean pieces: numbered only
+        - Warning pieces: orange highlight + number
+        - Critical pieces: red highlight + number
+        - Gaps: red circles and lines
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Path to the saved image
+        """
         output_path = self._output_path(f"{prefix}_analyzed.png")
         annotated = self.image.copy()
 
@@ -599,8 +1037,9 @@ class PatternAnalyzer:
         for piece in self.pieces:
             cx, cy = piece.centroid
 
+            # Highlight pieces with warnings
             if piece.warnings:
-                color = (0, 128, 255)
+                color = (0, 128, 255)  # default orange
                 for key, c in WARNING_COLORS.items():
                     if any(key in w for w in piece.warnings):
                         if c == (0, 0, 255):
@@ -609,120 +1048,129 @@ class PatternAnalyzer:
                         color = c
 
                 overlay = annotated.copy()
-                cv2.drawContours(overlay, [piece.contour], -1, color, -1)
+                cv2.drawContours(
+                    overlay, [piece.contour], -1, color, -1
+                )
                 cv2.addWeighted(overlay, 0.3, annotated, 0.7, 0, annotated)
-                cv2.drawContours(annotated, [piece.contour], -1, color, 2)
+                cv2.drawContours(
+                    annotated, [piece.contour], -1, color, 2
+                )
 
-            font_scale = max(0.3, min(0.7, np.sqrt(piece.area_sq_inches) * 0.3))
-
+            # Draw piece number label
+            font_scale = max(
+                0.3, min(0.7, np.sqrt(piece.area_sq_inches) * 0.3)
+            )
             text = str(piece.id)
-            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
-            cv2.rectangle(annotated,
-                         (cx - tw//2 - 2, cy - th//2 - 2),
-                         (cx + tw//2 + 2, cy + th//2 + 2),
-                         (255, 255, 255), -1)
-            cv2.putText(annotated, text,
-                       (cx - tw//2, cy + th//2),
-                       cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), 1)
+            (tw, th), _ = cv2.getTextSize(
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+            )
+            cv2.rectangle(
+                annotated,
+                (cx - tw // 2 - 2, cy - th // 2 - 2),
+                (cx + tw // 2 + 2, cy + th // 2 + 2),
+                (255, 255, 255), -1
+            )
+            cv2.putText(
+                annotated, text,
+                (cx - tw // 2, cy + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), 1
+            )
 
-        # Draw gaps
+        # Draw gap markers
         for gap in self.gaps:
             cv2.circle(annotated, gap.point1, 8, (0, 0, 255), 2)
             cv2.circle(annotated, gap.point2, 8, (0, 0, 255), 2)
-            cv2.line(annotated, gap.point1, gap.point2, (0, 0, 255), 2,
-                    lineType=cv2.LINE_AA)
-
-            mid_x = (gap.point1[0] + gap.point2[0]) // 2
-            mid_y = (gap.point1[1] + gap.point2[1]) // 2
-            label = f"GAP {gap.distance_inches:.2f}\""
-            cv2.putText(annotated, label, (mid_x + 5, mid_y - 5),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+            cv2.line(
+                annotated, gap.point1, gap.point2,
+                (0, 0, 255), 2, lineType=cv2.LINE_AA
+            )
 
         cv2.imwrite(output_path, annotated)
         print(f"Saved annotated image: {output_path}")
         return output_path
 
     def generate_qa_overlay(self, prefix="pattern"):
+        """Create an image showing only QA issues on a faded background.
+
+        Args:
+            prefix: Output filename prefix
+        """
         output_path = self._output_path(f"{prefix}_qa.png")
 
-        qa_image = cv2.addWeighted(self.image, 0.4,
-                                    np.ones_like(self.image) * 255, 0.6, 0)
+        qa_image = cv2.addWeighted(
+            self.image, 0.4,
+            np.ones_like(self.image) * 255, 0.6, 0
+        )
 
         for piece in self.pieces:
             if not piece.warnings:
                 continue
 
             cx, cy = piece.centroid
-
             mask = np.zeros(self.gray.shape, dtype=np.uint8)
             cv2.drawContours(mask, [piece.contour], -1, 255, -1)
-            qa_image[mask > 0] = (qa_image[mask > 0] * 0.5 +
-                                   np.array([0, 0, 200]) * 0.5).astype(np.uint8)
+            qa_image[mask > 0] = (
+                    qa_image[mask > 0] * 0.5 +
+                    np.array([0, 0, 200]) * 0.5
+            ).astype(np.uint8)
 
             short_warning = piece.warnings[0].split(":")[0]
-            cv2.putText(qa_image, f"#{piece.id}", (cx - 10, cy - 5),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
-            cv2.putText(qa_image, short_warning, (cx - 30, cy + 15),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 150), 1)
+            cv2.putText(
+                qa_image, f"#{piece.id}", (cx - 10, cy - 5),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1
+            )
+            cv2.putText(
+                qa_image, short_warning, (cx - 30, cy + 15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 150), 1
+            )
 
         # Draw gaps prominently
         for gap in self.gaps:
             cv2.circle(qa_image, gap.point1, 12, (0, 0, 255), 3)
             cv2.circle(qa_image, gap.point2, 12, (0, 0, 255), 3)
-            cv2.line(qa_image, gap.point1, gap.point2, (0, 0, 255), 3,
-                    lineType=cv2.LINE_AA)
-
-            mid_x = (gap.point1[0] + gap.point2[0]) // 2
-            mid_y = (gap.point1[1] + gap.point2[1]) // 2
-            cv2.putText(qa_image, "GAP", (mid_x + 8, mid_y),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            cv2.line(
+                qa_image, gap.point1, gap.point2,
+                (0, 0, 255), 3, lineType=cv2.LINE_AA
+            )
 
         cv2.imwrite(output_path, qa_image)
         print(f"Saved QA overlay: {output_path}")
 
-    def generate_gap_debug_image(self, prefix="pattern"):
-        output_path = self._output_path(f"{prefix}_gaps.png")
-
-        gap_image = self.image.copy()
-
-        if not self.gaps:
-            cv2.putText(gap_image, "No gaps detected", (20, 40),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 180, 0), 2)
-            cv2.imwrite(output_path, gap_image)
-            print(f"No gaps detected — saved: {output_path}")
-            return output_path
-
-        for gap in self.gaps:
-            cv2.circle(gap_image, gap.point1, 10, (0, 0, 255), 3)
-            cv2.circle(gap_image, gap.point2, 10, (0, 0, 255), 3)
-            cv2.line(gap_image, gap.point1, gap.point2, (0, 0, 255), 2,
-                    lineType=cv2.LINE_AA)
-
-            mid_x = (gap.point1[0] + gap.point2[0]) // 2
-            mid_y = (gap.point1[1] + gap.point2[1]) // 2
-            label = f"{gap.distance_inches:.2f}\" ({gap.distance_pixels:.0f}px)"
-            cv2.putText(gap_image, label, (mid_x + 10, mid_y - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-
-        cv2.imwrite(output_path, gap_image)
-        print(f"Saved gap detection image: {output_path}")
-        return output_path
+    # =========================================================================
+    # Output Generation — Text Report
+    # =========================================================================
 
     def generate_report(self, prefix="pattern"):
+        """Generate a detailed text report of the analysis.
+
+        Includes:
+            - Image and panel dimensions
+            - Line gap detection results
+            - Piece size distribution statistics
+            - Full piece table with measurements
+            - QA warning summary and details
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Report text as string
+        """
         output_path = self._output_path(f"{prefix}_report.txt")
+        img_h, img_w = self.image.shape[:2]
 
         lines = []
         lines.append("=" * 76)
         lines.append("STAINED GLASS PATTERN ANALYSIS REPORT")
         lines.append("=" * 76)
         lines.append("")
-
-        img_h, img_w = self.image.shape[:2]
         lines.append(f"Image size: {img_w}x{img_h} pixels")
         lines.append(f"Scale: {self.scale_dpi:.1f} DPI")
-        lines.append(f"Estimated panel size: "
-                    f"{img_w/self.scale_dpi:.1f}\" x "
-                    f"{img_h/self.scale_dpi:.1f}\"")
+        lines.append(
+            f"Estimated panel size: "
+            f"{img_w / self.scale_dpi:.1f}\" x "
+            f"{img_h / self.scale_dpi:.1f}\""
+        )
         lines.append(f"Total pieces detected: {len(self.pieces)}")
         lines.append("")
 
@@ -735,15 +1183,25 @@ class PatternAnalyzer:
             lines.append("")
             for i, gap in enumerate(self.gaps, 1):
                 lines.append(f"  Gap {i}:")
-                lines.append(f"    From: ({gap.point1[0]}, {gap.point1[1]})")
-                lines.append(f"    To:   ({gap.point2[0]}, {gap.point2[1]})")
-                lines.append(f"    Distance: {gap.distance_pixels:.0f}px "
-                           f"({gap.distance_inches:.2f}\")")
-                lines.append(f"    ⚠ Lead lines do not connect — "
-                           f"pieces may be incorrectly merged")
+                lines.append(
+                    f"    From: ({gap.point1[0]}, {gap.point1[1]})"
+                )
+                lines.append(
+                    f"    To:   ({gap.point2[0]}, {gap.point2[1]})"
+                )
+                lines.append(
+                    f"    Distance: {gap.distance_pixels:.0f}px "
+                    f"({gap.distance_inches:.2f}\")"
+                )
+                lines.append(
+                    f"    ⚠ Lead lines do not connect — "
+                    f"pieces may be incorrectly merged"
+                )
                 lines.append("")
         else:
-            lines.append("  ✓ No line gaps detected — all lines appear connected")
+            lines.append(
+                "  ✓ No line gaps detected — all lines appear connected"
+            )
         lines.append("")
 
         # Size distribution
@@ -763,17 +1221,21 @@ class PatternAnalyzer:
         lines.append("-" * 76)
         lines.append("ALL PIECES")
         lines.append("-" * 76)
-        lines.append(f"{'ID':>4} {'Area(sq in)':>11} {'MinW':>8} {'MaxW':>8} "
-                    f"{'Min Angle':>10} {'Vertices':>8} {'Warnings':>8}")
+        lines.append(
+            f"{'ID':>4} {'Area(sq in)':>11} {'MinW':>8} {'MaxW':>8} "
+            f"{'Min Angle':>10} {'Vertices':>8} {'Warnings':>8}"
+        )
         lines.append("-" * 76)
 
         for p in sorted(self.pieces, key=lambda x: x.id):
             warn_flag = "***" if p.warnings else ""
-            lines.append(f"{p.id:>4} {p.area_sq_inches:>11.2f} "
-                        f"{p.min_width_inches:>7.3f}\" "
-                        f"{p.max_width_inches:>7.3f}\" "
-                        f"{p.min_angle:>9.0f}° "
-                        f"{p.num_vertices:>8} {warn_flag:>8}")
+            lines.append(
+                f"{p.id:>4} {p.area_sq_inches:>11.2f} "
+                f"{p.min_width_inches:>7.3f}\" "
+                f"{p.max_width_inches:>7.3f}\" "
+                f"{p.min_angle:>9.0f}° "
+                f"{p.num_vertices:>8} {warn_flag:>8}"
+            )
 
         # Warnings summary
         lines.append("")
@@ -783,6 +1245,7 @@ class PatternAnalyzer:
 
         warning_pieces = [p for p in self.pieces if p.warnings]
         if warning_pieces:
+            # Group by type
             warning_type_counts = defaultdict(int)
             for p in self.pieces:
                 for w in p.warnings:
@@ -790,8 +1253,8 @@ class PatternAnalyzer:
                     warning_type_counts[wtype] += 1
 
             lines.append("\n  Warning Summary:")
-            for wtype, count in sorted(warning_type_counts.items(),
-                                       key=lambda x: -x[1]):
+            for wtype, count in sorted(
+                    warning_type_counts.items(), key=lambda x: -x[1]):
                 lines.append(f"    {wtype}: {count} pieces")
 
             lines.append(f"\n  Details:")
@@ -816,7 +1279,30 @@ class PatternAnalyzer:
 
         return report_text
 
+    # =========================================================================
+    # Output Generation — Interactive Bokeh Visualization
+    # =========================================================================
+
     def generate_bokeh_visualization(self, prefix="pattern"):
+        """Generate an interactive HTML visualization using Bokeh.
+
+        Features:
+            - Pan/zoom on the pattern image
+            - Hover over any piece for measurements and warnings
+            - Click a piece for detailed info panel
+            - Filter by QA status (OK / Warning / Critical)
+            - Warning breakdown bar chart
+            - Piece size distribution histogram
+            - Gap locations shown as red dashed lines
+
+        Requires: bokeh>=3.8
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Path to the saved HTML file
+        """
         from bokeh.plotting import figure, save, output_file
         from bokeh.models import (
             ColumnDataSource, HoverTool,
@@ -829,7 +1315,43 @@ class PatternAnalyzer:
 
         img_height, img_width = self.image.shape[:2]
 
-        # --- Background image as RGBA uint32 ---
+        # --- Prepare background image as RGBA uint32 ---
+        bg_image = self._prepare_bokeh_background(img_height, img_width)
+
+        # --- Prepare piece data ---
+        source, source_full, piece_data = self._prepare_bokeh_piece_data(
+            img_height
+        )
+
+        # --- Build figure ---
+        p = self._build_bokeh_figure(
+            bg_image, source, img_width, img_height
+        )
+
+        # --- Build side panels ---
+        right_panel = self._build_bokeh_panels(
+            source, source_full, piece_data, img_width, img_height
+        )
+
+        # --- Add gap visualization ---
+        if self.gaps:
+            self._add_bokeh_gaps(p, img_height)
+
+        layout = row(p, right_panel)
+        save(layout)
+        print(f"Saved interactive visualization: {output_path}")
+        return output_path
+
+    def _prepare_bokeh_background(self, img_height, img_width):
+        """Encode the pattern image as a uint32 RGBA array for Bokeh.
+
+        Args:
+            img_height: Image height in pixels
+            img_width: Image width in pixels
+
+        Returns:
+            uint32 array suitable for Bokeh's image_rgba
+        """
         img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
         img_rgba = np.zeros((img_height, img_width, 4), dtype=np.uint8)
         img_rgba[:, :, :3] = img_rgb
@@ -838,78 +1360,89 @@ class PatternAnalyzer:
         img_rgba = np.flipud(img_rgba)
 
         img_uint32 = np.zeros((img_height, img_width), dtype=np.uint32)
-        view = img_uint32.view(dtype=np.uint8).reshape((img_height, img_width, 4))
+        view = img_uint32.view(dtype=np.uint8).reshape(
+            (img_height, img_width, 4)
+        )
         view[:, :, 0] = img_rgba[:, :, 0]
         view[:, :, 1] = img_rgba[:, :, 1]
         view[:, :, 2] = img_rgba[:, :, 2]
         view[:, :, 3] = img_rgba[:, :, 3]
 
-        # --- Piece polygon data ---
-        xs_all = []
-        ys_all = []
-        piece_ids = []
-        areas = []
-        min_widths = []
-        max_widths = []
-        min_angles = []
-        vertices = []
-        centroids_x = []
-        centroids_y = []
-        warning_texts = []
-        warning_counts = []
-        qa_status = []
-        qa_colors = []
+        return img_uint32
+
+    def _prepare_bokeh_piece_data(self, img_height):
+        """Build ColumnDataSource with all piece data for Bokeh.
+
+        Args:
+            img_height: Image height (for y-axis flip)
+
+        Returns:
+            Tuple of (source, source_full, piece_data_dict)
+        """
+        from bokeh.models import ColumnDataSource
+
+        data = defaultdict(list)
 
         for piece in self.pieces:
+            # Simplify contour for performance
             epsilon = 0.01 * cv2.arcLength(piece.contour, True)
             simplified = cv2.approxPolyDP(piece.contour, epsilon, True)
             points = simplified.reshape(-1, 2)
 
+            # Flip y for Bokeh coordinate system and close polygon
             xs = points[:, 0].tolist()
             ys = (img_height - points[:, 1]).tolist()
             xs.append(xs[0])
             ys.append(ys[0])
 
-            xs_all.append(xs)
-            ys_all.append(ys)
+            data['xs'].append(xs)
+            data['ys'].append(ys)
+            data['piece_id'].append(piece.id)
+            data['area'].append(round(piece.area_sq_inches, 3))
+            data['min_width'].append(round(piece.min_width_inches, 3))
+            data['max_width'].append(round(piece.max_width_inches, 3))
+            data['min_angle'].append(round(piece.min_angle, 1))
+            data['vertices'].append(piece.num_vertices)
+            data['cx'].append(piece.centroid[0])
+            data['cy'].append(img_height - piece.centroid[1])
 
-            piece_ids.append(piece.id)
-            areas.append(round(piece.area_sq_inches, 3))
-            min_widths.append(round(piece.min_width_inches, 3))
-            max_widths.append(round(piece.max_width_inches, 3))
-            min_angles.append(round(piece.min_angle, 1))
-            vertices.append(piece.num_vertices)
-            centroids_x.append(piece.centroid[0])
-            centroids_y.append(img_height - piece.centroid[1])
+            warn_text = ("; ".join(piece.warnings)
+                         if piece.warnings else "None")
+            data['warnings'].append(warn_text)
+            data['warning_count'].append(len(piece.warnings))
 
-            warn_text = "; ".join(piece.warnings) if piece.warnings else "None"
-            warning_texts.append(warn_text)
-            warning_counts.append(len(piece.warnings))
-
+            # Categorize QA status
             if not piece.warnings:
-                qa_status.append("OK")
-                qa_colors.append("rgba(46, 204, 113, 0.0)")
+                data['qa_status'].append("OK")
+                data['fill_color'].append("rgba(46, 204, 113, 0.0)")
             elif any("VERY" in w or "TINY" in w or "SUSPICIOUSLY" in w
                      or "GAP" in w for w in piece.warnings):
-                qa_status.append("Critical")
-                qa_colors.append("rgba(231, 76, 60, 0.35)")
+                data['qa_status'].append("Critical")
+                data['fill_color'].append("rgba(231, 76, 60, 0.35)")
             else:
-                qa_status.append("Warning")
-                qa_colors.append("rgba(243, 156, 18, 0.35)")
+                data['qa_status'].append("Warning")
+                data['fill_color'].append("rgba(243, 156, 18, 0.35)")
 
-        source = ColumnDataSource(data=dict(
-            xs=xs_all, ys=ys_all,
-            piece_id=piece_ids, area=areas,
-            min_width=min_widths, max_width=max_widths,
-            min_angle=min_angles, vertices=vertices,
-            cx=centroids_x, cy=centroids_y,
-            warnings=warning_texts, warning_count=warning_counts,
-            qa_status=qa_status, fill_color=qa_colors,
-        ))
+        source = ColumnDataSource(data=dict(data))
+        source_full = ColumnDataSource(data=dict(data))
 
-        source_full = ColumnDataSource(data=dict(source.data))
+        return source, source_full, dict(data)
 
-        # --- Main figure ---
+    def _build_bokeh_figure(self, bg_image, source, img_width, img_height):
+        """Build the main Bokeh figure with image, patches, and tools.
+
+        Args:
+            bg_image: uint32 background image array
+            source: ColumnDataSource with piece data
+            img_width: Image width in pixels
+            img_height: Image height in pixels
+
+        Returns:
+            Bokeh figure object
+        """
+        from bokeh.plotting import figure
+        from bokeh.models import HoverTool
+
         p = figure(
             title="Stained Glass Pattern Analysis",
             width=800,
@@ -921,12 +1454,14 @@ class PatternAnalyzer:
             match_aspect=True,
         )
 
+        # Background image
         p.image_rgba(
-            image=[img_uint32],
+            image=[bg_image],
             x=0, y=0,
             dw=img_width, dh=img_height,
         )
 
+        # Piece polygons (transparent by default, colored for warnings)
         patches = p.patches(
             'xs', 'ys',
             source=source,
@@ -941,13 +1476,13 @@ class PatternAnalyzer:
             nonselection_line_alpha=0,
         )
 
-        # Piece labels
+        # Piece number labels
+        from bokeh.models import ColumnDataSource
         label_source = ColumnDataSource(data=dict(
-            x=centroids_x,
-            y=centroids_y,
-            text=[str(pid) for pid in piece_ids],
+            x=source.data['cx'],
+            y=source.data['cy'],
+            text=[str(pid) for pid in source.data['piece_id']],
         ))
-
         p.text(
             'x', 'y', 'text',
             source=label_source,
@@ -958,32 +1493,7 @@ class PatternAnalyzer:
             text_font_style="bold",
         )
 
-        # Draw gaps as red lines
-        if self.gaps:
-            gap_xs = []
-            gap_ys = []
-            for gap in self.gaps:
-                gap_xs.append([gap.point1[0], gap.point2[0]])
-                gap_ys.append([img_height - gap.point1[1],
-                              img_height - gap.point2[1]])
-
-            gap_source = ColumnDataSource(data=dict(xs=gap_xs, ys=gap_ys))
-            p.multi_line('xs', 'ys', source=gap_source,
-                        line_color="red", line_width=4, line_dash="dashed")
-
-            # Gap endpoint markers
-            gap_pts_x = []
-            gap_pts_y = []
-            for gap in self.gaps:
-                gap_pts_x.extend([gap.point1[0], gap.point2[0]])
-                gap_pts_y.extend([img_height - gap.point1[1],
-                                 img_height - gap.point2[1]])
-
-            p.circle(gap_pts_x, gap_pts_y, size=10,
-                    fill_color="red", fill_alpha=0.5,
-                    line_color="red", line_width=2)
-
-        # Hover tool
+        # Hover tooltip
         hover = HoverTool(
             renderers=[patches],
             tooltips="""
@@ -1009,91 +1519,281 @@ class PatternAnalyzer:
         p.axis.visible = False
         p.grid.visible = False
 
-        # --- Summary panel ---
+        return p
+
+    def _add_bokeh_gaps(self, p, img_height):
+        """Add gap visualization to the Bokeh figure.
+
+        Args:
+            p: Bokeh figure
+            img_height: Image height for y-flip
+        """
+        from bokeh.models import ColumnDataSource
+
+        gap_xs = []
+        gap_ys = []
+        gap_pts_x = []
+        gap_pts_y = []
+
+        for gap in self.gaps:
+            gap_xs.append([gap.point1[0], gap.point2[0]])
+            gap_ys.append([
+                img_height - gap.point1[1],
+                img_height - gap.point2[1]
+            ])
+            gap_pts_x.extend([gap.point1[0], gap.point2[0]])
+            gap_pts_y.extend([
+                img_height - gap.point1[1],
+                img_height - gap.point2[1]
+            ])
+
+        gap_source = ColumnDataSource(data=dict(xs=gap_xs, ys=gap_ys))
+        p.multi_line(
+            'xs', 'ys', source=gap_source,
+            line_color="red", line_width=4, line_dash="dashed"
+        )
+
+        # Gap endpoint markers (using scatter instead of deprecated circle)
+        p.scatter(
+            gap_pts_x, gap_pts_y, size=10,
+            fill_color="red", fill_alpha=0.5,
+            line_color="red", line_width=2,
+            marker="circle",
+        )
+
+    def _build_bokeh_panels(self, source, source_full, piece_data,
+                            img_width, img_height):
+        """Build the right-side info panels for the Bokeh layout.
+
+        Includes summary, detail panel, filter checkboxes,
+        warning chart, and size histogram.
+
+        Args:
+            source: Piece data ColumnDataSource
+            source_full: Unfiltered copy of piece data
+            piece_data: Dict of piece data arrays
+            img_width: Image width
+            img_height: Image height
+
+        Returns:
+            Bokeh column layout for right panel
+        """
+        from bokeh.plotting import figure as bokeh_figure
+        from bokeh.models import (
+            ColumnDataSource, CustomJS, Div, CheckboxGroup
+        )
+        from bokeh.layouts import column
+
+        areas = piece_data['area']
+        qa_status = piece_data['qa_status']
+
         total = len(self.pieces)
         ok_count = sum(1 for s in qa_status if s == "OK")
         warn_count = sum(1 for s in qa_status if s == "Warning")
         crit_count = sum(1 for s in qa_status if s == "Critical")
 
+        # --- Summary panel ---
         gap_html = ""
         if self.gaps:
             gap_html = f"""
             <h3 style="color: #e74c3c;">⚠ Line Gaps: {len(self.gaps)}</h3>
-            <p style="font-size: 12px; color: #c0392b;">
-                Red dashed lines on the pattern show where lead lines
-                don't connect. This may cause incorrect piece detection.
-            </p>
             """
 
-        summary_html = f"""
+        summary_div = Div(text=f"""
         <div style="font-family: Arial, sans-serif; padding: 15px;
                     background: #f8f9fa; border-radius: 8px; width: 320px;">
             <h2 style="margin-top: 0;">Pattern Summary</h2>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <table style="width: 100%; font-size: 14px;">
                 <tr><td><b>Total Pieces:</b></td><td>{total}</td></tr>
-                <tr><td><b>Image:</b></td>
-                    <td>{img_width}x{img_height}px @ {self.scale_dpi:.1f} DPI</td></tr>
+                <tr><td><b>Scale:</b></td>
+                    <td>{self.scale_dpi:.1f} DPI</td></tr>
                 <tr><td><b>Panel Size:</b></td>
-                    <td>{img_width/self.scale_dpi:.1f}" x
-                        {img_height/self.scale_dpi:.1f}"</td></tr>
+                    <td>{img_width / self.scale_dpi:.1f}" x
+                        {img_height / self.scale_dpi:.1f}"</td></tr>
                 <tr><td><b>Total Glass:</b></td>
                     <td>{sum(areas):.0f} sq in</td></tr>
             </table>
-
             {gap_html}
-
             <h3>QA Status</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <table style="width: 100%; font-size: 14px;">
                 <tr>
-                    <td><span style="color: #2ecc71; font-size: 1.5em;">●</span> OK:</td>
-                    <td><b>{ok_count}</b> ({100*ok_count/max(total,1):.0f}%)</td>
+                    <td><span style="color: #2ecc71; font-size: 1.5em;">
+                        ●</span> OK:</td>
+                    <td><b>{ok_count}</b>
+                        ({100 * ok_count / max(total, 1):.0f}%)</td>
                 </tr>
                 <tr>
-                    <td><span style="color: #f39c12; font-size: 1.5em;">●</span> Warning:</td>
-                    <td><b>{warn_count}</b> ({100*warn_count/max(total,1):.0f}%)</td>
+                    <td><span style="color: #f39c12; font-size: 1.5em;">
+                        ●</span> Warning:</td>
+                    <td><b>{warn_count}</b>
+                        ({100 * warn_count / max(total, 1):.0f}%)</td>
                 </tr>
                 <tr>
-                    <td><span style="color: #e74c3c; font-size: 1.5em;">●</span> Critical:</td>
-                    <td><b>{crit_count}</b> ({100*crit_count/max(total,1):.0f}%)</td>
+                    <td><span style="color: #e74c3c; font-size: 1.5em;">
+                        ●</span> Critical:</td>
+                    <td><b>{crit_count}</b>
+                        ({100 * crit_count / max(total, 1):.0f}%)</td>
                 </tr>
             </table>
-
-            <h3>Size Range</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                <tr><td>Smallest:</td><td>{min(areas):.2f} sq in</td></tr>
-                <tr><td>Largest:</td><td>{max(areas):.2f} sq in</td></tr>
-                <tr><td>Average:</td><td>{np.mean(areas):.2f} sq in</td></tr>
-            </table>
-
-            <h3 style="margin-top: 15px;">Instructions</h3>
+            <h3>Instructions</h3>
             <ul style="font-size: 12px; color: #555;">
-                <li><b>Hover</b> over a piece for details</li>
-                <li><b>Click</b> a piece to highlight it</li>
-                <li><b>Scroll</b> to zoom in/out</li>
+                <li><b>Hover</b> for piece details</li>
+                <li><b>Click</b> to highlight</li>
+                <li><b>Scroll</b> to zoom</li>
                 <li><b>Drag</b> to pan</li>
-                <li>Use filters below to show/hide by status</li>
             </ul>
         </div>
-        """
-        summary_div = Div(text=summary_html)
+        """)
 
-        # --- Detail panel ---
+        # --- Detail panel (updates on click) ---
         detail_div = Div(text="""
         <div style="font-family: Arial, sans-serif; padding: 15px;
                     background: #fff3cd; border-radius: 8px; width: 320px;">
             <h3 style="margin-top: 0;">Piece Detail</h3>
-            <p><i>Click a piece on the pattern to see details here</i></p>
+            <p><i>Click a piece to see details</i></p>
         </div>
         """, width=340)
 
-        tap_callback = CustomJS(args=dict(source=source, detail_div=detail_div), code="""
+        # JavaScript callback for click selection
+        tap_callback = CustomJS(
+            args=dict(source=source, detail_div=detail_div),
+            code=self._bokeh_tap_callback_js()
+        )
+        source.selected.js_on_change('indices', tap_callback)
+
+        # --- Filter checkboxes ---
+        filter_callback = CustomJS(
+            args=dict(source=source, source_full=source_full),
+            code=self._bokeh_filter_callback_js()
+        )
+
+        filter_div = Div(text="""
+        <div style="font-family: Arial; padding: 10px;
+                    background: #e8e8e8; border-radius: 8px; width: 320px;">
+            <h4 style="margin-top: 0;">Filter by QA Status:</h4>
+        </div>
+        """)
+
+        checkbox = CheckboxGroup(
+            labels=[
+                f"✓ OK ({ok_count})",
+                f"⚠ Warning ({warn_count})",
+                f"✖ Critical ({crit_count})"
+            ],
+            active=[0, 1, 2],
+        )
+        checkbox.js_on_change('active', filter_callback)
+
+        # --- Warning breakdown chart ---
+        warn_chart = self._build_warning_chart()
+
+        # --- Area histogram ---
+        area_hist = self._build_area_histogram(areas)
+
+        return column(
+            summary_div, detail_div,
+            filter_div, checkbox,
+            warn_chart, area_hist,
+        )
+
+    def _build_warning_chart(self):
+        """Build a bar chart showing warning type distribution.
+
+        Returns:
+            Bokeh figure or Div if no warnings
+        """
+        from bokeh.plotting import figure as bokeh_figure
+        from bokeh.models import ColumnDataSource, Div
+
+        warning_types = defaultdict(int)
+        for piece in self.pieces:
+            for w in piece.warnings:
+                wtype = w.split(":")[0]
+                warning_types[wtype] += 1
+
+        if not warning_types:
+            return Div(text="""
+            <div style="padding: 10px; background: #d4edda;
+                        border-radius: 8px;">
+                <b>✓ No warnings — all pieces OK!</b>
+            </div>
+            """)
+
+        warn_labels = list(warning_types.keys())
+        warn_values = list(warning_types.values())
+
+        warn_source = ColumnDataSource(data=dict(
+            labels=warn_labels,
+            counts=warn_values,
+            colors=[
+                "#e74c3c" if "VERY" in l or "TINY" in l
+                             or "SUSPICIOUSLY" in l or "GAP" in l
+                else "#f39c12"
+                for l in warn_labels
+            ]
+        ))
+
+        chart = bokeh_figure(
+            title="Warning Breakdown",
+            x_range=warn_labels,
+            width=340, height=200,
+            tools="", toolbar_location=None,
+        )
+        chart.vbar(
+            x='labels', top='counts', width=0.8,
+            source=warn_source, color='colors',
+        )
+        chart.xaxis.major_label_orientation = 0.8
+        chart.yaxis.axis_label = "Count"
+
+        return chart
+
+    def _build_area_histogram(self, areas):
+        """Build a histogram of piece areas.
+
+        Args:
+            areas: List of piece areas in square inches
+
+        Returns:
+            Bokeh figure
+        """
+        from bokeh.plotting import figure as bokeh_figure
+        from bokeh.models import ColumnDataSource
+
+        hist_values, hist_edges = np.histogram(areas, bins=20)
+        hist_source = ColumnDataSource(data=dict(
+            top=hist_values.tolist(),
+            left=hist_edges[:-1].tolist(),
+            right=hist_edges[1:].tolist(),
+        ))
+
+        hist = bokeh_figure(
+            title="Piece Size Distribution",
+            width=340, height=200,
+            tools="", toolbar_location=None,
+        )
+        hist.quad(
+            top='top', bottom=0, left='left', right='right',
+            source=hist_source,
+            fill_color="#3498db", line_color="white", alpha=0.8,
+        )
+        hist.xaxis.axis_label = "Area (sq in)"
+        hist.yaxis.axis_label = "Count"
+
+        return hist
+
+    @staticmethod
+    def _bokeh_tap_callback_js():
+        """Return JavaScript code for the piece-click callback."""
+        return """
             const indices = source.selected.indices;
             if (indices.length === 0) {
                 detail_div.text = `
-                <div style="font-family: Arial, sans-serif; padding: 15px;
-                            background: #fff3cd; border-radius: 8px; width: 320px;">
+                <div style="font-family: Arial; padding: 15px;
+                            background: #fff3cd; border-radius: 8px;
+                            width: 320px;">
                     <h3 style="margin-top: 0;">Piece Detail</h3>
-                    <p><i>Click a piece on the pattern to see details here</i></p>
+                    <p><i>Click a piece to see details</i></p>
                 </div>`;
                 return;
             }
@@ -1108,39 +1808,42 @@ class PatternAnalyzer:
 
             const warnings = data.warnings[idx];
             const warn_html = warnings === "None" ?
-                "<p style='color: #2ecc71;'><b>✓ No issues found</b></p>" :
+                "<p style='color: #2ecc71;'><b>✓ No issues</b></p>" :
                 warnings.split("; ").map(w =>
-                    "<p style='color: #c0392b; margin: 2px 0;'>⚠ " + w + "</p>"
+                    "<p style='color: #c0392b; margin: 2px 0;'>⚠ "
+                    + w + "</p>"
                 ).join("");
 
             detail_div.text = `
-            <div style="font-family: Arial, sans-serif; padding: 15px;
-                        background: ${bg_color}; border-radius: 8px; width: 320px;">
+            <div style="font-family: Arial; padding: 15px;
+                        background: ${bg_color}; border-radius: 8px;
+                        width: 320px;">
                 <h3 style="margin-top: 0;">
                     Piece #${data.piece_id[idx]}
                     <span style="color: ${status_color}; font-size: 0.8em;">
-                        (${status})
-                    </span>
+                        (${status})</span>
                 </h3>
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td>Area:</td><td><b>${data.area[idx]} sq in</b></td></tr>
-                    <tr><td>Min Width:</td><td><b>${data.min_width[idx]}"</b></td></tr>
-                    <tr><td>Max Width:</td><td><b>${data.max_width[idx]}"</b></td></tr>
-                    <tr><td>Min Angle:</td><td><b>${data.min_angle[idx]}°</b></td></tr>
-                    <tr><td>Vertices:</td><td><b>${data.vertices[idx]}</b></td></tr>
+                <table style="width: 100%; font-size: 14px;">
+                    <tr><td>Area:</td>
+                        <td><b>${data.area[idx]} sq in</b></td></tr>
+                    <tr><td>Min Width:</td>
+                        <td><b>${data.min_width[idx]}"</b></td></tr>
+                    <tr><td>Max Width:</td>
+                        <td><b>${data.max_width[idx]}"</b></td></tr>
+                    <tr><td>Min Angle:</td>
+                        <td><b>${data.min_angle[idx]}°</b></td></tr>
+                    <tr><td>Vertices:</td>
+                        <td><b>${data.vertices[idx]}</b></td></tr>
                 </table>
                 <h4 style="margin-bottom: 4px;">Warnings:</h4>
                 ${warn_html}
             </div>`;
-        """)
+        """
 
-        source.selected.js_on_change('indices', tap_callback)
-
-        # --- Filter controls ---
-        filter_callback = CustomJS(args=dict(
-            source=source,
-            source_full=source_full
-        ), code="""
+    @staticmethod
+    def _bokeh_filter_callback_js():
+        """Return JavaScript code for the QA status filter callback."""
+        return """
             const checkboxes = cb_obj.active;
             const show_ok = checkboxes.includes(0);
             const show_warn = checkboxes.includes(1);
@@ -1167,142 +1870,150 @@ class PatternAnalyzer:
 
             source.data = filtered;
             source.change.emit();
-        """)
+        """
 
-        filter_div = Div(text="""
-        <div style="font-family: Arial, sans-serif; padding: 10px;
-                    background: #e8e8e8; border-radius: 8px; width: 320px;">
-            <h4 style="margin-top: 0;">Filter by QA Status:</h4>
-        </div>
-        """)
+    # =========================================================================
+    # Convenience Method
+    # =========================================================================
 
-        checkbox = CheckboxGroup(
-            labels=[
-                f"✓ OK ({ok_count})",
-                f"⚠ Warning ({warn_count})",
-                f"✖ Critical ({crit_count})"
-            ],
-            active=[0, 1, 2],
-        )
-        checkbox.js_on_change('active', filter_callback)
+    def generate_all(self, prefix="pattern"):
+        """Generate all output files.
 
-        # --- Warning breakdown chart ---
-        warning_types = defaultdict(int)
-        for piece in self.pieces:
-            for w in piece.warnings:
-                wtype = w.split(":")[0]
-                warning_types[wtype] += 1
+        Runs the full pipeline and generates all outputs:
+            - Annotated image
+            - QA overlay image
+            - Text report
+            - Interactive Bokeh visualization (if available)
 
-        if warning_types:
-            warn_labels = list(warning_types.keys())
-            warn_values = list(warning_types.values())
+        Args:
+            prefix: Output filename prefix
+        """
+        self.generate_annotated_image(prefix=prefix)
+        self.generate_qa_overlay(prefix=prefix)
+        self.generate_report(prefix=prefix)
 
-            warn_source = ColumnDataSource(data=dict(
-                labels=warn_labels,
-                counts=warn_values,
-                colors=[
-                    "#e74c3c" if "VERY" in l or "TINY" in l
-                    or "SUSPICIOUSLY" in l or "GAP" in l
-                    else "#f39c12"
-                    for l in warn_labels
-                ]
-            ))
+        try:
+            self.generate_bokeh_visualization(prefix=prefix)
+        except ImportError as e:
+            print(f"\nBokeh visualization skipped: {e}")
+            print("Install with: pip install bokeh")
+        except Exception as e:
+            print(f"\nBokeh visualization failed: {e}")
+            import traceback
+            traceback.print_exc()
 
-            warn_chart = figure(
-                title="Warning Breakdown",
-                x_range=warn_labels,
-                width=340,
-                height=200,
-                tools="",
-                toolbar_location=None,
-            )
-            warn_chart.vbar(
-                x='labels', top='counts', width=0.8,
-                source=warn_source,
-                color='colors',
-            )
-            warn_chart.xaxis.major_label_orientation = 0.8
-            warn_chart.yaxis.axis_label = "Count"
-        else:
-            warn_chart = Div(text="""
-            <div style="padding: 10px; background: #d4edda; border-radius: 8px;">
-                <b>✓ No warnings — all pieces OK!</b>
-            </div>
-            """)
 
-        # --- Area histogram ---
-        hist_values, hist_edges = np.histogram(areas, bins=20)
-        hist_source = ColumnDataSource(data=dict(
-            top=hist_values.tolist(),
-            left=hist_edges[:-1].tolist(),
-            right=hist_edges[1:].tolist(),
-        ))
-
-        area_hist = figure(
-            title="Piece Size Distribution",
-            width=340,
-            height=200,
-            tools="",
-            toolbar_location=None,
-        )
-        area_hist.quad(
-            top='top', bottom=0, left='left', right='right',
-            source=hist_source,
-            fill_color="#3498db",
-            line_color="white",
-            alpha=0.8,
-        )
-        area_hist.xaxis.axis_label = "Area (sq in)"
-        area_hist.yaxis.axis_label = "Count"
-
-        # --- Layout ---
-        right_panel = column(
-            summary_div,
-            detail_div,
-            filter_div,
-            checkbox,
-            warn_chart,
-            area_hist,
-        )
-
-        layout = row(p, right_panel)
-
-        save(layout)
-        print(f"Saved interactive visualization: {output_path}")
-        return output_path
-
+# =============================================================================
+# Command Line Interface
+# =============================================================================
 
 def main():
+    """Main entry point for command-line usage."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Stained Glass Pattern Analyzer')
-    parser.add_argument('image', help='Path to pattern image')
-    parser.add_argument('--dpi', type=int, default=150,
-                       help='Scale DPI (default: 150)')
-    parser.add_argument('--panel-width', type=float, default=None,
-                       help='Actual panel width in inches (auto-calculates DPI)')
-    parser.add_argument('--panel-height', type=float, default=None,
-                       help='Actual panel height in inches (auto-calculates DPI)')
-    parser.add_argument('--threshold', type=int, default=128,
-                       help='Line detection threshold 0-255 (default: 128)')
-    parser.add_argument('--close-kernel', type=int, default=3,
-                       help='Morphological closing kernel size (default: 3)')
-    parser.add_argument('--dilate', type=int, default=1,
-                       help='Line dilation iterations (default: 1)')
-    parser.add_argument('--min-area', type=int, default=200,
-                       help='Minimum piece area in pixels (default: 200)')
-    parser.add_argument('--max-gap', type=int, default=20,
-                       help='Maximum gap distance in pixels to flag (default: 20)')
-    parser.add_argument('--prefix', type=str, default='pattern',
-                       help='Output file prefix (default: pattern)')
-    parser.add_argument('--output-dir', '-o', type=str, default='./output',
-                       help='Output directory (default: ./output)')
-    parser.add_argument('--no-bokeh', action='store_true',
-                       help='Skip Bokeh interactive visualization')
-    parser.add_argument('--min-gap', type=int, default=None,
-                        help='Minimum gap distance in pixels (default: auto)')
+    parser = argparse.ArgumentParser(
+        description='Stained Glass Pattern Analyzer — '
+                    'Detect pieces, measure properties, and check quality.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic analysis with auto DPI
+  %(prog)s pattern.png -o ./output
+
+  # Specify actual panel width for correct measurements
+  %(prog)s pattern.jpg --panel-width 24 -o ./output
+
+  # Specify panel height instead
+  %(prog)s pattern.jpg --panel-height 48 -o ./output
+
+  # Adjust line detection for faint lines
+  %(prog)s pattern.jpg --threshold 100 --dilate 2 -o ./output
+
+  # Skip Bokeh visualization
+  %(prog)s pattern.jpg --panel-width 24 --no-bokeh -o ./output
+        """
+    )
+
+    # Required
+    parser.add_argument(
+        'image',
+        help='Path to pattern image (JPG, PNG, etc.)'
+    )
+
+    # Scale options
+    scale_group = parser.add_argument_group('Scale Options')
+    scale_group.add_argument(
+        '--dpi', type=int, default=150,
+        help='Scale DPI for measurements (default: 150). '
+             'Overridden by --panel-width or --panel-height.'
+    )
+    scale_group.add_argument(
+        '--panel-width', type=float, default=None,
+        help='Actual panel width in inches (auto-calculates DPI)'
+    )
+    scale_group.add_argument(
+        '--panel-height', type=float, default=None,
+        help='Actual panel height in inches (auto-calculates DPI)'
+    )
+
+    # Image processing options
+    proc_group = parser.add_argument_group('Image Processing')
+    proc_group.add_argument(
+        '--threshold', type=int, default=128,
+        help='Line detection threshold 0-255 (default: 128). '
+             'Lower = detect fainter lines.'
+    )
+    proc_group.add_argument(
+        '--close-kernel', type=int, default=3,
+        help='Morphological closing kernel size (default: 3). '
+             'Seals small gaps from JPG compression.'
+    )
+    proc_group.add_argument(
+        '--dilate', type=int, default=1,
+        help='Line dilation iterations (default: 1). '
+             'Thickens lines to seal larger gaps.'
+    )
+    proc_group.add_argument(
+        '--min-area', type=int, default=200,
+        help='Minimum piece area in pixels (default: 200). '
+             'Smaller regions treated as noise.'
+    )
+
+    # Gap detection
+    gap_group = parser.add_argument_group('Gap Detection')
+    gap_group.add_argument(
+        '--max-gap', type=int, default=20,
+        help='Maximum gap distance in pixels to detect (default: 20)'
+    )
+    gap_group.add_argument(
+        '--min-gap', type=int, default=None,
+        help='Minimum gap distance in pixels (default: auto)'
+    )
+
+    gap_group.add_argument(
+        '--suspicious-ratio', type=float, default=8.0,
+        help='Flag pieces larger than this multiple of median area '
+             'as suspiciously large / possible merged pieces (default: 8.0)'
+    )
+
+    # Output options
+    out_group = parser.add_argument_group('Output')
+    out_group.add_argument(
+        '--prefix', type=str, default='pattern',
+        help='Output filename prefix (default: pattern)'
+    )
+    out_group.add_argument(
+        '--output-dir', '-o', type=str, default='./output',
+        help='Output directory (default: ./output)'
+    )
+    out_group.add_argument(
+        '--no-bokeh', action='store_true',
+        help='Skip interactive Bokeh HTML visualization'
+    )
 
     args = parser.parse_args()
+
+    # --- Run analysis pipeline ---
 
     print("Stained Glass Pattern Analyzer")
     print("=" * 40)
@@ -1328,7 +2039,8 @@ def main():
     print("\n--- Detecting Line Gaps ---")
     analyzer.detect_line_gaps(
         max_gap_pixels=args.max_gap,
-        min_gap_pixels=args.min_gap
+        min_gap_pixels=args.min_gap,
+        suspicious_ratio=args.suspicious_ratio,
     )
 
     print("\n--- Running QA ---")
@@ -1337,7 +2049,6 @@ def main():
     print("\n--- Generating Outputs ---")
     analyzer.generate_annotated_image(prefix=args.prefix)
     analyzer.generate_qa_overlay(prefix=args.prefix)
-    analyzer.generate_gap_debug_image(prefix=args.prefix)
     analyzer.generate_report(prefix=args.prefix)
 
     if not args.no_bokeh:
@@ -1352,20 +2063,19 @@ def main():
             import traceback
             traceback.print_exc()
 
+    # --- Summary ---
     print("\n--- Done! ---")
     output_dir = Path(args.output_dir).resolve()
     print(f"\nAll output files in: {output_dir}")
     print(f"  debug_00_threshold_only.png    — raw threshold result")
     print(f"  debug_01_binary.png            — after morphological cleanup")
     print(f"  debug_02_lines_highlighted.png — lines shown in red")
-    print(f"  debug_03_skeleton.png          — skeletonized line network")
-    print(f"  debug_04_endpoints.png         — detected line endpoints")
-    print(f"  {args.prefix}_analyzed.png     — numbered pieces with QA highlights")
+    print(f"  debug_04_gaps_found.png        — detected line gaps")
+    print(f"  {args.prefix}_analyzed.png     — numbered pieces + QA")
     print(f"  {args.prefix}_qa.png           — QA issues only")
-    print(f"  {args.prefix}_gaps.png         — detected line gaps")
     print(f"  {args.prefix}_report.txt       — full text report")
     if not args.no_bokeh:
-        print(f"  {args.prefix}_interactive.html — interactive Bokeh visualization")
+        print(f"  {args.prefix}_interactive.html — interactive visualization")
 
 
 if __name__ == "__main__":
