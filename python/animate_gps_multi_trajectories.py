@@ -337,12 +337,12 @@ class animate_gps_multi_trajectories():
         print("max_dist", max_dist, "max_elev", max_elev)
 
         d_hist = figure(y_axis_label='Distance (mi)', width=100, height=640, x_range=(0., 1.),
-                        y_range=(0, max_max_elev*1.1), tools="")
+                        y_range=(0, max_dist*1.1), tools="")
         d_hist.xaxis.visible = False  # Hide x-axis
         d_hist.xgrid.grid_line_color = None  # Remove x-grid lines
 
         e_hist = figure(x_axis_label='Elevation (ft)', width=1400, height=100, y_range=(0., 1.),
-                        x_range=(0, max_elev[i]*1.1), tools="")
+                        x_range=(0, max_max_elev*1.1), tools="")
         e_hist.yaxis.visible = False  # Hide y-axis
         e_hist.ygrid.grid_line_color = None  # Remove x-grid lines
 
