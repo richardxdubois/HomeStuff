@@ -1,7 +1,6 @@
 """
 Stained Glass Pattern Analyzer
 ===============================
-
 Analyzes stained glass pattern images to detect pieces, measure their
 properties, and perform quality assurance checks.
 
@@ -21,10 +20,10 @@ Usage:
     The tool auto-calculates DPI from the panel dimensions.
 
 Dependencies:
-    Required: opencv-python, numpy
+    Required: opencv-python, numpy, scikit-image
     Optional: bokeh (>=3.8), pillow (for interactive visualization)
 
-    pip install opencv-python numpy bokeh pillow
+    pip install opencv-python numpy scikit-image bokeh pillow
 
 Author: Collaborative development with Claude
 Date: 2024
@@ -69,22 +68,6 @@ class Piece:
     min_width_inches: float
     max_width_inches: float
     warnings: list = field(default_factory=list)
-
-
-@dataclass
-class Gap:
-    """Represents a detected gap in the lead line network.
-
-    Attributes:
-        point1: (x, y) first endpoint of the gap
-        point2: (x, y) second endpoint of the gap
-        distance_pixels: Gap distance in pixels
-        distance_inches: Gap distance in inches
-    """
-    point1: tuple
-    point2: tuple
-    distance_pixels: float
-    distance_inches: float
 
 
 # =============================================================================
@@ -226,7 +209,6 @@ class PatternAnalyzer:
         _, binary = cv2.threshold(
             self.gray, line_threshold, 255, cv2.THRESH_BINARY
         )
-
         cv2.imwrite(self._output_path("debug_00_threshold_only.png"), binary)
         print("Saved debug_00_threshold_only.png")
 
@@ -251,7 +233,6 @@ class PatternAnalyzer:
 
         # Save debug images
         cv2.imwrite(self._output_path("debug_01_binary.png"), binary)
-
         debug_color = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
         debug_color[binary == 0] = [0, 0, 255]  # lines in red
         cv2.imwrite(
@@ -321,7 +302,6 @@ class PatternAnalyzer:
             if area < min_area_pixels:
                 rejected_small += 1
                 continue
-
             if area > max_area:
                 rejected_large += 1
                 continue
@@ -342,10 +322,8 @@ class PatternAnalyzer:
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
             x, y, w, h = cv2.boundingRect(contour)
-
             epsilon = 0.015 * cv2.arcLength(contour, True)
             approx = cv2.approxPolyDP(contour, epsilon, True)
-
             min_angle = self._min_interior_angle(approx)
             min_width, max_width = self._piece_widths(contour)
             area_sq_inches = area / (self.scale_dpi ** 2)
@@ -399,7 +377,6 @@ class PatternAnalyzer:
             if child_area > parent_area * 0.05 and child_area > min_area:
                 return True
             child_idx = hierarchy[child_idx][0]  # next sibling
-
         return False
 
     # =========================================================================
@@ -420,7 +397,6 @@ class PatternAnalyzer:
         """
         points = approx_contour.reshape(-1, 2)
         n = len(points)
-
         if n < 3:
             return 180.0
 
@@ -473,15 +449,13 @@ class PatternAnalyzer:
 
         # Strategy 2: Distance transform for interior analysis
         dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-
         if dist.max() > 0:
             max_width_dt = dist.max() * 2 / self.scale_dpi
-            interior_pixels = cv2.countNonZero(mask)
 
+            interior_pixels = cv2.countNonZero(mask)
             if interior_pixels > 100:
                 skeleton = self._skeletonize(mask)
                 skeleton_distances = dist[skeleton > 0]
-
                 if len(skeleton_distances) > 2:
                     min_width_dt = (
                             np.percentile(skeleton_distances, 10) * 2
@@ -515,7 +489,6 @@ class PatternAnalyzer:
         skeleton = np.zeros_like(binary_image)
         temp = binary_image.copy()
         kernel = np.ones((3, 3), np.uint8)
-
         while True:
             eroded = cv2.erode(temp, kernel)
             dilated = cv2.dilate(eroded, kernel)
@@ -524,347 +497,207 @@ class PatternAnalyzer:
             temp = eroded.copy()
             if cv2.countNonZero(temp) == 0:
                 break
-
         return skeleton
 
     # =========================================================================
     # Line Gap Detection
     # =========================================================================
 
-    def detect_line_gaps(self, max_gap_pixels=20, min_gap_pixels=None,
-                         cluster_radius=8, suspicious_ratio=8.0):
-        """Detect gaps in the lead line network.
+    def detect_line_gaps(self, max_gap_pixels=20, min_gap_pixels=2,
+                         suspicious_ratio=2.5):
+        """Detect gaps in lead lines using morphological erosion.
 
-        Uses two strategies:
-            1. Analyze suspiciously large pieces — their boundaries are
-               walked to find points near other lines that don't connect
-            2. Progressive dilation — thicken lines incrementally and
-               check if new pieces appear (indicates a gap was bridged)
+        Strategy: progressively erode white regions (thicken black lines).
+        When a previously single piece splits into two, a gap has been
+        closed by the thickened lines, revealing where the original
+        gap was.
+
+        For each split, finds the closest points between the two new
+        pieces to pinpoint the gap location.
 
         Args:
-            max_gap_pixels: Maximum gap distance to search for (pixels)
-            min_gap_pixels: Minimum gap distance (auto-calculated if None)
-            cluster_radius: Radius for clustering nearby gap points
-            suspicious_ratio: Pieces larger than this multiple of the
-                         median area are analyzed for gaps (default 8.0)
-
-        Returns:
-            List of Gap objects (also stored as self.gaps)
+            max_gap_pixels: Maximum gap width in pixels to detect.
+                           Controls how far erosion proceeds. Default 20.
+            min_gap_pixels: Minimum gap width in pixels. Default 2.
+            suspicious_ratio: Multiplier for flagging suspiciously large
+                            pieces (stored for QA use). Default 2.5.
         """
-        # At the top of detect_line_gaps:
         self.suspicious_ratio = suspicious_ratio
+        binary = self.binary
 
-        if self.binary is None:
-            self.preprocess()
+        from skimage.measure import label
 
-        print("Searching for line gaps...")
-        self.gaps = []
+        original_labels = label(binary, connectivity=1)
+        original_count = original_labels.max()
+        print(f"Original piece count: {original_count}")
 
-        # Strategy 1: Analyze suspiciously large pieces
-        if len(self.pieces) > 3:
-            median_area = np.median([p.area for p in self.pieces])
-
-            for piece in self.pieces:
-                if piece.area <= median_area * suspicious_ratio:
-                    continue
-
-                print(f"  Analyzing suspicious piece #{piece.id} "
-                      f"({piece.area_sq_inches:.1f} sq in)...")
-
-                gaps = self._find_gaps_in_piece(piece, max_gap_pixels)
-                self.gaps.extend(gaps)
-
-        # Strategy 2: Progressive dilation (fallback)
-        if not self.gaps:
-            self._detect_gaps_by_dilation(max_gap_pixels)
-
-        # Save debug visualization
-        self._save_gap_debug_image()
-
-        print(f"Detected {len(self.gaps)} unique line gaps")
-        return self.gaps
-
-    def _find_gaps_in_piece(self, piece, max_gap_pixels):
-        """Find gap locations by analyzing a suspicious piece's boundary.
-
-        Walks the piece contour looking for points that come very close
-        to other lead lines without touching them. These near-misses
-        indicate gaps in the line network.
-
-        Args:
-            piece: Piece object to analyze
-            max_gap_pixels: Maximum gap distance to consider
-
-        Returns:
-            List of Gap objects found
-        """
         gaps = []
+        prev_labels = original_labels.copy()
+        prev_count = original_count
 
-        # Create masks for analysis
-        piece_mask = np.zeros(self.gray.shape, dtype=np.uint8)
-        cv2.drawContours(piece_mask, [piece.contour], -1, 255, -1)
+        # ERODE white regions (= thicken black lines)
+        # This CLOSES gaps, splitting merged pieces
+        for r in range(1, max_gap_pixels // 2 + 1):
+            kernel = cv2.getStructuringElement(
+                cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1)
+            )
+            # Erode white regions = dilate black lines directly on binary
+            eroded = cv2.erode(binary, kernel, iterations=1)
 
-        lines_mask = cv2.bitwise_not(self.binary)
+            new_labels = label(eroded, connectivity=1)
+            new_count = new_labels.max()
 
-        # Get piece boundary and dilate slightly
-        boundary_mask = np.zeros(self.gray.shape, dtype=np.uint8)
-        cv2.drawContours(boundary_mask, [piece.contour], -1, 255, 2)
-        boundary_dilated = cv2.dilate(
-            boundary_mask, np.ones((5, 5), np.uint8)
-        )
+            if new_count > prev_count:
+                pieces_split = new_count - prev_count
+                print(f"  Erosion r={r} ({2 * r}px): "
+                      f"{prev_count} → {new_count} pieces "
+                      f"({pieces_split} split)")
 
-        # Find "other lines" — lines NOT on this piece's boundary
-        other_lines = cv2.bitwise_and(
-            lines_mask, cv2.bitwise_not(boundary_dilated)
-        )
+                # Find which previous piece split
+                for prev_id in range(1, prev_count + 1):
+                    prev_mask = (prev_labels == prev_id)
+                    # What new labels exist in this previous region?
+                    overlapping_new = np.unique(new_labels[prev_mask])
+                    overlapping_new = overlapping_new[overlapping_new > 0]
 
-        if cv2.countNonZero(other_lines) == 0:
-            return gaps
+                    if len(overlapping_new) < 2:
+                        continue
 
-        # Distance from each pixel to nearest "other line"
-        other_lines_inv = cv2.bitwise_not(other_lines)
-        dist_to_other = cv2.distanceTransform(
-            other_lines_inv, cv2.DIST_L2, 5
-        )
+                    print(f"    Piece {prev_id} split into "
+                          f"{overlapping_new.tolist()}")
 
-        # Walk the contour finding near-miss points
-        contour_points = piece.contour.reshape(-1, 2)
-        step = max(1, len(contour_points) // 500)
+                    # Find closest points between the split parts
+                    for i in range(len(overlapping_new)):
+                        for j in range(i + 1, len(overlapping_new)):
+                            id_a = overlapping_new[i]
+                            id_b = overlapping_new[j]
 
-        near_points = []
-        for idx in range(0, len(contour_points), step):
-            px, py = contour_points[idx]
-            if (0 <= py < dist_to_other.shape[0] and
-                    0 <= px < dist_to_other.shape[1]):
-                dist = dist_to_other[py, px]
-                if 0 < dist < max_gap_pixels:
-                    near_points.append((px, py, dist))
+                            mask_a = (new_labels == id_a).astype(np.uint8)
+                            mask_b = (new_labels == id_b).astype(np.uint8)
 
-        if not near_points:
-            return gaps
+                            contours_a, _ = cv2.findContours(
+                                mask_a, cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_NONE
+                            )
+                            contours_b, _ = cv2.findContours(
+                                mask_b, cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_NONE
+                            )
 
-        print(f"    Found {len(near_points)} near-miss points")
+                            if not contours_a or not contours_b:
+                                continue
 
-        # Cluster nearby points — each cluster = one gap
-        clusters = self._cluster_points(near_points, max_gap_pixels)
-        print(f"    Clustered into {len(clusters)} gap locations")
+                            pts_a = contours_a[0].reshape(-1, 2)
+                            pts_b = contours_b[0].reshape(-1, 2)
 
-        # Convert clusters to Gap objects
-        for cluster in clusters:
-            gap = self._cluster_to_gap(cluster, other_lines)
-            if gap:
-                gaps.append(gap)
+                            if len(pts_a) > 500:
+                                pts_a = pts_a[::len(pts_a) // 500]
+                            if len(pts_b) > 500:
+                                pts_b = pts_b[::len(pts_b) // 500]
 
-        return gaps
+                            min_dist = float('inf')
+                            best_a, best_b = None, None
 
-    def _cluster_points(self, points, cluster_radius):
-        """Group nearby points into clusters.
+                            for pa in pts_a:
+                                dists = np.sqrt(
+                                    (pts_b[:, 0] - pa[0]) ** 2 +
+                                    (pts_b[:, 1] - pa[1]) ** 2
+                                )
+                                idx = np.argmin(dists)
+                                if dists[idx] < min_dist:
+                                    min_dist = dists[idx]
+                                    best_a = tuple(pa)
+                                    best_b = tuple(pts_b[idx])
+
+                            if best_a is not None:
+                                gap_width = max(
+                                    int(min_dist), min_gap_pixels
+                                )
+
+                                print(f"      GAP between {id_a}&{id_b}: "
+                                      f"{best_a} - {best_b} "
+                                      f"dist={min_dist:.1f}px "
+                                      f"({min_dist / self.scale_dpi:.2f}\")")
+
+                                gaps.append({
+                                    'from': best_a,
+                                    'to': best_b,
+                                    'center': (
+                                        (best_a[0] + best_b[0]) // 2,
+                                        (best_a[1] + best_b[1]) // 2
+                                    ),
+                                    'distance_px': gap_width,
+                                    'distance_in': (
+                                        gap_width / self.scale_dpi
+                                    ),
+                                })
+
+            prev_labels = new_labels
+            prev_count = new_count
+            if new_count <= 1:
+                break
+
+        clustered = self._cluster_gaps_morphological(gaps)
+        print(f"Detected {len(clustered)} line gap(s)")
+        self.gaps = clustered
+
+    def _cluster_gaps_morphological(self, gaps, radius=20):
+        """Cluster gap detections by center proximity, keep smallest.
+
+        Multiple erosion levels may detect the same physical gap.
+        This groups detections within 'radius' pixels and keeps
+        the smallest (most accurate) measurement.
 
         Args:
-            points: List of (x, y, distance) tuples
-            cluster_radius: Maximum distance between points in a cluster
+            gaps: List of gap dicts with 'center' and 'distance_px'
+            radius: Maximum pixel distance to consider same gap
 
         Returns:
-            List of clusters, each a list of (x, y, distance) tuples
+            List of deduplicated gap dicts, sorted by distance
         """
+        if not gaps:
+            return []
+
+        # Sort smallest first
+        sorted_gaps = sorted(gaps, key=lambda g: g['distance_px'])
+
         clusters = []
-        used = set()
+        for g in sorted_gaps:
+            cx, cy = g.get('center', g['from'])
 
-        for i, (px, py, d) in enumerate(points):
-            if i in used:
-                continue
+            merged = False
+            for cluster in clusters:
+                ccx, ccy = cluster.get('center', cluster['from'])
+                if abs(cx - ccx) <= radius and abs(cy - ccy) <= radius:
+                    merged = True
+                    break
 
-            cluster = [(px, py, d)]
-            used.add(i)
+            if not merged:
+                clusters.append(g)
 
-            for j, (ox, oy, od) in enumerate(points):
-                if j in used:
-                    continue
-                if np.sqrt((px - ox) ** 2 + (py - oy) ** 2) < cluster_radius:
-                    cluster.append((ox, oy, od))
-                    used.add(j)
-
-            clusters.append(cluster)
-
+        clusters.sort(key=lambda g: g['distance_px'])
         return clusters
 
-    def _cluster_to_gap(self, cluster, other_lines):
-        """Convert a cluster of near-miss points to a Gap object.
-
-        Finds the closest approach point and the nearest line pixel
-        on the other side of the gap.
-
-        Args:
-            cluster: List of (x, y, distance) tuples
-            other_lines: Binary image of line pixels to gap toward
-
-        Returns:
-            Gap object or None if no valid gap found
-        """
-        # Find the point with minimum distance to other line
-        best = min(cluster, key=lambda p: p[2])
-        bx, by, bdist = best
-
-        # Find nearest "other line" pixel
-        search_radius = int(bdist) + 5
-        min_y = max(0, by - search_radius)
-        max_y = min(other_lines.shape[0], by + search_radius)
-        min_x = max(0, bx - search_radius)
-        max_x = min(other_lines.shape[1], bx + search_radius)
-
-        region = other_lines[min_y:max_y, min_x:max_x]
-        line_points = np.where(region > 0)
-
-        if len(line_points[0]) == 0:
-            return None
-
-        dists = np.sqrt(
-            (line_points[1] + min_x - bx) ** 2 +
-            (line_points[0] + min_y - by) ** 2
-        )
-        closest_idx = np.argmin(dists)
-
-        target_x = int(line_points[1][closest_idx] + min_x)
-        target_y = int(line_points[0][closest_idx] + min_y)
-
-        return Gap(
-            point1=(bx, by),
-            point2=(target_x, target_y),
-            distance_pixels=bdist,
-            distance_inches=bdist / self.scale_dpi,
-        )
-
-    def _detect_gaps_by_dilation(self, max_gap_pixels):
-        """Detect gaps by progressively dilating lines.
-
-        Thickens all lines incrementally. If new pieces appear at
-        some dilation level, a gap was bridged at that point.
-
-        Args:
-            max_gap_pixels: Maximum dilation to attempt
-        """
-        lines = cv2.bitwise_not(self.binary)
-        kernel = np.ones((3, 3), np.uint8)
-        baseline_regions = self._count_significant_regions(self.binary)
-        print(f"  Dilation fallback — Baseline: {baseline_regions} regions")
-
-        for dilation in range(1, max_gap_pixels // 2 + 1):
-            dilated_lines = cv2.dilate(
-                lines, kernel, iterations=dilation
-            )
-            dilated_binary = cv2.bitwise_not(dilated_lines)
-            new_regions = self._count_significant_regions(dilated_binary)
-
-            if new_regions > baseline_regions:
-                print(f"    Dilation {dilation}px: {new_regions} regions "
-                      f"(+{new_regions - baseline_regions} new)")
-
-                gap_locations = self._find_new_regions(
-                    self.binary, dilated_binary, dilation
-                )
-                for loc in gap_locations:
-                    self.gaps.append(Gap(
-                        point1=(loc[0], loc[1]),
-                        point2=(loc[2], loc[3]),
-                        distance_pixels=loc[4],
-                        distance_inches=loc[4] / self.scale_dpi,
-                    ))
-
-    def _count_significant_regions(self, binary_image, min_area=200):
-        """Count white regions larger than min_area.
-
-        Args:
-            binary_image: Binary image to analyze
-            min_area: Minimum pixel area to count
-
-        Returns:
-            Number of significant regions
-        """
-        num_labels, _, stats, _ = cv2.connectedComponentsWithStats(
-            binary_image
-        )
-        count = 0
-        for i in range(1, num_labels):
-            if stats[i, cv2.CC_STAT_AREA] >= min_area:
-                count += 1
-        return count
-
-    def _find_new_regions(self, original_binary, dilated_binary,
-                          dilation_px):
-        """Find where new regions appeared after dilation.
-
-        Args:
-            original_binary: Binary image before dilation
-            dilated_binary: Binary image after dilation
-            dilation_px: Number of dilation iterations applied
-
-        Returns:
-            List of (x1, y1, x2, y2, gap_size) tuples
-        """
-        _, labels_orig, stats_orig, _ = \
-            cv2.connectedComponentsWithStats(original_binary)
-        num_new, labels_new, stats_new, centroids_new = \
-            cv2.connectedComponentsWithStats(dilated_binary)
-
-        gap_locations = []
-
-        for i in range(1, num_new):
-            area_new = stats_new[i, cv2.CC_STAT_AREA]
-            if area_new < 200:
-                continue
-
-            cx = int(centroids_new[i][0])
-            cy = int(centroids_new[i][1])
-
-            if not (0 <= cy < labels_orig.shape[0] and
-                    0 <= cx < labels_orig.shape[1]):
-                continue
-
-            orig_label = labels_orig[cy, cx]
-            if orig_label == 0:
-                continue
-
-            orig_area = stats_orig[orig_label, cv2.CC_STAT_AREA]
-
-            if orig_area > area_new * 1.5:
-                # Find gap boundary location
-                new_mask = (labels_new == i).astype(np.uint8) * 255
-                boundary = (
-                        cv2.dilate(new_mask, np.ones((3, 3), np.uint8))
-                        - new_mask
-                )
-
-                orig_lines = cv2.bitwise_not(original_binary)
-                dilated_lines = cv2.bitwise_not(dilated_binary)
-                new_line_pixels = cv2.subtract(dilated_lines, orig_lines)
-
-                gap_boundary = cv2.bitwise_and(boundary, new_line_pixels)
-                gap_points = np.where(gap_boundary > 0)
-
-                if len(gap_points[0]) > 0:
-                    gy = int(np.mean(gap_points[0]))
-                    gx = int(np.mean(gap_points[1]))
-                    gap_size = dilation_px * 2
-                    gap_locations.append((
-                        gx - gap_size // 2, gy,
-                        gx + gap_size // 2, gy,
-                        gap_size
-                    ))
-
-        return gap_locations
-
     def _save_gap_debug_image(self):
-        """Save debug image showing detected gap locations."""
+        """Save debug image showing detected gap locations.
+
+        Draws red circles at gap endpoints and red lines connecting
+        them, with distance labels.
+        """
         ep_image = cv2.cvtColor(self.gray, cv2.COLOR_GRAY2BGR)
+
         for gap in self.gaps:
-            cv2.circle(ep_image, gap.point1, 10, (0, 0, 255), 3)
-            cv2.circle(ep_image, gap.point2, 10, (0, 255, 0), 3)
-            cv2.line(ep_image, gap.point1, gap.point2, (0, 0, 255), 2)
-            mid_x = (gap.point1[0] + gap.point2[0]) // 2
-            mid_y = (gap.point1[1] + gap.point2[1]) // 2
-            label = f"{gap.distance_inches:.2f}\""
+            pt1 = (int(gap['from'][0]), int(gap['from'][1]))
+            pt2 = (int(gap['to'][0]), int(gap['to'][1]))
+            cv2.circle(ep_image, pt1, 10, (0, 0, 255), 3)
+            cv2.circle(ep_image, pt2, 10, (0, 255, 0), 3)
+            cv2.line(ep_image, pt1, pt2, (0, 0, 255), 2)
+            mid_x = (pt1[0] + pt2[0]) // 2
+            mid_y = (pt1[1] + pt2[1]) // 2
+            label = f"{gap['distance_in']:.2f}\""
             cv2.putText(ep_image, label, (mid_x + 10, mid_y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
         cv2.imwrite(self._output_path("debug_04_gaps_found.png"), ep_image)
 
     # =========================================================================
@@ -877,7 +710,7 @@ class PatternAnalyzer:
         Checks performed:
             - TINY: Piece area < 0.25 sq in
             - SMALL: Piece area < 0.5 sq in
-            - SUSPICIOUSLY LARGE: Area > 8x median (possible merged pieces)
+            - SUSPICIOUSLY LARGE: Area > Nx median (possible merged pieces)
             - VERY NARROW: Min width < 3/16"
             - NARROW: Min width < 1/4"
             - VERY SHARP ANGLE: Min angle < 20°
@@ -928,7 +761,8 @@ class PatternAnalyzer:
                 f"— challenging to cut"
             )
 
-        if median_area and piece.area_sq_inches > self.suspicious_ratio:
+        if median_area and (
+                piece.area_sq_inches / median_area > self.suspicious_ratio):
             piece.warnings.append(
                 f"SUSPICIOUSLY LARGE: {piece.area_sq_inches:.1f} sq in "
                 f"is {piece.area_sq_inches / median_area:.0f}x the median "
@@ -984,7 +818,7 @@ class PatternAnalyzer:
         """Flag pieces that are adjacent to detected line gaps."""
         for gap in self.gaps:
             for piece in self.pieces:
-                for pt in [gap.point1, gap.point2]:
+                for pt in [gap['from'], gap['to']]:
                     dist = cv2.pointPolygonTest(
                         piece.contour,
                         (float(pt[0]), float(pt[1])),
@@ -993,7 +827,7 @@ class PatternAnalyzer:
                     if abs(dist) < 10:
                         msg = (
                             f"ADJACENT TO GAP: Line gap of "
-                            f"{gap.distance_inches:.2f}\" at "
+                            f"{gap['distance_in']:.2f}\" at "
                             f"({pt[0]}, {pt[1]}) — "
                             f"lead lines may not connect properly"
                         )
@@ -1078,10 +912,12 @@ class PatternAnalyzer:
 
         # Draw gap markers
         for gap in self.gaps:
-            cv2.circle(annotated, gap.point1, 8, (0, 0, 255), 2)
-            cv2.circle(annotated, gap.point2, 8, (0, 0, 255), 2)
+            pt1 = (int(gap['from'][0]), int(gap['from'][1]))
+            pt2 = (int(gap['to'][0]), int(gap['to'][1]))
+            cv2.circle(annotated, pt1, 8, (0, 0, 255), 2)
+            cv2.circle(annotated, pt2, 8, (0, 0, 255), 2)
             cv2.line(
-                annotated, gap.point1, gap.point2,
+                annotated, pt1, pt2,
                 (0, 0, 255), 2, lineType=cv2.LINE_AA
             )
 
@@ -1096,7 +932,6 @@ class PatternAnalyzer:
             prefix: Output filename prefix
         """
         output_path = self._output_path(f"{prefix}_qa.png")
-
         qa_image = cv2.addWeighted(
             self.image, 0.4,
             np.ones_like(self.image) * 255, 0.6, 0
@@ -1105,7 +940,6 @@ class PatternAnalyzer:
         for piece in self.pieces:
             if not piece.warnings:
                 continue
-
             cx, cy = piece.centroid
             mask = np.zeros(self.gray.shape, dtype=np.uint8)
             cv2.drawContours(mask, [piece.contour], -1, 255, -1)
@@ -1126,10 +960,12 @@ class PatternAnalyzer:
 
         # Draw gaps prominently
         for gap in self.gaps:
-            cv2.circle(qa_image, gap.point1, 12, (0, 0, 255), 3)
-            cv2.circle(qa_image, gap.point2, 12, (0, 0, 255), 3)
+            pt1 = (int(gap['from'][0]), int(gap['from'][1]))
+            pt2 = (int(gap['to'][0]), int(gap['to'][1]))
+            cv2.circle(qa_image, pt1, 12, (0, 0, 255), 3)
+            cv2.circle(qa_image, pt2, 12, (0, 0, 255), 3)
             cv2.line(
-                qa_image, gap.point1, gap.point2,
+                qa_image, pt1, pt2,
                 (0, 0, 255), 3, lineType=cv2.LINE_AA
             )
 
@@ -1178,20 +1014,21 @@ class PatternAnalyzer:
         lines.append("-" * 40)
         lines.append("LINE GAP DETECTION")
         lines.append("-" * 40)
+
         if self.gaps:
             lines.append(f"  *** FOUND {len(self.gaps)} LINE GAP(S) ***")
             lines.append("")
             for i, gap in enumerate(self.gaps, 1):
                 lines.append(f"  Gap {i}:")
                 lines.append(
-                    f"    From: ({gap.point1[0]}, {gap.point1[1]})"
+                    f"    From: ({gap['from'][0]}, {gap['from'][1]})"
                 )
                 lines.append(
-                    f"    To:   ({gap.point2[0]}, {gap.point2[1]})"
+                    f"    To:   ({gap['to'][0]}, {gap['to'][1]})"
                 )
                 lines.append(
-                    f"    Distance: {gap.distance_pixels:.0f}px "
-                    f"({gap.distance_inches:.2f}\")"
+                    f"    Distance: {gap['distance_px']:.0f}px "
+                    f"({gap['distance_in']:.2f}\")"
                 )
                 lines.append(
                     f"    ⚠ Lead lines do not connect — "
@@ -1202,6 +1039,7 @@ class PatternAnalyzer:
             lines.append(
                 "  ✓ No line gaps detected — all lines appear connected"
             )
+
         lines.append("")
 
         # Size distribution
@@ -1270,10 +1108,8 @@ class PatternAnalyzer:
         lines.append("=" * 76)
 
         report_text = "\n".join(lines)
-
         with open(output_path, 'w') as f:
             f.write(report_text)
-
         print(f"\nSaved report: {output_path}")
         print("\n" + report_text)
 
@@ -1356,9 +1192,7 @@ class PatternAnalyzer:
         img_rgba = np.zeros((img_height, img_width, 4), dtype=np.uint8)
         img_rgba[:, :, :3] = img_rgb
         img_rgba[:, :, 3] = 255
-
         img_rgba = np.flipud(img_rgba)
-
         img_uint32 = np.zeros((img_height, img_width), dtype=np.uint32)
         view = img_uint32.view(dtype=np.uint8).reshape(
             (img_height, img_width, 4)
@@ -1367,7 +1201,6 @@ class PatternAnalyzer:
         view[:, :, 1] = img_rgba[:, :, 1]
         view[:, :, 2] = img_rgba[:, :, 2]
         view[:, :, 3] = img_rgba[:, :, 3]
-
         return img_uint32
 
     def _prepare_bokeh_piece_data(self, img_height):
@@ -1425,7 +1258,6 @@ class PatternAnalyzer:
 
         source = ColumnDataSource(data=dict(data))
         source_full = ColumnDataSource(data=dict(data))
-
         return source, source_full, dict(data)
 
     def _build_bokeh_figure(self, bg_image, source, img_width, img_height):
@@ -1515,7 +1347,6 @@ class PatternAnalyzer:
             """,
         )
         p.add_tools(hover)
-
         p.axis.visible = False
         p.grid.visible = False
 
@@ -1536,15 +1367,15 @@ class PatternAnalyzer:
         gap_pts_y = []
 
         for gap in self.gaps:
-            gap_xs.append([gap.point1[0], gap.point2[0]])
+            gap_xs.append([gap['from'][0], gap['to'][0]])
             gap_ys.append([
-                img_height - gap.point1[1],
-                img_height - gap.point2[1]
+                img_height - gap['from'][1],
+                img_height - gap['to'][1]
             ])
-            gap_pts_x.extend([gap.point1[0], gap.point2[0]])
+            gap_pts_x.extend([gap['from'][0], gap['to'][0]])
             gap_pts_y.extend([
-                img_height - gap.point1[1],
-                img_height - gap.point2[1]
+                img_height - gap['from'][1],
+                img_height - gap['to'][1]
             ])
 
         gap_source = ColumnDataSource(data=dict(xs=gap_xs, ys=gap_ys))
@@ -1553,7 +1384,7 @@ class PatternAnalyzer:
             line_color="red", line_width=4, line_dash="dashed"
         )
 
-        # Gap endpoint markers (using scatter instead of deprecated circle)
+        # Gap endpoint markers
         p.scatter(
             gap_pts_x, gap_pts_y, size=10,
             fill_color="red", fill_alpha=0.5,
@@ -1851,7 +1682,6 @@ class PatternAnalyzer:
 
             const full = source_full.data;
             const filtered = {};
-
             for (const key of Object.keys(full)) {
                 filtered[key] = [];
             }
@@ -1986,10 +1816,9 @@ Examples:
         help='Maximum gap distance in pixels to detect (default: 20)'
     )
     gap_group.add_argument(
-        '--min-gap', type=int, default=None,
-        help='Minimum gap distance in pixels (default: auto)'
+        '--min-gap', type=int, default=2,
+        help='Minimum gap distance in pixels (default: 2)'
     )
-
     gap_group.add_argument(
         '--suspicious-ratio', type=float, default=8.0,
         help='Flag pieces larger than this multiple of median area '
@@ -2014,7 +1843,6 @@ Examples:
     args = parser.parse_args()
 
     # --- Run analysis pipeline ---
-
     print("Stained Glass Pattern Analyzer")
     print("=" * 40)
 
