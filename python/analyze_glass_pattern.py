@@ -1442,6 +1442,101 @@ class PatternAnalyzer:
     # Output Generation — Static Images
     # =========================================================================
 
+    def generate_template(self, prefix="pattern"):
+        """Generate a clean numbered pattern for printing as templates.
+
+        Black lines on white background with piece numbers only.
+        No QA highlighting or color overlays. DPI metadata is set
+        so the image prints at actual size.
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Path to saved image
+        """
+        output_path = self._output_path(f"{prefix}_template.png")
+
+        # Start with the binary image (black lines, white background)
+        template = cv2.cvtColor(self.binary, cv2.COLOR_GRAY2BGR)
+
+        # Add piece numbers
+        for piece in self.pieces:
+            cx, cy = piece.centroid
+            font_scale = max(
+                0.3, min(0.7, np.sqrt(piece.area_sq_inches) * 0.3)
+            )
+            text = str(piece.id)
+            (tw, th), _ = cv2.getTextSize(
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+            )
+
+            # White background behind number for readability
+            cv2.rectangle(
+                template,
+                (cx - tw // 2 - 2, cy - th // 2 - 2),
+                (cx + tw // 2 + 2, cy + th // 2 + 2),
+                (255, 255, 255), -1
+            )
+            cv2.putText(
+                template, text,
+                (cx - tw // 2, cy + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                (0, 0, 0), 1
+            )
+
+        # Add dimension info at bottom margin
+        img_h, img_w = template.shape[:2]
+        if hasattr(self, 'frame_info'):
+            f = self.frame_info
+            dim_text = (
+                f"Pattern: {f['pattern_width']:.1f}\" x "
+                f"{f['pattern_height']:.1f}\"  |  "
+                f"Zinc outer: {f['outer_width']:.1f}\" x "
+                f"{f['outer_height']:.1f}\"  |  "
+                f"{len(self.pieces)} pieces  |  "
+                f"Print at {self.scale_dpi:.0f} DPI for actual size"
+            )
+        else:
+            dim_text = (
+                f"Pattern: {img_w / self.scale_dpi:.1f}\" x "
+                f"{img_h / self.scale_dpi:.1f}\"  |  "
+                f"{len(self.pieces)} pieces  |  "
+                f"Print at {self.scale_dpi:.0f} DPI for actual size"
+            )
+
+        # Add a white strip at bottom for the label
+        label_h = 40
+        label_strip = np.ones((label_h, img_w, 3), dtype=np.uint8) * 255
+        cv2.putText(
+            label_strip, dim_text,
+            (10, 28),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+            (0, 0, 0), 1
+        )
+        template = np.vstack([template, label_strip])
+
+        # Save with DPI metadata using Pillow
+        try:
+            from PIL import Image
+            # Convert BGR to RGB for Pillow
+            template_rgb = cv2.cvtColor(template, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(template_rgb)
+
+            # Set DPI metadata
+            dpi = int(round(self.scale_dpi))
+            pil_image.save(output_path, dpi=(dpi, dpi))
+            print(f"Saved template: {output_path} "
+                  f"(DPI set to {dpi} for actual-size printing)")
+        except ImportError:
+            # Fall back to OpenCV without DPI metadata
+            cv2.imwrite(output_path, template)
+            print(f"Saved template: {output_path} "
+                  f"(Install Pillow for automatic DPI metadata: "
+                  f"pip install Pillow)")
+
+        return output_path
+
     def generate_annotated_image(self, prefix="pattern"):
         """Create an annotated image with piece numbers and QA highlights.
 
@@ -2736,6 +2831,7 @@ Examples:
     analyzer.generate_annotated_image(prefix=args.prefix)
     analyzer.generate_qa_overlay(prefix=args.prefix)
     analyzer.generate_report(prefix=args.prefix)
+    analyzer.generate_template(prefix=args.prefix)
 
     if not args.no_bokeh:
         print("\n--- Generating Interactive Visualization ---")
@@ -2760,6 +2856,7 @@ Examples:
     print(f"  {args.prefix}_analyzed.png     — numbered pieces + QA")
     print(f"  {args.prefix}_qa.png           — QA issues only")
     print(f"  {args.prefix}_report.txt       — full text report")
+    print(f"  {args.prefix}_template.png     — numbered template for printing")
     if not args.no_bokeh:
         print(f"  {args.prefix}_interactive.html — interactive visualization")
 
