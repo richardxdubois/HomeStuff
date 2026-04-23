@@ -103,7 +103,8 @@ class PatternAnalyzer:
 
     def __init__(self, image_path, scale_dpi=150, output_dir=".",
                  panel_width=None, panel_height=None,
-                 zinc_channel_depth=0.25, zinc_face_width=0.5):
+                 zinc_channel_depth=0.25, zinc_face_width=0.5,
+                 came_width=None, technique='lead'):
 
         self.image = cv2.imread(image_path)
         if self.image is None:
@@ -163,6 +164,17 @@ class PatternAnalyzer:
         print(f"Pixel value range: {self.gray.min()} - {self.gray.max()}")
         print(f"Mean pixel value: {self.gray.mean():.1f}")
 
+        # Came/foil width for template scissors
+        # Lead scissors remove 1/16" strip
+        # Foil scissors remove ~1.5 mil strip
+        if came_width:
+            self.came_width = came_width
+        elif technique == 'foil':
+            self.came_width = 0.0015  # 1.5 mil
+        else:
+            self.came_width = 1 / 16  # 0.0625"
+
+        self.technique = technique
 
     # =========================================================================
     # Utility Methods
@@ -1445,9 +1457,9 @@ class PatternAnalyzer:
     def generate_template(self, prefix="pattern"):
         """Generate a clean numbered pattern for printing as templates.
 
-        Black lines on white background with piece numbers only.
-        No QA highlighting or color overlays. DPI metadata is set
-        so the image prints at actual size.
+        Lines are drawn at the actual came/foil width so that pattern
+        scissors (which remove a strip equal to the came width) cut
+        correctly. DPI metadata is set for actual-size printing.
 
         Args:
             prefix: Output filename prefix
@@ -1457,8 +1469,36 @@ class PatternAnalyzer:
         """
         output_path = self._output_path(f"{prefix}_template.png")
 
-        # Start with the binary image (black lines, white background)
-        template = cv2.cvtColor(self.binary, cv2.COLOR_GRAY2BGR)
+        # Calculate line width in pixels from came width
+        line_width_px = max(1, int(round(
+            self.came_width * self.scale_dpi
+        )))
+
+        print(f"Template line width: {self.came_width}\" = "
+              f"{line_width_px}px at {self.scale_dpi:.0f} DPI "
+              f"({self.technique})")
+
+        # Start with white background
+        img_h, img_w = self.gray.shape
+        template = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
+
+        # Draw each piece contour at the correct came width
+        for piece in self.pieces:
+            cv2.drawContours(
+                template, [piece.contour], -1,
+                (0, 0, 0), line_width_px, lineType=cv2.LINE_AA
+            )
+
+        # Draw outer border at zinc face width
+        zinc_border_px = max(1, int(round(
+            self.zinc_face_width * self.scale_dpi
+        )))
+        cv2.rectangle(
+            template,
+            (0, 0),
+            (img_w - 1, img_h - 1),
+            (0, 0, 0), zinc_border_px
+        )
 
         # Add piece numbers
         for piece in self.pieces:
@@ -1471,7 +1511,6 @@ class PatternAnalyzer:
                 text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
             )
 
-            # White background behind number for readability
             cv2.rectangle(
                 template,
                 (cx - tw // 2 - 2, cy - th // 2 - 2),
@@ -1486,26 +1525,29 @@ class PatternAnalyzer:
             )
 
         # Add dimension info at bottom margin
-        img_h, img_w = template.shape[:2]
+        technique_label = (
+            "copper foil" if self.technique == 'foil' else "lead came"
+        )
         if hasattr(self, 'frame_info'):
             f = self.frame_info
             dim_text = (
                 f"Pattern: {f['pattern_width']:.1f}\" x "
                 f"{f['pattern_height']:.1f}\"  |  "
-                f"Zinc outer: {f['outer_width']:.1f}\" x "
+                f"Zinc: {f['outer_width']:.1f}\" x "
                 f"{f['outer_height']:.1f}\"  |  "
                 f"{len(self.pieces)} pieces  |  "
-                f"Print at {self.scale_dpi:.0f} DPI for actual size"
+                f"{technique_label} {self.came_width:.4g}\"  |  "
+                f"Print at {self.scale_dpi:.0f} DPI"
             )
         else:
             dim_text = (
                 f"Pattern: {img_w / self.scale_dpi:.1f}\" x "
                 f"{img_h / self.scale_dpi:.1f}\"  |  "
                 f"{len(self.pieces)} pieces  |  "
-                f"Print at {self.scale_dpi:.0f} DPI for actual size"
+                f"{technique_label} {self.came_width:.4g}\"  |  "
+                f"Print at {self.scale_dpi:.0f} DPI"
             )
 
-        # Add a white strip at bottom for the label
         label_h = 40
         label_strip = np.ones((label_h, img_w, 3), dtype=np.uint8) * 255
         cv2.putText(
@@ -1519,23 +1561,475 @@ class PatternAnalyzer:
         # Save with DPI metadata using Pillow
         try:
             from PIL import Image
-            # Convert BGR to RGB for Pillow
             template_rgb = cv2.cvtColor(template, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(template_rgb)
-
-            # Set DPI metadata
             dpi = int(round(self.scale_dpi))
             pil_image.save(output_path, dpi=(dpi, dpi))
             print(f"Saved template: {output_path} "
                   f"(DPI set to {dpi} for actual-size printing)")
         except ImportError:
-            # Fall back to OpenCV without DPI metadata
             cv2.imwrite(output_path, template)
             print(f"Saved template: {output_path} "
-                  f"(Install Pillow for automatic DPI metadata: "
-                  f"pip install Pillow)")
+                  f"(Install Pillow for automatic DPI metadata)")
 
         return output_path
+
+    def generate_packed_templates(self, prefix="pattern",
+                                  page_width=8.5, page_height=11.0,
+                                  margin=0.5, piece_gap=0.25,
+                                  overlap=0.5):
+        """Generate packed piece templates as a single multi-page PDF.
+
+        Arranges individual pieces onto pages for efficient printing.
+        Pieces larger than a single page are split across multiple
+        pages with overlap marks for alignment.
+
+        Args:
+            prefix: Output filename prefix
+            page_width: Paper width in inches (default 8.5)
+            page_height: Paper height in inches (default 11.0)
+            margin: Page margin in inches (default 0.5)
+            piece_gap: Gap between pieces in inches (default 0.25)
+            overlap: Overlap for multi-page pieces in inches (default 0.5)
+
+        Returns:
+            Path to saved PDF file
+        """
+        from PIL import Image
+
+        dpi = int(round(self.scale_dpi))
+
+        # Usable area in pixels
+        usable_w = page_width - 2 * margin
+        usable_h = page_height - 2 * margin - 0.4  # reserve for footer
+        usable_w_px = int(usable_w * dpi)
+        usable_h_px = int(usable_h * dpi)
+        page_w_px = int(page_width * dpi)
+        page_h_px = int(page_height * dpi)
+        margin_px = int(margin * dpi)
+        gap_px = int(piece_gap * dpi)
+        overlap_px = int(overlap * dpi)
+
+        line_width_px = max(1, int(round(self.came_width * dpi)))
+
+        print(f"\nPacking pieces onto {page_width}\" x {page_height}\" pages")
+        print(f"  Usable area: {usable_w:.1f}\" x {usable_h:.1f}\"")
+        print(f"  Piece gap: {piece_gap}\"")
+        print(f"  Line width: {self.came_width}\" ({line_width_px}px)")
+
+        # Get bounding box for each piece
+        piece_rects = []
+        for piece in self.pieces:
+            x, y, w, h = piece.bounding_box
+            piece_rects.append({
+                'piece': piece,
+                'width': w + line_width_px,
+                'height': h + line_width_px,
+            })
+
+        # Separate oversized pieces
+        normal_pieces = []
+        oversized_pieces = []
+
+        for pr in piece_rects:
+            if pr['width'] > usable_w_px or pr['height'] > usable_h_px:
+                oversized_pieces.append(pr)
+            else:
+                normal_pieces.append(pr)
+
+        if oversized_pieces:
+            print(f"  {len(oversized_pieces)} oversized piece(s) "
+                  f"will span multiple pages")
+
+        # Sort normal pieces by height (tallest first) for shelf packing
+        normal_pieces.sort(key=lambda p: p['height'], reverse=True)
+
+        # Shelf packing
+        page_assignments = self._shelf_pack(
+            normal_pieces, usable_w_px, usable_h_px, gap_px
+        )
+
+        # Count total pages for footer
+        oversized_page_count = 0
+        for pr in oversized_pieces:
+            bx, by, bw, bh = pr['piece'].bounding_box
+            step_x = usable_w_px - overlap_px
+            step_y = usable_h_px - overlap_px
+            cols = max(1, int(np.ceil(bw / step_x)))
+            rows = max(1, int(np.ceil(bh / step_y)))
+            oversized_page_count += cols * rows
+
+        total_pages = len(page_assignments) + oversized_page_count
+
+        # Render all pages
+        all_pages = []
+        page_num = 0
+
+        for page_pieces in page_assignments:
+            page_num += 1
+            page_img = self._render_template_page(
+                page_pieces, page_w_px, page_h_px,
+                margin_px, line_width_px, gap_px,
+                page_num, total_pages,
+                page_width, page_height
+            )
+            all_pages.append(page_img)
+
+            # Log pieces on this page
+            piece_ids = [pr['piece'].id for pr, _, _ in page_pieces]
+            print(f"  Page {page_num}: Pieces {piece_ids}")
+
+        for pr in oversized_pieces:
+            piece = pr['piece']
+            piece_pages = self._render_oversized_piece(
+                piece, page_w_px, page_h_px,
+                margin_px, usable_w_px, usable_h_px,
+                line_width_px, overlap_px,
+                page_width, page_height,
+                page_num, total_pages
+            )
+
+            for sub_img, sub_label in piece_pages:
+                page_num += 1
+                all_pages.append(sub_img)
+                print(f"  Page {page_num}: Piece {piece.id} — {sub_label}")
+
+        # Save as multi-page PDF
+        output_path = self._output_path(f"{prefix}_templates.pdf")
+
+        pil_pages = []
+        for page_img in all_pages:
+            rgb = cv2.cvtColor(page_img, cv2.COLOR_BGR2RGB)
+            pil_page = Image.fromarray(rgb)
+            pil_pages.append(pil_page)
+
+        if pil_pages:
+            pil_pages[0].save(
+                output_path,
+                save_all=True,
+                append_images=pil_pages[1:],
+                resolution=dpi,
+            )
+            print(f"\nSaved {len(pil_pages)}-page template PDF: {output_path}")
+
+        return output_path
+
+    def _shelf_pack(self, pieces, usable_w, usable_h, gap):
+        """Pack pieces onto pages using shelf algorithm.
+
+        Places pieces left-to-right on horizontal shelves.
+        When a piece doesn't fit on the current shelf, starts
+        a new shelf below. When a shelf doesn't fit on the
+        current page, starts a new page.
+
+        Args:
+            pieces: List of piece dicts sorted by height (tallest first)
+            usable_w: Usable width in pixels
+            usable_h: Usable height in pixels
+            gap: Gap between pieces in pixels
+
+        Returns:
+            List of pages, each a list of (piece_dict, x, y) tuples
+        """
+        pages = []
+        current_page = []
+        shelf_y = 0
+        shelf_h = 0
+        cursor_x = 0
+
+        for pr in pieces:
+            w, h = pr['width'], pr['height']
+
+            # Try to place on current shelf
+            if cursor_x + w <= usable_w and shelf_y + h <= usable_h:
+                current_page.append((pr, cursor_x, shelf_y))
+                cursor_x += w + gap
+                shelf_h = max(shelf_h, h)
+                continue
+
+            # Try new shelf on current page
+            new_shelf_y = shelf_y + shelf_h + gap
+            if new_shelf_y + h <= usable_h:
+                shelf_y = new_shelf_y
+                shelf_h = h
+                cursor_x = w + gap
+                current_page.append((pr, 0, shelf_y))
+                continue
+
+            # Need a new page
+            if current_page:
+                pages.append(current_page)
+            current_page = [(pr, 0, 0)]
+            cursor_x = w + gap
+            shelf_y = 0
+            shelf_h = h
+
+        if current_page:
+            pages.append(current_page)
+
+        return pages
+
+    def _render_template_page(self, page_pieces, page_w, page_h,
+                              margin, line_width, gap,
+                              page_num, total_pages,
+                              page_width_in, page_height_in):
+        """Render a single page of packed piece templates.
+
+        Each piece is drawn with its outline at came width,
+        numbered prominently, and labeled with color group
+        if available.
+
+        Args:
+            page_pieces: List of (piece_dict, x, y) tuples
+            page_w, page_h: Page size in pixels
+            margin: Margin in pixels
+            line_width: Came line width in pixels
+            gap: Gap between pieces in pixels
+            page_num: Current page number
+            total_pages: Total number of pages
+            page_width_in, page_height_in: Page size in inches
+
+        Returns:
+            Page image as numpy array
+        """
+        page = np.ones((page_h, page_w, 3), dtype=np.uint8) * 255
+
+        for pr, px, py in page_pieces:
+            piece = pr['piece']
+            bx, by, bw, bh = piece.bounding_box
+
+            # Offset contour to packed position
+            offset_x = margin + px - bx + line_width // 2
+            offset_y = margin + py - by + line_width // 2
+            shifted = piece.contour.copy()
+            shifted[:, :, 0] += offset_x
+            shifted[:, :, 1] += offset_y
+
+            # Draw piece outline
+            cv2.drawContours(
+                page, [shifted], -1,
+                (0, 0, 0), line_width, lineType=cv2.LINE_AA
+            )
+
+            # Calculate centroid in page coordinates
+            cx = piece.centroid[0] - bx + margin + px + line_width // 2
+            cy = piece.centroid[1] - by + margin + py + line_width // 2
+
+            # Piece number — prominent
+            font_scale = max(
+                0.5, min(1.0, np.sqrt(piece.area_sq_inches) * 0.35)
+            )
+            text = str(piece.id)
+            (tw, th), _ = cv2.getTextSize(
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2
+            )
+
+            cv2.rectangle(
+                page,
+                (cx - tw // 2 - 3, cy - th // 2 - 3),
+                (cx + tw // 2 + 3, cy + th // 2 + 3),
+                (255, 255, 255), -1
+            )
+            cv2.putText(
+                page, text,
+                (cx - tw // 2, cy + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                (0, 0, 0), 2
+            )
+
+            # Color group name below number
+            color_name = getattr(piece, 'color_group_name', None)
+            if color_name:
+                (cw, ch), _ = cv2.getTextSize(
+                    color_name, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1
+                )
+                cv2.putText(
+                    page, color_name,
+                    (cx - cw // 2, cy + th // 2 + ch + 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.35,
+                    (80, 80, 80), 1
+                )
+
+        # Footer
+        footer_y = page_h - margin // 2
+        technique_label = (
+            "copper foil" if self.technique == 'foil' else "lead came"
+        )
+        footer = (
+            f"Page {page_num}/{total_pages}  |  "
+            f"{technique_label} {self.came_width:.4g}\"  |  "
+            f"Print at {self.scale_dpi:.0f} DPI for actual size"
+        )
+        cv2.putText(
+            page, footer,
+            (margin, footer_y),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+            (100, 100, 100), 1
+        )
+
+        return page
+
+    def _render_oversized_piece(self, piece, page_w, page_h,
+                                margin, usable_w, usable_h,
+                                line_width, overlap,
+                                page_width_in, page_height_in,
+                                current_page_num, total_pages):
+        """Render an oversized piece across multiple pages with overlap marks.
+
+        Args:
+            piece: Piece object
+            page_w, page_h: Page size in pixels
+            margin: Margin in pixels
+            usable_w, usable_h: Usable area in pixels
+            line_width: Came line width in pixels
+            overlap: Overlap region in pixels
+            page_width_in, page_height_in: Page size in inches
+            current_page_num: Starting page number
+            total_pages: Total pages in document
+
+        Returns:
+            List of (page_image, label_string) tuples
+        """
+        bx, by, bw, bh = piece.bounding_box
+
+        step_x = usable_w - overlap
+        step_y = usable_h - overlap
+        cols = max(1, int(np.ceil(bw / step_x)))
+        rows = max(1, int(np.ceil(bh / step_y)))
+
+        pages = []
+        mark_color = (0, 0, 200)  # red in BGR
+        mark_len = int(0.25 * self.scale_dpi)
+
+        for row_idx in range(rows):
+            for col_idx in range(cols):
+                page = np.ones((page_h, page_w, 3), dtype=np.uint8) * 255
+
+                # Source region offset
+                src_x = bx + col_idx * step_x
+                src_y = by + row_idx * step_y
+                offset_x = margin - src_x
+                offset_y = margin - src_y
+
+                shifted = piece.contour.copy()
+                shifted[:, :, 0] += offset_x
+                shifted[:, :, 1] += offset_y
+
+                cv2.drawContours(
+                    page, [shifted], -1,
+                    (0, 0, 0), line_width, lineType=cv2.LINE_AA
+                )
+
+                # Overlap marks — right edge
+                if col_idx < cols - 1:
+                    mark_x = margin + usable_w - overlap
+                    for my in range(margin, margin + usable_h,
+                                    int(1.0 * self.scale_dpi)):
+                        cv2.line(page,
+                                 (mark_x, my - mark_len),
+                                 (mark_x, my + mark_len),
+                                 mark_color, 2)
+                        cv2.putText(page, ">>>",
+                                    (mark_x + 5, my + 4),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                                    mark_color, 1)
+
+                # Overlap marks — left edge
+                if col_idx > 0:
+                    mark_x = margin + overlap
+                    for my in range(margin, margin + usable_h,
+                                    int(1.0 * self.scale_dpi)):
+                        cv2.line(page,
+                                 (mark_x, my - mark_len),
+                                 (mark_x, my + mark_len),
+                                 mark_color, 2)
+                        cv2.putText(page, "<<<",
+                                    (mark_x - 30, my + 4),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                                    mark_color, 1)
+
+                # Overlap marks — bottom edge
+                if row_idx < rows - 1:
+                    mark_y = margin + usable_h - overlap
+                    for mx in range(margin, margin + usable_w,
+                                    int(1.0 * self.scale_dpi)):
+                        cv2.line(page,
+                                 (mx - mark_len, mark_y),
+                                 (mx + mark_len, mark_y),
+                                 mark_color, 2)
+
+                # Overlap marks — top edge
+                if row_idx > 0:
+                    mark_y = margin + overlap
+                    for mx in range(margin, margin + usable_w,
+                                    int(1.0 * self.scale_dpi)):
+                        cv2.line(page,
+                                 (mx - mark_len, mark_y),
+                                 (mx + mark_len, mark_y),
+                                 mark_color, 2)
+
+                # Piece number if centroid is on this page
+                cx = piece.centroid[0] + offset_x
+                cy = piece.centroid[1] + offset_y
+                if (margin < cx < margin + usable_w and
+                        margin < cy < margin + usable_h):
+                    font_scale = max(
+                        0.5, min(1.0, np.sqrt(piece.area_sq_inches) * 0.35)
+                    )
+                    text = str(piece.id)
+                    (tw, th), _ = cv2.getTextSize(
+                        text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2
+                    )
+                    cv2.rectangle(
+                        page,
+                        (cx - tw // 2 - 3, cy - th // 2 - 3),
+                        (cx + tw // 2 + 3, cy + th // 2 + 3),
+                        (255, 255, 255), -1
+                    )
+                    cv2.putText(
+                        page, text,
+                        (cx - tw // 2, cy + th // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                        (0, 0, 0), 2
+                    )
+
+                # Footer
+                label = (f"section ({col_idx + 1},{row_idx + 1}) "
+                         f"of ({cols},{rows})")
+                page_n = current_page_num + row_idx * cols + col_idx + 1
+                footer_y = page_h - margin // 2
+                footer = (
+                    f"Page {page_n}/{total_pages}  |  "
+                    f"Piece {piece.id} — {label}  |  "
+                    f"Overlap: {overlap / self.scale_dpi:.1f}\""
+                )
+                cv2.putText(
+                    page, footer,
+                    (margin, footer_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    (100, 100, 100), 1
+                )
+
+                pages.append((page, label))
+
+        return pages
+
+    def _save_with_dpi(self, image, path):
+        """Save an image with DPI metadata.
+
+        Args:
+            image: numpy array (BGR)
+            path: Output file path
+        """
+        try:
+            from PIL import Image
+            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(rgb)
+            dpi = int(round(self.scale_dpi))
+            pil_image.save(path, dpi=(dpi, dpi))
+        except ImportError:
+            cv2.imwrite(path, image)
+
 
     def generate_annotated_image(self, prefix="pattern"):
         """Create an annotated image with piece numbers and QA highlights.
@@ -2716,6 +3210,20 @@ Examples:
         help='Zinc U-channel total face width in inches (default: 0.5)'
     )
 
+    frame_group.add_argument(
+        '--came-width', type=float, default=None,
+        help='Width of material between glass pieces in inches. '
+             'For lead: heart width, typically 1/16 (0.0625). '
+             'For copper foil: 2x foil thickness, typically 1/32 (0.03125). '
+             'This is the strip the pattern scissors remove.'
+    )
+    frame_group.add_argument(
+        '--technique', type=str, default='lead',
+        choices=['lead', 'foil'],
+        help='Construction technique (default: lead). '
+             'Sets default came width if --came-width not specified.'
+    )
+
     # Image processing options
     proc_group = parser.add_argument_group('Image Processing')
     proc_group.add_argument(
@@ -2769,6 +3277,15 @@ Examples:
         '--no-bokeh', action='store_true',
         help='Skip interactive Bokeh HTML visualization'
     )
+    # In Output group:
+    out_group.add_argument(
+        '--page-width', type=float, default=8.5,
+        help='Template page width in inches (default: 8.5)'
+    )
+    out_group.add_argument(
+        '--page-height', type=float, default=11.0,
+        help='Template page height in inches (default: 11.0)'
+    )
 
     color_group = parser.add_argument_group('Color Analysis')
     color_group.add_argument(
@@ -2793,6 +3310,8 @@ Examples:
         panel_height=args.panel_height,
         zinc_channel_depth=args.zinc_channel_depth,
         zinc_face_width=args.zinc_face_width,
+        came_width=args.came_width,
+        technique=args.technique,
     )
 
     print("\n--- Preprocessing ---")
@@ -2832,6 +3351,11 @@ Examples:
     analyzer.generate_qa_overlay(prefix=args.prefix)
     analyzer.generate_report(prefix=args.prefix)
     analyzer.generate_template(prefix=args.prefix)
+    analyzer.generate_packed_templates(
+        prefix=args.prefix,
+        page_width=args.page_width,
+        page_height=args.page_height,
+    )
 
     if not args.no_bokeh:
         print("\n--- Generating Interactive Visualization ---")
@@ -2856,7 +3380,8 @@ Examples:
     print(f"  {args.prefix}_analyzed.png     — numbered pieces + QA")
     print(f"  {args.prefix}_qa.png           — QA issues only")
     print(f"  {args.prefix}_report.txt       — full text report")
-    print(f"  {args.prefix}_template.png     — numbered template for printing")
+    print(f"  {args.prefix}_template.png     — full numbered template")
+    print(f"  {args.prefix}_templates.pdf     — packed templates for printing")
     if not args.no_bokeh:
         print(f"  {args.prefix}_interactive.html — interactive visualization")
 
