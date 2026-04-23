@@ -102,20 +102,9 @@ class PatternAnalyzer:
     """
 
     def __init__(self, image_path, scale_dpi=150, output_dir=".",
-                 panel_width=None, panel_height=None):
-        """Initialize the analyzer with an image.
+                 panel_width=None, panel_height=None,
+                 zinc_channel_depth=0.25, zinc_face_width=0.5):
 
-        Args:
-            image_path: Path to the pattern image file (JPG, PNG, etc.)
-            scale_dpi: Dots per inch for measurements (default 150).
-                       Overridden if panel_width or panel_height is given.
-            output_dir: Directory for output files (created if needed)
-            panel_width: Actual panel width in inches (auto-calculates DPI)
-            panel_height: Actual panel height in inches (auto-calculates DPI)
-
-        Raises:
-            FileNotFoundError: If the image file cannot be loaded
-        """
         self.image = cv2.imread(image_path)
         if self.image is None:
             raise FileNotFoundError(f"Could not load image: {image_path}")
@@ -125,32 +114,55 @@ class PatternAnalyzer:
         self.gaps = []
         self.binary = None
         self.image_path = image_path
+        self.zinc_channel_depth = zinc_channel_depth
+        self.zinc_face_width = zinc_face_width
 
         img_h, img_w = self.image.shape[:2]
 
-        # Calculate DPI from panel dimensions if provided
+        # Panel dimensions: user specifies outer (zinc) dimension
+        # Pattern (glass) dimension is smaller by 2x channel depth
         if panel_width:
-            self.scale_dpi = img_w / panel_width
-            print(f"Calculated DPI from panel width "
-                  f"({panel_width}\"): {self.scale_dpi:.1f}")
+            self.outer_width = panel_width
+            self.pattern_width = panel_width - 2 * zinc_channel_depth
+            self.scale_dpi = img_w / self.pattern_width
+            self.outer_height = img_h / self.scale_dpi + 2 * zinc_channel_depth
+            self.pattern_height = img_h / self.scale_dpi
+            print(f"Zinc outer dimension: "
+                  f"{self.outer_width:.1f}\" x {self.outer_height:.1f}\"")
+            print(f"Pattern (glass) dimension: "
+                  f"{self.pattern_width:.1f}\" x {self.pattern_height:.1f}\"")
+            print(f"Zinc channel depth: {zinc_channel_depth}\"")
+            print(f"Calculated DPI from pattern width: "
+                  f"{self.scale_dpi:.1f}")
         elif panel_height:
-            self.scale_dpi = img_h / panel_height
-            print(f"Calculated DPI from panel height "
-                  f"({panel_height}\"): {self.scale_dpi:.1f}")
+            self.outer_height = panel_height
+            self.pattern_height = panel_height - 2 * zinc_channel_depth
+            self.scale_dpi = img_h / self.pattern_height
+            self.outer_width = img_w / self.scale_dpi + 2 * zinc_channel_depth
+            self.pattern_width = img_w / self.scale_dpi
+            print(f"Zinc outer dimension: "
+                  f"{self.outer_width:.1f}\" x {self.outer_height:.1f}\"")
+            print(f"Pattern (glass) dimension: "
+                  f"{self.pattern_width:.1f}\" x {self.pattern_height:.1f}\"")
+            print(f"Zinc channel depth: {zinc_channel_depth}\"")
+            print(f"Calculated DPI from pattern height: "
+                  f"{self.scale_dpi:.1f}")
         else:
             self.scale_dpi = scale_dpi
+            self.pattern_width = img_w / self.scale_dpi
+            self.pattern_height = img_h / self.scale_dpi
+            self.outer_width = self.pattern_width + 2 * zinc_channel_depth
+            self.outer_height = self.pattern_height + 2 * zinc_channel_depth
 
         # Set up output directory
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"Loaded image: {img_w}x{img_h} pixels")
-        print(f"At {self.scale_dpi:.1f} DPI that's approximately "
-              f"{img_w / self.scale_dpi:.1f}\" x "
-              f"{img_h / self.scale_dpi:.1f}\"")
         print(f"Output directory: {self.output_dir.resolve()}")
         print(f"Pixel value range: {self.gray.min()} - {self.gray.max()}")
         print(f"Mean pixel value: {self.gray.mean():.1f}")
+
 
     # =========================================================================
     # Utility Methods
@@ -836,6 +848,117 @@ class PatternAnalyzer:
                         )
                         if msg not in piece.warnings:
                             piece.warnings.append(msg)
+
+    def calculate_frame(self):
+        """Calculate zinc frame requirements for the panel."""
+        img_h, img_w = self.image.shape[:2]
+
+        panel_w = self.pattern_width
+        panel_h = self.pattern_height
+        outer_w = self.outer_width
+        outer_h = self.outer_height
+        depth = self.zinc_channel_depth
+        face = self.zinc_face_width
+
+        # Detect panel shape
+        contours, hierarchy = cv2.findContours(
+            self.binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        image_area = img_h * img_w
+        panel_shape = "rectangular"
+
+        if contours:
+            sorted_contours = sorted(
+                contours, key=cv2.contourArea, reverse=True
+            )
+            for c in sorted_contours:
+                area = cv2.contourArea(c)
+                if area > image_area * 0.95:
+                    continue
+                if area < image_area * 0.3:
+                    break
+                rect = cv2.minAreaRect(c)
+                rect_area = rect[1][0] * rect[1][1]
+                if rect_area > 0:
+                    rectangularity = area / rect_area
+                else:
+                    rectangularity = 1.0
+                if rectangularity < 0.9:
+                    perimeter_px = cv2.arcLength(c, True)
+                    vertices = cv2.approxPolyDP(
+                        c, 0.02 * perimeter_px, True
+                    )
+                    if len(vertices) > 8:
+                        panel_shape = "curved/elliptical"
+                    elif len(vertices) > 4:
+                        panel_shape = "polygonal"
+                break
+
+        # Rectangular zinc perimeter uses OUTER dimensions
+        rect_perimeter = 2 * (outer_w + outer_h)
+
+        # Zinc frame inventory for rectangular panels
+        if panel_shape == "rectangular":
+            zinc_pieces = [
+                {'label': 'Top', 'length_inches': round(outer_w, 2),
+                 'orientation': 'horizontal'},
+                {'label': 'Bottom', 'length_inches': round(outer_w, 2),
+                 'orientation': 'horizontal'},
+                {'label': 'Left', 'length_inches': round(outer_h, 2),
+                 'orientation': 'vertical'},
+                {'label': 'Right', 'length_inches': round(outer_h, 2),
+                 'orientation': 'vertical'},
+            ]
+        else:
+            zinc_pieces = None
+
+        # Interior came calculation
+        total_piece_perimeter = 0
+        for piece in self.pieces:
+            perim_px = cv2.arcLength(piece.contour, True)
+            total_piece_perimeter += perim_px / self.scale_dpi
+
+        pattern_perimeter = 2 * (panel_w + panel_h)
+        interior_came = (total_piece_perimeter / 2) - pattern_perimeter
+        interior_came = max(0, interior_came)
+
+        waste_factor = 1.10
+
+        self.frame_info = {
+            'panel_shape': panel_shape,
+            'outer_width': outer_w,
+            'outer_height': outer_h,
+            'pattern_width': panel_w,
+            'pattern_height': panel_h,
+            'zinc_channel_depth': depth,
+            'zinc_face_width': face,
+            'zinc_pieces': zinc_pieces,
+            'zinc_perimeter': round(rect_perimeter, 1),
+            'zinc_perimeter_with_waste': round(
+                rect_perimeter * waste_factor, 1),
+            'interior_came_inches': round(interior_came, 1),
+            'interior_came_feet': round(interior_came / 12, 2),
+            'interior_came_with_waste': round(
+                interior_came * waste_factor / 12, 2),
+            'total_came_inches': round(
+                rect_perimeter + interior_came, 1),
+            'total_came_feet': round(
+                (rect_perimeter + interior_came) / 12, 2),
+            'total_with_waste_feet': round(
+                (rect_perimeter + interior_came) * waste_factor / 12, 2),
+        }
+
+        print(f"\nFrame calculation:")
+        print(f"  Panel shape: {panel_shape}")
+        print(f"  Zinc outer: {outer_w:.1f}\" x {outer_h:.1f}\"")
+        print(f"  Pattern (glass): {panel_w:.1f}\" x {panel_h:.1f}\"")
+        print(f"  Interior came: {interior_came:.1f}\" "
+              f"({interior_came / 12:.1f} ft)")
+        print(f"  Total came needed (with 10% waste): "
+              f"{(rect_perimeter + interior_came) * waste_factor / 12:.1f} ft")
+
+        return self.frame_info
 
     def analyze_colors_from_source(self, source_image_path, num_colors=6):
         """Sample colors from a source image for each detected piece.
@@ -1535,6 +1658,86 @@ class PatternAnalyzer:
             lines.append(f"  Median:   {np.median(areas):.2f} sq in")
             lines.append(f"  Total glass area: {sum(areas):.1f} sq in")
         lines.append("")
+
+        # Frame/came requirements
+        if hasattr(self, 'frame_info'):
+            lines.append("-" * 40)
+            lines.append("FRAME & CAME REQUIREMENTS")
+            lines.append("-" * 40)
+            f = self.frame_info
+
+            lines.append(f"  Panel shape: {f['panel_shape']}")
+            lines.append(
+                f"  Zinc outer dimension: "
+                f"{f['outer_width']:.1f}\" x {f['outer_height']:.1f}\""
+            )
+            lines.append(
+                f"  Pattern (glass) dimension: "
+                f"{f['pattern_width']:.1f}\" x "
+                f"{f['pattern_height']:.1f}\""
+            )
+            lines.append(
+                f"  Zinc U-channel: {f['zinc_face_width']}\" face, "
+                f"{f['zinc_channel_depth']}\" channel depth"
+            )
+            lines.append("")
+
+            lines.append("  Zinc outer frame (U-channel):")
+            if f.get('zinc_pieces'):
+                lines.append(
+                    f"    {'Piece':<10} {'Length':>10} {'Cut':>12}"
+                )
+                lines.append(f"    {'-' * 34}")
+                for zp in f['zinc_pieces']:
+                    length = zp['length_inches']
+                    lines.append(
+                        f"    {zp['label']:<10} "
+                        f"{length:>9.1f}\" "
+                        f"{'miter 45°':>12}"
+                    )
+                lines.append(f"    {'-' * 34}")
+                total_zinc = sum(
+                    zp['length_inches'] for zp in f['zinc_pieces']
+                )
+                lines.append(
+                    f"    {'Total':<10} {total_zinc:>9.1f}\""
+                )
+                waste_zinc = total_zinc * 1.10
+                lines.append(
+                    f"    {'+ 10% waste':<10} "
+                    f"{waste_zinc:>9.1f}\" "
+                    f"({waste_zinc / 12:.1f} ft)"
+                )
+            else:
+                lines.append(
+                    f"    Non-rectangular — total perimeter: "
+                    f"{f['zinc_perimeter']}\" "
+                    f"({f['zinc_perimeter'] / 12:.1f} ft)"
+                )
+
+            lines.append("")
+            lines.append("  Interior lead came (H-channel):")
+            lines.append(
+                f"    Total length: "
+                f"{f['interior_came_inches']}\" "
+                f"({f['interior_came_feet']} ft)"
+            )
+            lines.append(
+                f"    + 10% waste: "
+                f"{f['interior_came_with_waste']} ft"
+            )
+            lines.append("")
+            lines.append("  Combined total:")
+            lines.append(
+                f"    All came/zinc: "
+                f"{f['total_came_inches']}\" "
+                f"({f['total_came_feet']} ft)"
+            )
+            lines.append(
+                f"    + 10% waste: "
+                f"{f['total_with_waste_feet']} ft"
+            )
+            lines.append("")
 
         # Piece table
         lines.append("-" * 76)
@@ -2407,6 +2610,17 @@ Examples:
         help='Actual panel height in inches (auto-calculates DPI)'
     )
 
+    # In the Frame group or Scale group:
+    frame_group = parser.add_argument_group('Frame')
+    frame_group.add_argument(
+        '--zinc-channel-depth', type=float, default=0.25,
+        help='Zinc U-channel depth in inches (default: 0.25)'
+    )
+    frame_group.add_argument(
+        '--zinc-face-width', type=float, default=0.5,
+        help='Zinc U-channel total face width in inches (default: 0.5)'
+    )
+
     # Image processing options
     proc_group = parser.add_argument_group('Image Processing')
     proc_group.add_argument(
@@ -2482,6 +2696,8 @@ Examples:
         output_dir=args.output_dir,
         panel_width=args.panel_width,
         panel_height=args.panel_height,
+        zinc_channel_depth=args.zinc_channel_depth,
+        zinc_face_width=args.zinc_face_width,
     )
 
     print("\n--- Preprocessing ---")
@@ -2503,6 +2719,9 @@ Examples:
 
     print("\n--- Running QA ---")
     analyzer.run_qa()
+
+    print("\n--- Calculating Frame Requirements ---")
+    analyzer.calculate_frame()
 
     if args.source_image:
         print("\n--- Analyzing Colors ---")
