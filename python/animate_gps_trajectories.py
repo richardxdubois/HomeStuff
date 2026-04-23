@@ -129,7 +129,7 @@ class animate_gps_trajectories():
         canvas_layout = column(div_text, self.toggle, self.refresh_slider, anim)
         output_file(self.html_name)
 
-        show(canvas_layout)
+        save(canvas_layout, title="Animate GPS Trajectories")
 
     def latlon_to_mercator(self, lat, lon):
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857")
