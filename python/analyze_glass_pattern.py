@@ -68,7 +68,10 @@ class Piece:
     min_width_inches: float
     max_width_inches: float
     warnings: list = field(default_factory=list)
-
+    sampled_color: tuple = None
+    color_group_id: int = None
+    color_group_center: tuple = None
+    color_group_name: str = None
 
 # =============================================================================
 # Main Analyzer Class
@@ -834,6 +837,484 @@ class PatternAnalyzer:
                         if msg not in piece.warnings:
                             piece.warnings.append(msg)
 
+    def analyze_colors_from_source(self, source_image_path, num_colors=6):
+        """Sample colors from a source image for each detected piece.
+
+        Loads a reference image (photo, painting, etc.) that corresponds
+        to the pattern, and samples the dominant color within each piece's
+        region. Then clusters all piece colors into groups for glass
+        purchasing.
+
+        The source image must align with the pattern image — same scene,
+        same boundaries. It will be resized to match the pattern if needed.
+
+        Args:
+            source_image_path: Path to the reference image
+            num_colors: Number of color groups to cluster into (default 6)
+
+        Returns:
+            Dict with color group info:
+                {group_id: {'color_bgr': (b,g,r), 'color_name': str,
+                            'piece_ids': [...], 'total_area_sq_in': float}}
+        """
+        # Load source image
+        source = cv2.imread(source_image_path)
+        if source is None:
+            raise FileNotFoundError(
+                f"Could not load source image: {source_image_path}"
+            )
+
+        # Resize source to match pattern if needed
+        pattern_h, pattern_w = self.image.shape[:2]
+        source_h, source_w = source.shape[:2]
+
+        if (source_w, source_h) != (pattern_w, pattern_h):
+            print(f"Resizing source image from {source_w}x{source_h} "
+                  f"to {pattern_w}x{pattern_h}")
+            source = cv2.resize(source, (pattern_w, pattern_h),
+                                interpolation=cv2.INTER_AREA)
+
+        self.source_image = source
+
+        # Sample dominant color for each piece
+        print(f"\nSampling colors from source image...")
+        piece_colors = []
+
+        for piece in self.pieces:
+            # Create mask for this piece
+            mask = np.zeros(self.gray.shape, dtype=np.uint8)
+            cv2.drawContours(mask, [piece.contour], -1, 255, -1)
+
+            # Erode mask slightly to avoid sampling from lead lines
+            erode_kernel = np.ones((5, 5), np.uint8)
+            mask_eroded = cv2.erode(mask, erode_kernel, iterations=2)
+
+            # If erosion eliminated the mask (tiny piece), use original
+            if cv2.countNonZero(mask_eroded) < 10:
+                mask_eroded = mask
+
+            # Sample pixels within the mask
+            pixels = source[mask_eroded > 0]
+
+            if len(pixels) == 0:
+                piece.sampled_color = (128, 128, 128)  # default grey
+            else:
+                # Use median for robustness against outliers
+                median_color = np.median(pixels, axis=0).astype(int)
+                piece.sampled_color = tuple(median_color)
+
+            piece_colors.append(piece.sampled_color)
+            print(f"  Piece {piece.id:>3}: BGR={piece.sampled_color}")
+
+        # Cluster colors into groups using K-means
+        color_groups = self._cluster_colors(piece_colors, num_colors)
+
+        # Check if absolute names are distinctive
+        abs_names = [g['color_name'] for g in self.color_groups.values()]
+        unique_names = len(set(abs_names))
+
+        if unique_names < len(abs_names) * 0.7:
+            # Too many duplicate names — use relative naming
+            print(f"\nAbsolute naming produced only {unique_names} "
+                  f"unique names for {len(abs_names)} groups — "
+                  f"switching to relative naming")
+            self._name_colors_relative()
+        else:
+            print(f"\nUsing absolute color names "
+                  f"({unique_names} unique names)")
+
+        return color_groups
+
+    def _cluster_colors(self, piece_colors, num_colors):
+        """Cluster piece colors into groups using K-means.
+
+        Args:
+            piece_colors: List of (B, G, R) tuples, one per piece
+            num_colors: Number of clusters
+
+        Returns:
+            Dict of color groups with piece assignments and areas
+        """
+        from sklearn.cluster import KMeans
+
+        # Prepare data for clustering
+        color_array = np.array(piece_colors, dtype=np.float32)
+
+        # Don't request more clusters than pieces
+        num_colors = min(num_colors, len(self.pieces))
+
+        kmeans = KMeans(n_clusters=num_colors, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(color_array)
+        centers = kmeans.cluster_centers_.astype(int)
+
+        # Build color group info
+        color_groups = {}
+        for group_id in range(num_colors):
+            group_pieces = [
+                self.pieces[i] for i in range(len(self.pieces))
+                if labels[i] == group_id
+            ]
+
+            center_bgr = tuple(centers[group_id])
+            color_name = self._name_color(center_bgr)
+
+            total_area = sum(p.area_sq_inches for p in group_pieces)
+            piece_ids = [p.id for p in group_pieces]
+
+            color_groups[group_id] = {
+                'color_bgr': center_bgr,
+                'color_rgb': (center_bgr[2], center_bgr[1], center_bgr[0]),
+                'color_name': color_name,
+                'piece_ids': piece_ids,
+                'piece_count': len(piece_ids),
+                'total_area_sq_in': round(total_area, 2),
+            }
+
+            # Assign group info back to each piece
+            for piece in group_pieces:
+                piece.color_group_id = group_id
+                piece.color_group_center = center_bgr
+                piece.color_group_name = color_name
+
+            print(f"  Group {group_id}: {color_name} "
+                  f"BGR={center_bgr} — "
+                  f"{len(piece_ids)} pieces, "
+                  f"{total_area:.1f} sq in")
+
+        self.color_groups = color_groups
+        return color_groups
+
+    def _name_color(self, bgr):
+        """Generate a human-readable name for a BGR color.
+
+        Uses HSV conversion to classify into basic color categories.
+
+        Args:
+            bgr: (B, G, R) color tuple
+
+        Returns:
+            String color name like "Steel Blue", "Warm Tan", etc.
+        """
+        # Convert to HSV for easier classification
+        pixel = np.uint8([[list(bgr)]])
+        hsv = cv2.cvtColor(pixel, cv2.COLOR_BGR2HSV)[0][0]
+        h, s, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
+
+        # Low saturation = grey/white/black
+        if s < 30:
+            if v < 60:
+                return "Dark Grey"
+            elif v < 130:
+                return "Medium Grey"
+            elif v < 200:
+                return "Light Grey"
+            else:
+                return "White"
+
+        # Low value = dark
+        if v < 50:
+            return "Black"
+
+        # Classify by hue
+        # OpenCV hue range is 0-179
+        brightness = "Dark" if v < 120 else "Medium" if v < 180 else "Light"
+
+        if h < 10 or h >= 170:
+            base = "Red"
+        elif h < 22:
+            base = "Orange" if s > 100 else "Brown"
+        elif h < 35:
+            base = "Gold" if v > 150 else "Brown"
+        elif h < 45:
+            base = "Yellow"
+        elif h < 75:
+            base = "Green"
+        elif h < 100:
+            base = "Teal"
+        elif h < 130:
+            base = "Blue"
+        elif h < 145:
+            base = "Steel Blue"
+        elif h < 160:
+            base = "Purple"
+        else:
+            base = "Pink"
+
+        return f"{brightness} {base}"
+
+    def generate_color_report(self, prefix="pattern"):
+        """Generate a color summary report for glass purchasing.
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Report text as string
+        """
+        if not hasattr(self, 'color_groups') or not self.color_groups:
+            print("No color analysis done yet. "
+                  "Run analyze_colors_from_source() first.")
+            return ""
+
+        output_path = self._output_path(f"{prefix}_color_report.txt")
+
+        lines = []
+        lines.append("=" * 60)
+        lines.append("GLASS COLOR SUMMARY — PURCHASING GUIDE")
+        lines.append("=" * 60)
+        lines.append("")
+
+        total_area = sum(
+            g['total_area_sq_in'] for g in self.color_groups.values()
+        )
+
+        lines.append(f"Total glass area: {total_area:.1f} sq in")
+        lines.append(f"Color groups: {len(self.color_groups)}")
+        lines.append("")
+
+        lines.append("-" * 60)
+        lines.append(
+            f"{'#':>3} {'Color':>20} {'Pieces':>8} {'Area (sq in)':>14} {'%':>6}"
+        )
+        lines.append("-" * 60)
+
+        for gid, group in sorted(
+                self.color_groups.items(),
+                key=lambda x: -x[1]['total_area_sq_in']):
+            pct = 100 * group['total_area_sq_in'] / total_area
+            rgb = group['color_rgb']
+            lines.append(
+                f"{gid:>3} {group['color_name']:>20} "
+                f"{group['piece_count']:>8} "
+                f"{group['total_area_sq_in']:>14.1f} "
+                f"{pct:>5.1f}%"
+            )
+            lines.append(
+                f"{'':>24} RGB=({rgb[0]},{rgb[1]},{rgb[2]}) "
+                f"Pieces: {group['piece_ids']}"
+            )
+
+        lines.append("")
+        lines.append("-" * 60)
+        lines.append("PER-PIECE COLOR ASSIGNMENTS")
+        lines.append("-" * 60)
+        lines.append(
+            f"{'ID':>4} {'Color Group':>20} {'Area':>10} {'Sampled BGR':>20}"
+        )
+
+        for p in sorted(self.pieces, key=lambda x: x.id):
+            name = getattr(p, 'color_group_name', 'Unassigned')
+            bgr = getattr(p, 'sampled_color', (0, 0, 0))
+            lines.append(
+                f"{p.id:>4} {name:>20} "
+                f"{p.area_sq_inches:>9.2f} "
+                f"({bgr[0]:>3},{bgr[1]:>3},{bgr[2]:>3})"
+            )
+
+        lines.append("")
+        lines.append("=" * 60)
+
+        report_text = "\n".join(lines)
+        with open(output_path, 'w') as f:
+            f.write(report_text)
+        print(f"\nSaved color report: {output_path}")
+        print("\n" + report_text)
+
+        return report_text
+
+    def generate_colored_pattern(self, prefix="pattern"):
+        """Generate a pattern image with pieces filled by color group.
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Path to saved image
+        """
+        if not hasattr(self, 'color_groups') or not self.color_groups:
+            print("No color analysis done yet. "
+                  "Run analyze_colors_from_source() first.")
+            return None
+
+        output_path = self._output_path(f"{prefix}_colored.png")
+
+        # Start with white background
+        colored = np.ones_like(self.image) * 255
+
+        # Fill each piece with its cluster color
+        for piece in self.pieces:
+            fill_color = getattr(piece, 'color_group_center', (200, 200, 200))
+            fill_color = self._boost_color(fill_color)
+            cv2.drawContours(
+                colored, [piece.contour], -1, fill_color, -1
+            )
+
+        # Redraw the lead lines on top
+        colored[self.binary == 0] = [0, 0, 0]
+
+        # Add piece numbers
+        for piece in self.pieces:
+            cx, cy = piece.centroid
+            font_scale = max(
+                0.3, min(0.7, np.sqrt(piece.area_sq_inches) * 0.3)
+            )
+            text = str(piece.id)
+            (tw, th), _ = cv2.getTextSize(
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+            )
+            cv2.putText(
+                colored, text,
+                (cx - tw // 2, cy + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                (0, 0, 0), 1
+            )
+
+        cv2.imwrite(output_path, colored)
+        print(f"Saved colored pattern: {output_path}")
+        return output_path
+
+    def _boost_color(self, bgr, saturation_boost=2.5, value_boost=1.4):
+        """Boost saturation and brightness to make subtle colors visible.
+
+        Args:
+            bgr: (B, G, R) color tuple
+            saturation_boost: Multiplier for saturation (default 2.5)
+            value_boost: Multiplier for brightness (default 1.4)
+
+        Returns:
+            Boosted (B, G, R) tuple
+        """
+        pixel = np.uint8([[list(bgr)]])
+        hsv = cv2.cvtColor(pixel, cv2.COLOR_BGR2HSV)[0][0]
+        h = hsv[0]
+        s = min(255, int(hsv[1] * saturation_boost))
+        v = min(255, int(hsv[2] * value_boost))
+        boosted = cv2.cvtColor(
+            np.uint8([[[h, s, v]]]), cv2.COLOR_HSV2BGR
+        )[0][0]
+        return tuple(int(c) for c in boosted)
+
+    def _name_color(self, bgr):
+        """Generate a human-readable name for a BGR color."""
+        pixel = np.uint8([[list(bgr)]])
+        hsv = cv2.cvtColor(pixel, cv2.COLOR_BGR2HSV)[0][0]
+        h, s, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
+
+        # Determine warmth from the original BGR
+        b, g, r = int(bgr[0]), int(bgr[1]), int(bgr[2])
+        warmth = r - b  # positive = warm, negative = cool
+
+        # Low saturation — grey family, distinguish by value and warmth
+        if s < 40:
+            if v < 60:
+                temp = "Warm " if warmth > 5 else "Cool " if warmth < -5 else ""
+                return f"Dark {temp}Grey"
+            elif v < 100:
+                temp = "Warm " if warmth > 5 else "Cool " if warmth < -5 else ""
+                return f"Medium {temp}Grey"
+            elif v < 160:
+                temp = "Warm " if warmth > 5 else "Cool " if warmth < -5 else ""
+                return f"Light {temp}Grey"
+            elif v < 210:
+                return "Pale Grey" if warmth < 3 else "Cream"
+            else:
+                return "White"
+
+        # Low value = very dark
+        if v < 50:
+            return "Black"
+
+        # Classify by hue
+        brightness = "Dark" if v < 120 else "Medium" if v < 180 else "Light"
+
+        if h < 10 or h >= 170:
+            base = "Red"
+        elif h < 22:
+            base = "Orange" if s > 100 else "Brown"
+        elif h < 35:
+            base = "Gold" if v > 150 else "Brown"
+        elif h < 45:
+            base = "Yellow"
+        elif h < 75:
+            base = "Green"
+        elif h < 100:
+            base = "Teal"
+        elif h < 130:
+            base = "Blue"
+        elif h < 145:
+            base = "Steel Blue"
+        elif h < 160:
+            base = "Purple"
+        else:
+            base = "Pink"
+
+        return f"{brightness} {base}"
+
+    def _name_colors_relative(self):
+        """Rename color groups based on relative brightness and warmth.
+
+        Instead of absolute HSV thresholds, ranks the clusters
+        from darkest to lightest and coolest to warmest, producing
+        more distinctive names.
+
+        Call after _cluster_colors has set self.color_groups.
+        """
+        if not self.color_groups:
+            return
+
+        groups = list(self.color_groups.items())
+
+        # Calculate brightness and warmth for each group
+        for gid, group in groups:
+            b, g, r = group['color_bgr']
+            group['brightness'] = int(r) + int(g) + int(b)
+            group['warmth'] = int(r) - int(b)
+
+        # Sort by brightness
+        groups_by_bright = sorted(groups, key=lambda x: x[1]['brightness'])
+        n = len(groups_by_bright)
+
+        # Assign brightness tier
+        for i, (gid, group) in enumerate(groups_by_bright):
+            if n <= 3:
+                tiers = ["Dark", "Medium", "Light"]
+            elif n <= 5:
+                tiers = ["Darkest", "Dark", "Medium", "Light", "Lightest"]
+            else:
+                tiers = ["Darkest", "Dark", "Medium Dark",
+                         "Medium Light", "Light", "Lightest"]
+            group['bright_tier'] = tiers[min(i, len(tiers) - 1)]
+
+        # Determine warmth descriptor
+        warmths = [g['warmth'] for _, g in groups]
+        avg_warmth = np.mean(warmths)
+
+        for gid, group in groups:
+            w = group['warmth']
+            if w > avg_warmth + 5:
+                temp = "Warm"
+            elif w < avg_warmth - 5:
+                temp = "Cool"
+            else:
+                temp = "Neutral"
+
+            rgb = group['color_rgb']
+            name = f"{group['bright_tier']} {temp}"
+            group['color_name'] = name
+
+            # Update pieces
+            for piece in self.pieces:
+                if getattr(piece, 'color_group_id', None) == gid:
+                    piece.color_group_name = name
+
+        print("\nRelative color naming:")
+        for gid, group in sorted(groups,
+                                 key=lambda x: x[1]['brightness']):
+            print(f"  Group {gid}: {group['color_name']} "
+                  f"RGB={group['color_rgb']} "
+                  f"(brightness={group['brightness']}, "
+                  f"warmth={group['warmth']})")
+
     # =========================================================================
     # Output Generation — Static Images
     # =========================================================================
@@ -1173,7 +1654,18 @@ class PatternAnalyzer:
         if self.gaps:
             self._add_bokeh_gaps(p, img_height)
 
-        layout = row(p, right_panel)
+        # --- Add colored figure if color analysis was done ---
+        color_fig = self._build_bokeh_colored_figure(
+            source, img_width, img_height
+        )
+
+        if color_fig:
+            # Stack the two figures vertically on the left
+            figures = column(p, color_fig)
+            layout = row(figures, right_panel)
+        else:
+            layout = row(p, right_panel)
+
         save(layout)
         print(f"Saved interactive visualization: {output_path}")
         return output_path
@@ -1527,6 +2019,135 @@ class PatternAnalyzer:
             warn_chart, area_hist,
         )
 
+    def _build_bokeh_colored_figure(self, source, img_width, img_height):
+        """Build a second Bokeh figure showing pieces filled with sampled colors.
+
+        Args:
+            source: ColumnDataSource with piece data
+            img_width: Image width in pixels
+            img_height: Image height in pixels
+
+        Returns:
+            Bokeh figure object, or None if no color analysis done
+        """
+        if not hasattr(self, 'color_groups') or not self.color_groups:
+            return None
+
+        from bokeh.plotting import figure
+        from bokeh.models import ColumnDataSource, HoverTool
+
+        # Build color data source
+        color_data = defaultdict(list)
+
+        for piece in self.pieces:
+            # Simplify contour for performance
+            epsilon = 0.01 * cv2.arcLength(piece.contour, True)
+            simplified = cv2.approxPolyDP(piece.contour, epsilon, True)
+            points = simplified.reshape(-1, 2)
+
+            xs = points[:, 0].tolist()
+            ys = (img_height - points[:, 1]).tolist()
+            xs.append(xs[0])
+            ys.append(ys[0])
+
+            color_data['xs'].append(xs)
+            color_data['ys'].append(ys)
+            color_data['piece_id'].append(piece.id)
+            color_data['area'].append(round(piece.area_sq_inches, 3))
+            color_data['cx'].append(piece.centroid[0])
+            color_data['cy'].append(img_height - piece.centroid[1])
+
+            # Get color info
+            bgr = getattr(piece, 'color_group_center', (200, 200, 200))
+            boosted = self._boost_color(bgr)
+            r, g, b = int(boosted[2]), int(boosted[1]), int(boosted[0])
+            color_data['fill_color'].append(f"rgb({r},{g},{b})")
+
+            name = getattr(piece, 'color_group_name', 'Unassigned')
+            color_data['color_name'].append(name)
+            color_data['color_rgb'].append(f"({r},{g},{b})")
+
+            # Sampled color (actual, not cluster center)
+            sampled = getattr(piece, 'sampled_color', (128, 128, 128))
+            sr, sg, sb = int(sampled[2]), int(sampled[1]), int(sampled[0])
+            color_data['sampled_rgb'].append(f"({sr},{sg},{sb})")
+
+        color_source = ColumnDataSource(data=dict(color_data))
+
+        p = figure(
+            title="Color Analysis — Glass Color Groups",
+            width=800,
+            height=int(800 * img_height / img_width),
+            x_range=(0, img_width),
+            y_range=(0, img_height),
+            tools="pan,wheel_zoom,box_zoom,reset,save",
+            active_scroll="wheel_zoom",
+            match_aspect=True,
+        )
+
+        # White background
+        p.rect(
+            x=img_width / 2, y=img_height / 2,
+            width=img_width, height=img_height,
+            fill_color="white", line_color=None
+        )
+
+        # Colored piece polygons
+        patches = p.patches(
+            'xs', 'ys',
+            source=color_source,
+            fill_color='fill_color',
+            fill_alpha=0.85,
+            line_color="black",
+            line_width=2,
+        )
+
+        # Piece number labels
+        label_source = ColumnDataSource(data=dict(
+            x=color_data['cx'],
+            y=color_data['cy'],
+            text=[str(pid) for pid in color_data['piece_id']],
+        ))
+        p.text(
+            'x', 'y', 'text',
+            source=label_source,
+            text_font_size="9pt",
+            text_align="center",
+            text_baseline="middle",
+            text_color="#000000",
+            text_font_style="bold",
+        )
+
+        # Hover tooltip with color info
+        hover = HoverTool(
+            renderers=[patches],
+            tooltips="""
+            <div style="background: white; padding: 8px; border-radius: 4px;
+                        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">
+                <div style="font-weight: bold; font-size: 14px;
+                            margin-bottom: 4px;">Piece #@piece_id</div>
+                <table>
+                    <tr><td>Color Group:</td>
+                        <td><b>@color_name</b></td></tr>
+                    <tr><td>Group RGB:</td>
+                        <td><b>@color_rgb</b></td></tr>
+                    <tr><td>Sampled RGB:</td>
+                        <td><b>@sampled_rgb</b></td></tr>
+                    <tr><td>Area:</td>
+                        <td><b>@area sq in</b></td></tr>
+                </table>
+                <div style="margin-top: 4px; width: 40px; height: 20px;
+                            background: rgb@color_rgb; border: 1px solid #333;">
+                </div>
+            </div>
+            """,
+        )
+        p.add_tools(hover)
+        p.axis.visible = False
+        p.grid.visible = False
+
+        return p
+
     def _build_warning_chart(self):
         """Build a bar chart showing warning type distribution.
 
@@ -1840,6 +2461,15 @@ Examples:
         help='Skip interactive Bokeh HTML visualization'
     )
 
+    color_group = parser.add_argument_group('Color Analysis')
+    color_group.add_argument(
+        '--source-image', type=str, default=None,
+        help='Reference image for color sampling (photo, painting, etc.)'
+    )
+    color_group.add_argument(
+        '--num-colors', type=int, default=6,
+        help='Number of color groups for clustering (default: 6)'
+    )
     args = parser.parse_args()
 
     # --- Run analysis pipeline ---
@@ -1873,6 +2503,15 @@ Examples:
 
     print("\n--- Running QA ---")
     analyzer.run_qa()
+
+    if args.source_image:
+        print("\n--- Analyzing Colors ---")
+        analyzer.analyze_colors_from_source(
+            args.source_image,
+            num_colors=args.num_colors
+        )
+        analyzer.generate_colored_pattern(prefix=args.prefix)
+        analyzer.generate_color_report(prefix=args.prefix)
 
     print("\n--- Generating Outputs ---")
     analyzer.generate_annotated_image(prefix=args.prefix)
