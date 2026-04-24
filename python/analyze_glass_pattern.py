@@ -1875,12 +1875,21 @@ class PatternAnalyzer:
                             trim_color, 1, lineType=cv2.LINE_AA
                         )
 
-                # --- Registration marks ---
-                # Crosshairs in overlap zones for alignment
+                # --- Trim lines and registration marks ---
+                #
+                # Convention: trim the LEFT and TOP edges of overlap zones.
+                # This means:
+                #   - Right/bottom overlaps on this page: show crosshairs, NO trim line
+                #   - Left/top overlaps on this page: show trim line AND crosshairs
+                #
+                # Workflow: cut along trim lines on pages that have them,
+                # then align cut edges using crosshairs on the adjacent page.
+
                 mark_size = int(0.15 * dpi)
                 mark_spacing = int(2.0 * dpi)
 
-                # Right overlap zone
+                # RIGHT overlap zone — this page keeps it intact
+                # Draw crosshairs that the NEXT page will align to after trimming
                 if col_idx < cols - 1:
                     mark_x = printer_margin_px + content_w_px + overlap_px // 2
                     if mark_x < page_w_px - printer_margin_px:
@@ -1893,9 +1902,25 @@ class PatternAnalyzer:
                                 mark_size, reg_color
                             )
 
-                # Left overlap zone (marks should match right overlap of
-                # previous tile)
+                # LEFT overlap zone — trim this edge to align with previous page
                 if col_idx > 0:
+                    # Trim line at inner edge of overlap
+                    trim_x = printer_margin_px + overlap_px
+                    cv2.line(
+                        page,
+                        (trim_x, printer_margin_px),
+                        (trim_x, printer_margin_px + actual_h),
+                        trim_color, 1, lineType=cv2.LINE_AA
+                    )
+                    # Label the trim line
+                    cv2.putText(
+                        page, "CUT",
+                        (trim_x + 4, printer_margin_px + 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                        trim_color, 1
+                    )
+                    # Crosshairs in overlap zone (will be cut off —
+                    # they match the ones on the previous page's right overlap)
                     mark_x = printer_margin_px + overlap_px // 2
                     for my in range(
                             printer_margin_px + mark_spacing,
@@ -1906,7 +1931,7 @@ class PatternAnalyzer:
                             mark_size, reg_color
                         )
 
-                # Bottom overlap zone
+                # BOTTOM overlap zone — this page keeps it intact
                 if row_idx < rows - 1:
                     mark_y = (printer_margin_px + content_h_px_tile +
                               overlap_px // 2)
@@ -1920,8 +1945,23 @@ class PatternAnalyzer:
                                 mark_size, reg_color
                             )
 
-                # Top overlap zone
+                # TOP overlap zone — trim this edge to align with page above
                 if row_idx > 0:
+                    # Trim line at inner edge of overlap
+                    trim_y = printer_margin_px + overlap_px
+                    cv2.line(
+                        page,
+                        (printer_margin_px, trim_y),
+                        (printer_margin_px + actual_w, trim_y),
+                        trim_color, 1, lineType=cv2.LINE_AA
+                    )
+                    cv2.putText(
+                        page, "CUT",
+                        (printer_margin_px + 4, trim_y - 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                        trim_color, 1
+                    )
+                    # Crosshairs in overlap zone
                     mark_y = printer_margin_px + overlap_px // 2
                     for mx in range(
                             printer_margin_px + mark_spacing,
@@ -1954,7 +1994,8 @@ class PatternAnalyzer:
                     dim_label = (
                         f"Pattern: {f['pattern_width']:.1f}\" x "
                         f"{f['pattern_height']:.1f}\"  |  "
-                        f"Trim grey lines, align crosshairs, tape"
+                        f"Cut along CUT lines, align pattern to "
+                        f"crosshairs on adjacent page, tape"
                     )
                 else:
                     dim_label = (
