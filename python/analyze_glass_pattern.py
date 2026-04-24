@@ -1649,6 +1649,22 @@ class PatternAnalyzer:
             normal_pieces, usable_w_px, usable_h_px, gap_px
         )
 
+        page_assignments = self._shelf_pack(
+            normal_pieces, usable_w_px, usable_h_px, gap_px
+        )
+
+        # Debug: show what's on each page and remaining space
+        for pg_idx, page_pieces in enumerate(page_assignments):
+            pieces_info = []
+            for pr, px, py in page_pieces:
+                p = pr['piece']
+                pieces_info.append(
+                    f"#{p.id}({pr['width']}x{pr['height']}px "
+                    f"at {px},{py})"
+                )
+            print(f"  Page {pg_idx + 1}: {len(page_pieces)} pieces — "
+                  f"{', '.join(pieces_info)}")
+
         # Count total pages for footer
         oversized_page_count = 0
         for pr in oversized_pieces:
@@ -1715,12 +1731,10 @@ class PatternAnalyzer:
         return output_path
 
     def _shelf_pack(self, pieces, usable_w, usable_h, gap):
-        """Pack pieces onto pages using shelf algorithm.
+        """Pack pieces onto pages using best-fit shelf algorithm with rotation.
 
-        Places pieces left-to-right on horizontal shelves.
-        When a piece doesn't fit on the current shelf, starts
-        a new shelf below. When a shelf doesn't fit on the
-        current page, starts a new page.
+        Strategy: place one large piece, then immediately scan all remaining
+        pieces to fill the same page before starting a new one.
 
         Args:
             pieces: List of piece dicts sorted by height (tallest first)
@@ -1731,41 +1745,165 @@ class PatternAnalyzer:
         Returns:
             List of pages, each a list of (piece_dict, x, y) tuples
         """
-        pages = []
-        current_page = []
-        shelf_y = 0
-        shelf_h = 0
-        cursor_x = 0
+        print(f"  Usable area: {usable_w}x{usable_h} pixels")
 
         for pr in pieces:
             w, h = pr['width'], pr['height']
+            pr['rotated'] = False
+            pr['rot_width'] = h
+            pr['rot_height'] = w
+            print(f"    Piece #{pr['piece'].id}: "
+                  f"{w}x{h}px "
+                  f"({w / self.scale_dpi:.1f}\"x{h / self.scale_dpi:.1f}\")")
 
-            # Try to place on current shelf
-            if cursor_x + w <= usable_w and shelf_y + h <= usable_h:
-                current_page.append((pr, cursor_x, shelf_y))
-                cursor_x += w + gap
-                shelf_h = max(shelf_h, h)
+        placed = set()
+        pages = []
+
+        def best_orientation(pr, max_w, max_h):
+            """Return (w, h, rotated) for best fit, or None."""
+            w, h = pr['width'], pr['height']
+            rw, rh = pr['rot_width'], pr['rot_height']
+
+            fits_normal = (w <= max_w and h <= max_h)
+            fits_rotated = (rw <= max_w and rh <= max_h)
+
+            if fits_normal and fits_rotated:
+                # Prefer orientation that wastes less height
+                waste_normal = max_h - h
+                waste_rotated = max_h - rh
+                if waste_normal <= waste_rotated:
+                    return w, h, False
+                else:
+                    return rw, rh, True
+            elif fits_normal:
+                return w, h, False
+            elif fits_rotated:
+                return rw, rh, True
+            return None
+
+        def fill_page(shelves):
+            """Try to fit as many unplaced pieces as possible onto shelves."""
+            changed = True
+            while changed:
+                changed = False
+
+                # Try to fill gaps on existing shelves
+                for shelf in shelves:
+                    remaining_w = usable_w - shelf['cursor_x']
+                    if remaining_w < gap:
+                        continue
+
+                    for idx, pr in enumerate(pieces):
+                        if idx in placed:
+                            continue
+
+                        result = best_orientation(
+                            pr, remaining_w, shelf['height']
+                        )
+                        if result:
+                            w, h, rotated = result
+                            page = pages[-1]
+                            page.append((pr, shelf['cursor_x'], shelf['y']))
+                            pr['rotated'] = rotated
+                            pr['placed_w'] = w
+                            pr['placed_h'] = h
+                            shelf['cursor_x'] += w + gap
+                            remaining_w = usable_w - shelf['cursor_x']
+                            placed.add(idx)
+                            changed = True
+
+                # Try to add new shelves below existing ones
+                if shelves:
+                    last = shelves[-1]
+                    new_y = last['y'] + last['height'] + gap
+                    remaining_h = usable_h - new_y
+
+                    if remaining_h < gap:
+                        continue
+
+                    # Find the tallest piece that fits
+                    best_idx = None
+                    best_w = 0
+                    best_h = 0
+                    best_rot = False
+
+                    for idx, pr in enumerate(pieces):
+                        if idx in placed:
+                            continue
+
+                        result = best_orientation(
+                            pr, usable_w, remaining_h
+                        )
+                        if result:
+                            w, h, rotated = result
+                            # Prefer tallest to maximize shelf use
+                            if h > best_h or (h == best_h and w > best_w):
+                                best_idx = idx
+                                best_w = w
+                                best_h = h
+                                best_rot = rotated
+
+                    if best_idx is not None:
+                        pr = pieces[best_idx]
+                        new_shelf = {
+                            'y': new_y,
+                            'height': best_h,
+                            'cursor_x': best_w + gap,
+                        }
+                        shelves.append(new_shelf)
+                        pages[-1].append((pr, 0, new_y))
+                        pr['rotated'] = best_rot
+                        pr['placed_w'] = best_w
+                        pr['placed_h'] = best_h
+                        placed.add(best_idx)
+                        changed = True
+
+        # Main loop: pick next unplaced piece, start a page, fill it
+        for idx, pr in enumerate(pieces):
+            if idx in placed:
                 continue
 
-            # Try new shelf on current page
-            new_shelf_y = shelf_y + shelf_h + gap
-            if new_shelf_y + h <= usable_h:
-                shelf_y = new_shelf_y
-                shelf_h = h
-                cursor_x = w + gap
-                current_page.append((pr, 0, shelf_y))
-                continue
+            w, h = pr['width'], pr['height']
+            rw, rh = pr['rot_width'], pr['rot_height']
 
-            # Need a new page
-            if current_page:
-                pages.append(current_page)
-            current_page = [(pr, 0, 0)]
-            cursor_x = w + gap
-            shelf_y = 0
-            shelf_h = h
+            # Start new page with this piece
+            pages.append([])
 
-        if current_page:
-            pages.append(current_page)
+            # Pick best orientation for starting the page
+            # Prefer orientation that leaves more useful space
+            use_rotated = False
+            if rh <= usable_h and rw <= usable_w:
+                # Both fit — which leaves more space?
+                if w <= usable_w and h <= usable_h:
+                    space_normal_right = (usable_w - w) * usable_h
+                    space_normal_below = usable_w * (usable_h - h)
+                    space_rot_right = (usable_w - rw) * usable_h
+                    space_rot_below = usable_w * (usable_h - rh)
+                    if max(space_rot_right, space_rot_below) > max(
+                            space_normal_right, space_normal_below):
+                        use_rotated = True
+                else:
+                    use_rotated = True
+
+            if use_rotated:
+                pw, ph = rw, rh
+            else:
+                pw, ph = w, h
+
+            shelves = [{
+                'y': 0,
+                'height': ph,
+                'cursor_x': pw + gap,
+            }]
+
+            pages[-1].append((pr, 0, 0))
+            pr['rotated'] = use_rotated
+            pr['placed_w'] = pw
+            pr['placed_h'] = ph
+            placed.add(idx)
+
+            # Now aggressively fill this page
+            fill_page(shelves)
 
         return pages
 
@@ -1773,47 +1911,52 @@ class PatternAnalyzer:
                               margin, line_width, gap,
                               page_num, total_pages,
                               page_width_in, page_height_in):
-        """Render a single page of packed piece templates.
-
-        Each piece is drawn with its outline at came width,
-        numbered prominently, and labeled with color group
-        if available.
-
-        Args:
-            page_pieces: List of (piece_dict, x, y) tuples
-            page_w, page_h: Page size in pixels
-            margin: Margin in pixels
-            line_width: Came line width in pixels
-            gap: Gap between pieces in pixels
-            page_num: Current page number
-            total_pages: Total number of pages
-            page_width_in, page_height_in: Page size in inches
-
-        Returns:
-            Page image as numpy array
-        """
+        """Render a single page of packed piece templates."""
         page = np.ones((page_h, page_w, 3), dtype=np.uint8) * 255
 
         for pr, px, py in page_pieces:
             piece = pr['piece']
             bx, by, bw, bh = piece.bounding_box
+            rotated = pr.get('rotated', False)
 
-            # Offset contour to packed position
-            offset_x = margin + px - bx + line_width // 2
-            offset_y = margin + py - by + line_width // 2
-            shifted = piece.contour.copy()
-            shifted[:, :, 0] += offset_x
-            shifted[:, :, 1] += offset_y
+            if rotated:
+                # Rotate contour 90° clockwise around bounding box center
+                bcx = bx + bw / 2
+                bcy = by + bh / 2
+                contour = piece.contour.copy().astype(np.float64)
+                # Translate to origin
+                contour[:, :, 0] -= bcx
+                contour[:, :, 1] -= bcy
+                # Rotate 90° CW: (x,y) -> (y, -x)
+                rotated_contour = contour.copy()
+                rotated_contour[:, :, 0] = contour[:, :, 1]
+                rotated_contour[:, :, 1] = -contour[:, :, 0]
+                # Get new bounding box
+                min_x = rotated_contour[:, :, 0].min()
+                min_y = rotated_contour[:, :, 1].min()
+                # Translate to packed position
+                rotated_contour[:, :, 0] += margin + px - min_x + line_width // 2
+                rotated_contour[:, :, 1] += margin + py - min_y + line_width // 2
+                draw_contour = rotated_contour.astype(np.int32)
+            else:
+                draw_contour = piece.contour.copy()
+                draw_contour[:, :, 0] += margin + px - bx + line_width // 2
+                draw_contour[:, :, 1] += margin + py - by + line_width // 2
 
             # Draw piece outline
             cv2.drawContours(
-                page, [shifted], -1,
+                page, [draw_contour], -1,
                 (0, 0, 0), line_width, lineType=cv2.LINE_AA
             )
 
             # Calculate centroid in page coordinates
-            cx = piece.centroid[0] - bx + margin + px + line_width // 2
-            cy = piece.centroid[1] - by + margin + py + line_width // 2
+            M = cv2.moments(draw_contour)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+            else:
+                cx = margin + px + pr.get('placed_w', bw) // 2
+                cy = margin + py + pr.get('placed_h', bh) // 2
 
             # Piece number — prominent
             font_scale = max(
@@ -1840,11 +1983,14 @@ class PatternAnalyzer:
             # Color group name below number
             color_name = getattr(piece, 'color_group_name', None)
             if color_name:
+                label = color_name
+                if rotated:
+                    label += " (R)"
                 (cw, ch), _ = cv2.getTextSize(
-                    color_name, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1
+                    label, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1
                 )
                 cv2.putText(
-                    page, color_name,
+                    page, label,
                     (cx - cw // 2, cy + th // 2 + ch + 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.35,
                     (80, 80, 80), 1
@@ -1858,7 +2004,8 @@ class PatternAnalyzer:
         footer = (
             f"Page {page_num}/{total_pages}  |  "
             f"{technique_label} {self.came_width:.4g}\"  |  "
-            f"Print at {self.scale_dpi:.0f} DPI for actual size"
+            f"Print at {self.scale_dpi:.0f} DPI for actual size  |  "
+            f"(R) = rotated 90°"
         )
         cv2.putText(
             page, footer,
