@@ -1709,6 +1709,334 @@ class PatternAnalyzer:
 
         return output_path
 
+    def generate_tiled_pattern(self, prefix="pattern",
+                               page_width=8.5, page_height=11.0,
+                               printer_margin=0.25, overlap=0.5):
+        """Generate a tiled multi-page PDF of the full pattern for assembly.
+
+        Divides the full numbered pattern into page-sized tiles with
+        overlap regions for trimming and taping. Includes registration
+        marks, trim lines, and tile position labels.
+
+        For putting on the layout board during panel assembly.
+
+        Args:
+            prefix: Output filename prefix
+            page_width: Paper width in inches (default 8.5)
+            page_height: Paper height in inches (default 11.0)
+            printer_margin: Non-printable margin in inches (default 0.25)
+            overlap: Overlap between tiles in inches (default 0.5)
+
+        Returns:
+            Path to saved PDF file
+        """
+        from PIL import Image
+
+        dpi = int(round(self.scale_dpi))
+
+        # Printable area (inside printer margins)
+        printable_w = page_width - 2 * printer_margin
+        printable_h = page_height - 2 * printer_margin
+        printable_w_px = int(printable_w * dpi)
+        printable_h_px = int(printable_h * dpi)
+        page_w_px = int(page_width * dpi)
+        page_h_px = int(page_height * dpi)
+        printer_margin_px = int(printer_margin * dpi)
+        overlap_px = int(overlap * dpi)
+
+        # Reserve space for footer
+        footer_h_px = int(0.35 * dpi)
+        content_h_px = printable_h_px - footer_h_px
+
+        # Build the full pattern image with piece numbers
+        # Use binary as base, add numbers
+        line_width_px = max(1, int(round(self.came_width * dpi)))
+
+        img_h, img_w = self.gray.shape
+        full_pattern = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
+
+        # Draw pieces at came width
+        for piece in self.pieces:
+            cv2.drawContours(
+                full_pattern, [piece.contour], -1,
+                (0, 0, 0), line_width_px, lineType=cv2.LINE_AA
+            )
+
+        # Add piece numbers
+        for piece in self.pieces:
+            cx, cy = piece.centroid
+            font_scale = max(
+                0.4, min(0.8, np.sqrt(piece.area_sq_inches) * 0.3)
+            )
+            text = str(piece.id)
+            (tw, th), _ = cv2.getTextSize(
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+            )
+            cv2.rectangle(
+                full_pattern,
+                (cx - tw // 2 - 2, cy - th // 2 - 2),
+                (cx + tw // 2 + 2, cy + th // 2 + 2),
+                (255, 255, 255), -1
+            )
+            cv2.putText(
+                full_pattern, text,
+                (cx - tw // 2, cy + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                (0, 0, 0), 1
+            )
+
+            # Add color group name if available
+            color_name = getattr(piece, 'color_group_name', None)
+            if color_name:
+                (cw, ch), _ = cv2.getTextSize(
+                    color_name, cv2.FONT_HERSHEY_SIMPLEX, 0.3, 1
+                )
+                cv2.putText(
+                    full_pattern, color_name,
+                    (cx - cw // 2, cy + th // 2 + ch + 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                    (120, 120, 120), 1
+                )
+
+        # Calculate tile grid
+        # Each tile shows content_w x content_h of unique pattern
+        # Plus overlap on edges shared with neighbors
+        content_w_px = printable_w_px - overlap_px  # unique content per tile
+        content_h_px_tile = content_h_px - overlap_px
+
+        cols = max(1, int(np.ceil(img_w / content_w_px)))
+        rows = max(1, int(np.ceil(img_h / content_h_px_tile)))
+        total_pages = cols * rows
+
+        print(f"\nTiling full pattern onto {page_width}\" x {page_height}\" pages")
+        print(f"  Pattern size: {img_w}x{img_h}px "
+              f"({img_w / dpi:.1f}\" x {img_h / dpi:.1f}\")")
+        print(f"  Printable area: {printable_w:.1f}\" x {printable_h:.1f}\"")
+        print(f"  Overlap: {overlap}\"")
+        print(f"  Tile grid: {cols} x {rows} = {total_pages} pages")
+
+        # Render each tile
+        all_pages = []
+        trim_color = (200, 200, 200)  # light grey for trim lines
+        reg_color = (0, 0, 200)  # red for registration marks
+
+        for row_idx in range(rows):
+            for col_idx in range(cols):
+                page = np.ones(
+                    (page_h_px, page_w_px, 3), dtype=np.uint8
+                ) * 255
+
+                # Source region in pattern coordinates
+                src_x = col_idx * content_w_px
+                src_y = row_idx * content_h_px_tile
+
+                # How much of the pattern to show on this tile
+                # (includes overlap with neighbors)
+                show_w = min(printable_w_px, img_w - src_x)
+                show_h = min(content_h_px, img_h - src_y)
+
+                # Clamp source region
+                src_x_end = min(src_x + show_w, img_w)
+                src_y_end = min(src_y + show_h, img_h)
+                actual_w = src_x_end - src_x
+                actual_h = src_y_end - src_y
+
+                # Copy pattern region onto page
+                if actual_w > 0 and actual_h > 0:
+                    page[
+                        printer_margin_px:printer_margin_px + actual_h,
+                        printer_margin_px:printer_margin_px + actual_w
+                    ] = full_pattern[
+                        src_y:src_y_end,
+                        src_x:src_x_end
+                    ]
+
+                # --- Trim lines ---
+                # Show where to cut before taping
+                # Right edge trim (if not last column)
+                if col_idx < cols - 1:
+                    trim_x = printer_margin_px + content_w_px
+                    if trim_x < page_w_px - printer_margin_px:
+                        cv2.line(
+                            page,
+                            (trim_x, printer_margin_px),
+                            (trim_x, printer_margin_px + actual_h),
+                            trim_color, 1, lineType=cv2.LINE_AA
+                        )
+
+                # Bottom edge trim (if not last row)
+                if row_idx < rows - 1:
+                    trim_y = printer_margin_px + content_h_px_tile
+                    if trim_y < page_h_px - printer_margin_px:
+                        cv2.line(
+                            page,
+                            (printer_margin_px, trim_y),
+                            (printer_margin_px + actual_w, trim_y),
+                            trim_color, 1, lineType=cv2.LINE_AA
+                        )
+
+                # --- Registration marks ---
+                # Crosshairs in overlap zones for alignment
+                mark_size = int(0.15 * dpi)
+                mark_spacing = int(2.0 * dpi)
+
+                # Right overlap zone
+                if col_idx < cols - 1:
+                    mark_x = printer_margin_px + content_w_px + overlap_px // 2
+                    if mark_x < page_w_px - printer_margin_px:
+                        for my in range(
+                                printer_margin_px + mark_spacing,
+                                printer_margin_px + actual_h,
+                                mark_spacing):
+                            self._draw_crosshair(
+                                page, mark_x, my,
+                                mark_size, reg_color
+                            )
+
+                # Left overlap zone (marks should match right overlap of
+                # previous tile)
+                if col_idx > 0:
+                    mark_x = printer_margin_px + overlap_px // 2
+                    for my in range(
+                            printer_margin_px + mark_spacing,
+                            printer_margin_px + actual_h,
+                            mark_spacing):
+                        self._draw_crosshair(
+                            page, mark_x, my,
+                            mark_size, reg_color
+                        )
+
+                # Bottom overlap zone
+                if row_idx < rows - 1:
+                    mark_y = (printer_margin_px + content_h_px_tile +
+                              overlap_px // 2)
+                    if mark_y < page_h_px - printer_margin_px:
+                        for mx in range(
+                                printer_margin_px + mark_spacing,
+                                printer_margin_px + actual_w,
+                                mark_spacing):
+                            self._draw_crosshair(
+                                page, mx, mark_y,
+                                mark_size, reg_color
+                            )
+
+                # Top overlap zone
+                if row_idx > 0:
+                    mark_y = printer_margin_px + overlap_px // 2
+                    for mx in range(
+                            printer_margin_px + mark_spacing,
+                            printer_margin_px + actual_w,
+                            mark_spacing):
+                        self._draw_crosshair(
+                            page, mx, mark_y,
+                            mark_size, reg_color
+                        )
+
+                # --- Footer ---
+                footer_y = page_h_px - printer_margin_px - int(0.15 * dpi)
+
+                # Tile position label
+                tile_label = (
+                    f"Tile ({col_idx + 1},{row_idx + 1}) of "
+                    f"({cols},{rows})  |  "
+                    f"Page {row_idx * cols + col_idx + 1}/{total_pages}"
+                )
+                cv2.putText(
+                    page, tile_label,
+                    (printer_margin_px, footer_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                    (100, 100, 100), 1
+                )
+
+                # Dimension and assembly info
+                if hasattr(self, 'frame_info'):
+                    f = self.frame_info
+                    dim_label = (
+                        f"Pattern: {f['pattern_width']:.1f}\" x "
+                        f"{f['pattern_height']:.1f}\"  |  "
+                        f"Trim grey lines, align crosshairs, tape"
+                    )
+                else:
+                    dim_label = (
+                        f"Pattern: {img_w / dpi:.1f}\" x "
+                        f"{img_h / dpi:.1f}\"  |  "
+                        f"Trim grey lines, align crosshairs, tape"
+                    )
+                cv2.putText(
+                    page, dim_label,
+                    (printer_margin_px, footer_y + int(0.2 * dpi)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.35,
+                    (150, 150, 150), 1
+                )
+
+                # --- Tile position diagram ---
+                # Small diagram showing which tile this is
+                diag_size = int(0.8 * dpi)
+                diag_x = page_w_px - printer_margin_px - diag_size - 10
+                diag_y = footer_y - int(0.1 * dpi)
+                cell_w = diag_size // cols
+                cell_h = int(diag_size * 0.6) // rows
+
+                for dr in range(rows):
+                    for dc in range(cols):
+                        x1 = diag_x + dc * cell_w
+                        y1 = diag_y + dr * cell_h
+                        x2 = x1 + cell_w
+                        y2 = y1 + cell_h
+
+                        if dr == row_idx and dc == col_idx:
+                            cv2.rectangle(
+                                page, (x1, y1), (x2, y2),
+                                (0, 0, 200), -1
+                            )
+                        else:
+                            cv2.rectangle(
+                                page, (x1, y1), (x2, y2),
+                                (200, 200, 200), 1
+                            )
+
+                all_pages.append(page)
+
+        # Save as multi-page PDF
+        output_path = self._output_path(f"{prefix}_tiled_pattern.pdf")
+
+        pil_pages = []
+        for page_img in all_pages:
+            rgb = cv2.cvtColor(page_img, cv2.COLOR_BGR2RGB)
+            pil_page = Image.fromarray(rgb)
+            pil_pages.append(pil_page)
+
+        if pil_pages:
+            pil_pages[0].save(
+                output_path,
+                save_all=True,
+                append_images=pil_pages[1:],
+                resolution=dpi,
+            )
+            print(f"\nSaved {len(pil_pages)}-page tiled pattern PDF: "
+                  f"{output_path}")
+
+        return output_path
+
+    def _draw_crosshair(self, image, cx, cy, size, color):
+        """Draw a registration crosshair mark.
+
+        Args:
+            image: Image to draw on
+            cx, cy: Center position
+            size: Half-length of crosshair arms
+            color: BGR color tuple
+        """
+        cv2.line(image,
+                 (cx - size, cy), (cx + size, cy),
+                 color, 1, lineType=cv2.LINE_AA)
+        cv2.line(image,
+                 (cx, cy - size), (cx, cy + size),
+                 color, 1, lineType=cv2.LINE_AA)
+        # Small circle at center for precise alignment
+        cv2.circle(image, (cx, cy), 3, color, 1, lineType=cv2.LINE_AA)
+
+
     def _shelf_pack(self, pieces, usable_w, usable_h, gap):
         """Pack pieces onto pages using best-fit shelf algorithm with rotation.
 
@@ -3412,6 +3740,10 @@ Examples:
         '--page-height', type=float, default=11.0,
         help='Template page height in inches (default: 11.0)'
     )
+    out_group.add_argument(
+        '--printer-margin', type=float, default=0.25,
+        help='Non-printable printer margin in inches (default: 0.25)'
+    )
 
     color_group = parser.add_argument_group('Color Analysis')
     color_group.add_argument(
@@ -3482,6 +3814,12 @@ Examples:
         page_width=args.page_width,
         page_height=args.page_height,
     )
+    print("\n--- Generating Tiled Pattern ---")
+    analyzer.generate_tiled_pattern(
+        prefix=args.prefix,
+        page_width=args.page_width,
+        page_height=args.page_height,
+    )
 
     if not args.no_bokeh:
         print("\n--- Generating Interactive Visualization ---")
@@ -3508,6 +3846,7 @@ Examples:
     print(f"  {args.prefix}_report.txt       — full text report")
     print(f"  {args.prefix}_template.png     — full numbered template")
     print(f"  {args.prefix}_templates.pdf     — packed templates for printing")
+    print(f"  {args.prefix}_tiled_pattern.pdf — tiled full pattern for assembly board")
     if not args.no_bokeh:
         print(f"  {args.prefix}_interactive.html — interactive visualization")
 
