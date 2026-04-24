@@ -3600,6 +3600,1232 @@ class PatternAnalyzer:
             traceback.print_exc()
 
 
+def footer_html():
+    return """
+<footer>
+    <p>Stained Glass Pattern Analyzer — Collaborative development with Claude - 2026</p>
+    <p>
+        Source code: 
+        <a href="https://github.com/richardxdubois/HomeStuff/blob/master/python/analyze_glass_pattern.py"
+           target="_blank">
+            github.com/richardxdubois/HomeStuff — analyze_glass_pattern.py
+        </a>
+    </p>
+</footer>
+"""
+
+def generate_documentation(output_dir="."):
+    """Generate HTML documentation for the Stained Glass Pattern Analyzer.
+
+    Creates a set of linked HTML pages covering user guide,
+    reference, and algorithm explanations.
+
+    Args:
+        output_dir: Directory to write documentation files
+    """
+    from pathlib import Path
+
+    doc_dir = Path(output_dir) / "docs"
+    doc_dir.mkdir(parents=True, exist_ok=True)
+
+    # Shared CSS
+    css = """
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            line-height: 1.6;
+            background: #fafafa;
+        }
+        nav {
+            background: #2c3e50;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+        }
+        nav a {
+            color: #ecf0f1;
+            text-decoration: none;
+            margin-right: 20px;
+            font-size: 14px;
+        }
+        nav a:hover { color: #3498db; }
+        nav a.active { 
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 2px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 6px;
+            margin-top: 40px;
+        }
+        h3 { color: #34495e; margin-top: 30px; }
+        code {
+            background: #ecf0f1;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            line-height: 1.4;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+        }
+        th, td {
+            border: 1px solid #bdc3c7;
+            padding: 10px 14px;
+            text-align: left;
+        }
+        th {
+            background: #2c3e50;
+            color: white;
+        }
+        tr:nth-child(even) { background: #f2f2f2; }
+        .tip {
+            background: #d5f5e3;
+            border-left: 4px solid #27ae60;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .warning {
+            background: #fdebd0;
+            border-left: 4px solid #f39c12;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .note {
+            background: #d6eaf8;
+            border-left: 4px solid #3498db;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .workflow-step {
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+        }
+        .workflow-step h4 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .workflow-step .step-num {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            width: 28px;
+            height: 28px;
+            text-align: center;
+            line-height: 28px;
+            border-radius: 50%;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #bdc3c7;
+            color: #7f8c8d;
+            font-size: 0.85em;
+        }
+        footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    """
+
+    def nav_bar(active):
+        pages = [
+            ('index.html', 'Home'),
+            ('quickstart.html', 'Quick Start'),
+            ('userguide.html', 'User Guide'),
+            ('reference.html', 'Reference'),
+            ('algorithms.html', 'Algorithms'),
+            ('tips.html', 'Tips &amp; Tricks'),
+        ]
+        links = []
+        for href, label in pages:
+            cls = ' class="active"' if label == active else ''
+            links.append(f'<a href="{href}"{cls}>{label}</a>')
+        return f'<nav>{"".join(links)}</nav>'
+
+    # ================================================================
+    # INDEX PAGE
+    # ================================================================
+    index_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stained Glass Pattern Analyzer — Documentation</title>
+    {css}
+</head>
+<body>
+{nav_bar('Home')}
+
+<h1>🔷 Stained Glass Pattern Analyzer</h1>
+
+<p>A command-line tool that analyzes stained glass pattern images to detect 
+pieces, measure their properties, perform quality assurance checks, analyze 
+colors, and generate printable templates.</p>
+
+<h2>What It Does</h2>
+
+<table>
+<tr><th>Feature</th><th>Description</th></tr>
+<tr><td>Piece Detection</td><td>Finds individual glass pieces from black-line-on-white pattern images</td></tr>
+<tr><td>Measurements</td><td>Area, minimum/maximum width, interior angles, complexity for each piece</td></tr>
+<tr><td>QA Warnings</td><td>Flags sharp angles, narrow pieces, tiny pieces, elongated shapes, gaps in lead lines</td></tr>
+<tr><td>Gap Detection</td><td>Finds disconnected lead lines using morphological analysis</td></tr>
+<tr><td>Color Analysis</td><td>Samples colors from a reference image and groups into glass purchasing categories</td></tr>
+<tr><td>Frame Calculation</td><td>Zinc frame inventory and interior came requirements</td></tr>
+<tr><td>Interactive Visualization</td><td>Bokeh HTML with hover details, click selection, filtering</td></tr>
+<tr><td>Printable Templates</td><td>Packed multi-page PDF with correct came/foil line widths</td></tr>
+<tr><td>Tiled Full Pattern</td><td>Multi-page PDF for layout board assembly with registration marks</td></tr>
+</table>
+
+<h2>The Workflow</h2>
+
+<div class="workflow-step">
+    <h4><span class="step-num">1</span> Create or Find Source Image</h4>
+    <p>A photo, painting, or design you want to translate into stained glass.</p>
+</div>
+
+<div class="workflow-step">
+    <h4><span class="step-num">2</span> Trace Pattern in Affinity Designer</h4>
+    <p>Place source as background layer. Draw lead lines with Pen Tool using 
+    black strokes on a white background. Use snap-to-node for clean intersections.</p>
+</div>
+
+<div class="workflow-step">
+    <h4><span class="step-num">3</span> Run Analyzer — Fix Gaps — Iterate</h4>
+    <p>The analyzer detects gaps where lines don't connect. Fix them in Affinity, 
+    re-run until zero gaps reported.</p>
+</div>
+
+<div class="workflow-step">
+    <h4><span class="step-num">4</span> Review QA Warnings — Adjust Design</h4>
+    <p>Sharp angles, narrow pieces, tiny pieces — fix or accept with knowledge 
+    of the cutting difficulty.</p>
+</div>
+
+<div class="workflow-step">
+    <h4><span class="step-num">5</span> Color Analysis — Glass Shopping List</h4>
+    <p>Supply the source image to get a color-grouped purchasing guide with 
+    area totals per color.</p>
+</div>
+
+<div class="workflow-step">
+    <h4><span class="step-num">6</span> Print Templates — Cut Glass</h4>
+    <p>Print packed templates at actual size with correct came/foil line widths. 
+    Print tiled full pattern for the layout board.</p>
+</div>
+
+<h2>Requirements</h2>
+
+<pre><code>pip install opencv-python numpy scikit-image scikit-learn bokeh pillow</code></pre>
+
+<h2>Quick Example</h2>
+
+<pre><code>python analyze_glass_pattern.py my_pattern.png \\
+    --panel-width 24 \\
+    --source-image reference_photo.jpg \\
+    --num-colors 6 \\
+    -o ./output</code></pre>
+
+{footer_html()}
+</body>
+</html>"""
+
+    # ================================================================
+    # QUICK START PAGE
+    # ================================================================
+    quickstart_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quick Start — Stained Glass Pattern Analyzer</title>
+    {css}
+</head>
+<body>
+{nav_bar('Quick Start')}
+
+<h1>Quick Start Guide</h1>
+
+<h2>Installation</h2>
+
+<pre><code># Create a virtual environment (recommended)
+python -m venv glass_env
+source glass_env/bin/activate  # macOS/Linux
+
+# Install dependencies
+pip install opencv-python numpy scikit-image scikit-learn bokeh pillow</code></pre>
+
+<h2>Minimum Viable Run</h2>
+
+<p>All you need is a pattern image (black lines on white background):</p>
+
+<pre><code>python analyze_glass_pattern.py pattern.png -o ./output</code></pre>
+
+<p>This produces:</p>
+<ul>
+    <li>Annotated image with piece numbers and QA highlighting</li>
+    <li>QA overlay showing only problem pieces</li>
+    <li>Text report with measurements and warnings</li>
+    <li>Interactive Bokeh HTML visualization</li>
+</ul>
+
+<h2>With Real-World Scale</h2>
+
+<p>Specify the outer zinc frame dimension for accurate measurements:</p>
+
+<pre><code>python analyze_glass_pattern.py pattern.png \\
+    --panel-width 24 \\
+    -o ./output</code></pre>
+
+<div class="note">
+    <strong>Note:</strong> <code>--panel-width</code> is the outer zinc frame dimension. 
+    The tool automatically subtracts the zinc channel depth (default 0.25") 
+    to calculate the glass pattern dimension.
+</div>
+
+<h2>With Color Analysis</h2>
+
+<p>Supply a reference image that aligns with your pattern:</p>
+
+<pre><code>python analyze_glass_pattern.py pattern.png \\
+    --panel-width 24 \\
+    --source-image reference_photo.jpg \\
+    --num-colors 6 \\
+    -o ./output</code></pre>
+
+<p>Additional outputs:</p>
+<ul>
+    <li>Colored pattern image showing glass color groups</li>
+    <li>Color purchasing report with area totals per color</li>
+    <li>Color figure in the Bokeh visualization</li>
+</ul>
+
+<h2>With Templates for Cutting</h2>
+
+<pre><code>python analyze_glass_pattern.py pattern.png \\
+    --panel-width 24 \\
+    --technique lead \\
+    --source-image reference_photo.jpg \\
+    -o ./output</code></pre>
+
+<p>Template outputs:</p>
+<ul>
+    <li>Full numbered template image (DPI set for actual-size printing)</li>
+    <li>Packed multi-page PDF — individual pieces for cutting</li>
+    <li>Tiled multi-page PDF — full pattern for layout board</li>
+</ul>
+
+<h2>Output Files</h2>
+
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>debug_00_threshold_only.png</code></td><td>Raw threshold result — verify line detection</td></tr>
+<tr><td><code>debug_01_binary.png</code></td><td>After morphological cleanup</td></tr>
+<tr><td><code>debug_02_lines_highlighted.png</code></td><td>Lines shown in red for verification</td></tr>
+<tr><td><code>pattern_analyzed.png</code></td><td>Numbered pieces with QA highlighting</td></tr>
+<tr><td><code>pattern_qa.png</code></td><td>QA issues only on faded background</td></tr>
+<tr><td><code>pattern_report.txt</code></td><td>Full text report with measurements</td></tr>
+<tr><td><code>pattern_interactive.html</code></td><td>Interactive Bokeh visualization</td></tr>
+<tr><td><code>pattern_colored.png</code></td><td>Pieces filled with group colors</td></tr>
+<tr><td><code>pattern_color_report.txt</code></td><td>Glass purchasing guide by color</td></tr>
+<tr><td><code>pattern_template.png</code></td><td>Full numbered template for printing</td></tr>
+<tr><td><code>pattern_templates.pdf</code></td><td>Packed piece templates for cutting</td></tr>
+<tr><td><code>pattern_tiled_pattern.pdf</code></td><td>Tiled full pattern for layout board</td></tr>
+</table>
+
+{footer_html()}
+</body>
+</html>"""
+
+    # ================================================================
+    # USER GUIDE PAGE
+    # ================================================================
+    userguide_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Guide — Stained Glass Pattern Analyzer</title>
+    {css}
+</head>
+<body>
+{nav_bar('User Guide')}
+
+<h1>User Guide</h1>
+
+<h2>Preparing Your Pattern Image</h2>
+
+<h3>Drawing in Affinity Designer</h3>
+
+<ol>
+    <li><strong>Set up document:</strong> File → New. Set dimensions in inches 
+    to match your desired pattern size (glass area, not zinc outer).</li>
+    <li><strong>Place reference image:</strong> File → Place. Position and scale 
+    to fill the document.</li>
+    <li><strong>Create a new layer</strong> above the reference for your lead lines.</li>
+    <li><strong>Set stroke:</strong> Black color, no fill. Width 2-3pt for visibility 
+    while drawing (the analyzer controls template line width separately).</li>
+    <li><strong>Draw with Pen Tool (P):</strong> Click for corner nodes, click-and-drag 
+    for curves.</li>
+    <li><strong>Enable snapping:</strong> View → Snapping Manager. Enable snap to 
+    node/point and snap to edge/path.</li>
+</ol>
+
+<div class="tip">
+    <strong>Tip:</strong> Work with yellow or colored strokes for visibility over 
+    the reference image. Change to black before exporting.
+</div>
+
+<h3>Ensuring Clean Intersections</h3>
+
+<p>The most common issue is <strong>gaps where lines don't quite meet</strong>. 
+The analyzer will detect these, but it's easier to prevent them:</p>
+
+<ul>
+    <li><strong>Snap to node</strong> — when ending a line at an existing line, 
+    snap to one of its nodes</li>
+    <li><strong>Snap to edge</strong> — when ending a line on a curve (like an 
+    ellipse), snap to the curve path</li>
+    <li><strong>Adding nodes to curves:</strong> Select curve with Node Tool (A), 
+    click on the path to add a node, then snap new lines to that node</li>
+    <li><strong>Converting shapes to curves:</strong> Ellipses and rectangles must 
+    be converted (Layer → Convert to Curves) before you can add nodes to them</li>
+</ul>
+
+<div class="warning">
+    <strong>Warning:</strong> Converting a shape to curves is one-way — you can't 
+    convert back. Make sure the shape is positioned correctly first.
+</div>
+
+<h3>Exporting the Pattern</h3>
+
+<ol>
+    <li>Hide the reference image layer</li>
+    <li>Ensure all strokes are <strong>black</strong></li>
+    <li>Ensure the background is <strong>white</strong> (add a white rectangle at 
+    the bottom of the layer stack if needed)</li>
+    <li>File → Export → PNG</li>
+    <li>Set resolution to at least 150 DPI (higher is better for accuracy)</li>
+</ol>
+
+<h2>Understanding Scale and Dimensions</h2>
+
+<h3>The Zinc Frame Model</h3>
+
+<p>The tool uses a model where:</p>
+
+<ul>
+    <li><code>--panel-width 24</code> = the <strong>outer zinc frame</strong> dimension (24")</li>
+    <li>The glass pattern is <strong>inset</strong> by the zinc channel depth on each side</li>
+    <li>Default zinc: 0.5" face width, 0.25" channel depth</li>
+    <li>So pattern width = 24 - 2 × 0.25 = <strong>23.5"</strong></li>
+</ul>
+
+<table>
+<tr><th>Parameter</th><th>Default</th><th>Meaning</th></tr>
+<tr><td><code>--panel-width</code></td><td>—</td><td>Outer zinc frame width in inches</td></tr>
+<tr><td><code>--panel-height</code></td><td>—</td><td>Outer zinc frame height in inches</td></tr>
+<tr><td><code>--zinc-channel-depth</code></td><td>0.25"</td><td>How far glass sits inside zinc channel</td></tr>
+<tr><td><code>--zinc-face-width</code></td><td>0.5"</td><td>Total visible width of zinc U-channel</td></tr>
+</table>
+
+<div class="note">
+    <strong>Note:</strong> Set your Affinity document size to the <strong>pattern</strong> 
+    dimension (23.5" × 16.5"), not the zinc outer dimension. The analyzer 
+    reports both in the output.
+</div>
+
+<h2>The Iterative Workflow</h2>
+
+<h3>Step 1: Initial Analysis</h3>
+
+<pre><code>python analyze_glass_pattern.py pattern.png --panel-width 24 -o ./output</code></pre>
+
+<p>Check the report for:</p>
+<ul>
+    <li><strong>Piece count:</strong> Does it match what you expect?</li>
+    <li><strong>Gaps detected:</strong> These cause pieces to merge incorrectly</li>
+    <li><strong>QA warnings:</strong> Sharp angles, tiny pieces, narrow sections</li>
+</ul>
+
+<h3>Step 2: Fix Gaps</h3>
+
+<p>If gaps are detected:</p>
+<ol>
+    <li>Open the annotated image — gaps are marked with red circles</li>
+    <li>Find the corresponding location in Affinity</li>
+    <li>Fix the connection (snap line endpoints to nodes)</li>
+    <li>Re-export and re-run the analyzer</li>
+    <li>Repeat until "No line gaps detected"</li>
+</ol>
+
+<div class="tip">
+    <strong>Tip:</strong> Start with <code>--max-gap 5</code> for freehand drawings 
+    to only flag the smallest real gaps. Larger values will flag near-misses 
+    at every curved intersection.
+</div>
+
+<h3>Step 3: Address QA Warnings</h3>
+
+<p>Not all warnings require changes — they're information for your design decisions:</p>
+
+<table>
+<tr><th>Warning</th><th>Threshold</th><th>What to Consider</th></tr>
+<tr><td>VERY SHARP ANGLE</td><td>&lt; 20°</td><td>Nearly impossible to score and break. Redesign the intersection.</td></tr>
+<tr><td>SHARP ANGLE</td><td>&lt; 35°</td><td>Difficult but possible with grinding. Plan for extra time.</td></tr>
+<tr><td>TINY</td><td>&lt; 0.25 sq in</td><td>Very hard to cut. Consider merging into adjacent piece or using paint.</td></tr>
+<tr><td>SMALL</td><td>&lt; 0.5 sq in</td><td>Challenging. Copper foil technique handles small pieces better than lead.</td></tr>
+<tr><td>VERY NARROW</td><td>&lt; 3/16"</td><td>Will likely break during cutting or handling.</td></tr>
+<tr><td>NARROW</td><td>&lt; 1/4"</td><td>Fragile. Handle with care.</td></tr>
+<tr><td>COMPLEX</td><td>&gt; 12 vertices</td><td>Many cuts needed. Consider simplifying the shape.</td></tr>
+<tr><td>VERY ELONGATED</td><td>&gt; 6:1 ratio</td><td>Long thin pieces are fragile. Consider dividing.</td></tr>
+<tr><td>SUSPICIOUSLY LARGE</td><td>&gt; Nx median</td><td>May indicate merged pieces from an undetected gap.</td></tr>
+</table>
+
+<h2>Color Analysis</h2>
+
+<h3>Preparing the Source Image</h3>
+
+<p>The source image (photo, painting, etc.) must <strong>align with the pattern</strong>. 
+If you traced over the source in Affinity, the alignment is already correct — 
+just export both at the same document dimensions.</p>
+
+<p>The tool resizes the source to match the pattern if they're different pixel 
+dimensions, but the content should align (same scene, same boundaries).</p>
+
+<h3>Choosing the Number of Colors</h3>
+
+<pre><code>--num-colors 6    # default</code></pre>
+
+<p>This is the number of distinct glass colors you want in your design. Consider:</p>
+
+<ul>
+    <li><strong>Fewer colors (3-4):</strong> Simpler, bolder design. Easier to purchase glass.</li>
+    <li><strong>More colors (8-10):</strong> More nuanced. More glass types to buy and manage.</li>
+    <li><strong>Match your source:</strong> Count the distinct color regions in your 
+    reference image for a good starting point.</li>
+</ul>
+
+<div class="tip">
+    <strong>Tip:</strong> Run the analysis with different <code>--num-colors</code> values 
+    and compare the colored pattern outputs to find the right balance.
+</div>
+
+<h3>The Color Report</h3>
+
+<p>The color report is a glass purchasing guide:</p>
+
+<pre><code>============================================================
+GLASS COLOR SUMMARY — PURCHASING GUIDE
+============================================================
+Total glass area: 385.9 sq in
+Color groups: 6
+------------------------------------------------------------
+  #   Color              Pieces   Area (sq in)      %
+------------------------------------------------------------
+  0   Medium Warm          9          113.1  29.3%
+  3   Dark Neutral         7          112.4  29.1%
+  2   Darkest Warm         7           60.1  15.6%
+  ...</code></pre>
+
+<p>Each group shows the representative RGB color, piece count, total area, 
+and which piece IDs belong to it. Use the RGB value to match glass colors 
+at your supplier.</p>
+
+<h2>Printing Templates</h2>
+
+<h3>Construction Technique</h3>
+
+<table>
+<tr><th>Technique</th><th>Flag</th><th>Line Width</th><th>Use Case</th></tr>
+<tr><td>Lead came</td><td><code>--technique lead</code></td><td>1/16" (heart width)</td><td>Traditional, larger pieces</td></tr>
+<tr><td>Copper foil</td><td><code>--technique foil</code></td><td>~1.5 mil (hairline)</td><td>Small pieces, detailed work</td></tr>
+</table>
+
+<p>The template line width matches what the pattern scissors remove, so pieces 
+cut with pattern scissors are the correct size.</p>
+
+<h3>Packed Templates (for cutting)</h3>
+
+<p>The <code>pattern_templates.pdf</code> file packs individual pieces onto 
+printable pages. Pieces are rotated if they fit better that way 
+(marked with "(R)").</p>
+
+<ul>
+    <li>Print at <strong>100% / actual size</strong> — do not scale to fit</li>
+    <li>The DPI metadata is set so the printer should handle this automatically</li>
+    <li>Oversized pieces span multiple pages with overlap marks for taping</li>
+    <li>Each piece is numbered and labeled with its color group</li>
+</ul>
+
+<h3>Tiled Full Pattern (for layout board)</h3>
+
+<p>The <code>pattern_tiled_pattern.pdf</code> tiles the entire pattern across 
+multiple pages for assembly on the layout board:</p>
+
+<ul>
+    <li><strong>Grey trim lines:</strong> Cut along these before taping</li>
+    <li><strong>Red crosshairs:</strong> Align these when taping tiles together</li>
+    <li><strong>Position diagram:</strong> Small grid in footer shows which tile you're looking at</li>
+    <li>Print at actual size, trim overlapping edges, align crosshairs, tape</li>
+</ul>
+
+<h2>Interactive Visualization</h2>
+
+<p>The Bokeh HTML visualization provides:</p>
+
+<ul>
+    <li><strong>Hover</strong> over any piece to see measurements and warnings</li>
+    <li><strong>Click</strong> a piece for detailed info in the side panel</li>
+    <li><strong>Scroll</strong> to zoom in/out</li>
+    <li><strong>Drag</strong> to pan</li>
+    <li><strong>Filter</strong> by QA status using checkboxes (OK / Warning / Critical)</li>
+    <li><strong>Warning chart</strong> showing distribution of warning types</li>
+    <li><strong>Size histogram</strong> showing piece area distribution</li>
+    <li><strong>Color figure</strong> (if color analysis done) showing pieces filled with group colors</li>
+</ul>
+
+{footer_html()}
+</body>
+</html>"""
+
+    # ================================================================
+    # REFERENCE PAGE
+    # ================================================================
+    reference_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reference — Stained Glass Pattern Analyzer</title>
+    {css}
+</head>
+<body>
+{nav_bar('Reference')}
+
+<h1>Command Reference</h1>
+
+<h2>Synopsis</h2>
+
+<pre><code>python analyze_glass_pattern.py IMAGE [options]</code></pre>
+
+<h2>Required Arguments</h2>
+
+<table>
+<tr><th>Argument</th><th>Description</th></tr>
+<tr><td><code>IMAGE</code></td><td>Path to pattern image (PNG, JPG, etc.). 
+Black lines on white background.</td></tr>
+</table>
+
+<h2>Scale Options</h2>
+
+<table>
+<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>--dpi N</code></td><td>150</td><td>Scale DPI for measurements. 
+Overridden by <code>--panel-width</code> or <code>--panel-height</code>.</td></tr>
+<tr><td><code>--panel-width N</code></td><td>—</td><td>Outer zinc frame width in inches. 
+Auto-calculates DPI from image dimensions.</td></tr>
+<tr><td><code>--panel-height N</code></td><td>—</td><td>Outer zinc frame height in inches. 
+Alternative to <code>--panel-width</code>.</td></tr>
+</table>
+
+<h2>Image Processing</h2>
+
+<table>
+<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>--threshold N</code></td><td>128</td><td>Line detection threshold (0-255). 
+Pixels darker than this become lines. Lower values detect fainter lines.</td></tr>
+<tr><td><code>--close-kernel N</code></td><td>3</td><td>Morphological closing kernel size. 
+Seals small gaps from JPEG compression. Set to 0 to disable.</td></tr>
+<tr><td><code>--dilate N</code></td><td>1</td><td>Line dilation iterations. 
+Thickens lines to seal larger gaps.</td></tr>
+<tr><td><code>--min-area N</code></td><td>200</td><td>Minimum piece area in pixels. 
+Smaller regions treated as noise.</td></tr>
+</table>
+
+<h2>Gap Detection</h2>
+
+<table>
+<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>--max-gap N</code></td><td>20</td><td>Maximum gap width in pixels to detect. 
+Controls how far erosion proceeds.</td></tr>
+<tr><td><code>--min-gap N</code></td><td>2</td><td>Minimum gap width in pixels.</td></tr>
+<tr><td><code>--suspicious-ratio N</code></td><td>8.0</td><td>Flag pieces larger than 
+N× the median area as suspiciously large.</td></tr>
+</table>
+
+<div class="tip">
+    <strong>Tip:</strong> For freehand drawings with many curved intersections, 
+    use <code>--max-gap 5</code> to only flag genuine small gaps rather than 
+    every near-miss.
+</div>
+
+<h2>Frame Options</h2>
+
+<table>
+<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>--zinc-channel-depth N</code></td><td>0.25</td><td>Zinc U-channel depth in inches. 
+Glass pattern is inset by this amount on each side.</td></tr>
+<tr><td><code>--zinc-face-width N</code></td><td>0.5</td><td>Zinc U-channel total face width 
+in inches.</td></tr>
+<tr><td><code>--technique TYPE</code></td><td>lead</td><td>Construction technique: 
+<code>lead</code> or <code>foil</code>. Sets default template line width.</td></tr>
+<tr><td><code>--came-width N</code></td><td>—</td><td>Override template line width in inches. 
+Lead default: 1/16" (heart width). Foil default: 0.0015" (2× thickness).</td></tr>
+</table>
+
+<h2>Color Analysis</h2>
+
+<table>
+<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>--source-image PATH</code></td><td>—</td><td>Reference image for color sampling. 
+Must align with the pattern image.</td></tr>
+<tr><td><code>--num-colors N</code></td><td>6</td><td>Number of color groups for 
+K-means clustering.</td></tr>
+</table>
+
+<h2>Output Options</h2>
+
+<table>
+<tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>--output-dir PATH</code> or <code>-o PATH</code></td><td>./output</td>
+<td>Output directory (created if needed).</td></tr>
+<tr><td><code>--prefix NAME</code></td><td>pattern</td><td>Output filename prefix.</td></tr>
+<tr><td><code>--no-bokeh</code></td><td>—</td><td>Skip interactive Bokeh HTML visualization.</td></tr>
+<tr><td><code>--page-width N</code></td><td>8.5</td><td>Template page width in inches.</td></tr>
+<tr><td><code>--page-height N</code></td><td>11.0</td><td>Template page height in inches.</td></tr>
+<tr><td><code>--printer-margin N</code></td><td>0.25</td><td>Non-printable printer margin 
+in inches.</td></tr>
+</table>
+
+<h2>QA Warning Thresholds</h2>
+
+<p>These are currently hardcoded. Here are the values used:</p>
+
+<table>
+<tr><th>Warning Type</th><th>Threshold</th><th>Severity</th></tr>
+<tr><td>TINY</td><td>&lt; 0.25 sq in</td><td>Critical</td></tr>
+<tr><td>SMALL</td><td>&lt; 0.5 sq in</td><td>Warning</td></tr>
+<tr><td>VERY NARROW</td><td>&lt; 3/16" (0.1875")</td><td>Critical</td></tr>
+<tr><td>NARROW</td><td>&lt; 1/4" (0.25")</td><td>Warning</td></tr>
+<tr><td>VERY SHARP ANGLE</td><td>&lt; 20°</td><td>Critical</td></tr>
+<tr><td>SHARP ANGLE</td><td>&lt; 35°</td><td>Warning</td></tr>
+<tr><td>COMPLEX</td><td>&gt; 12 vertices</td><td>Warning</td></tr>
+<tr><td>VERY ELONGATED</td><td>&gt; 6:1 aspect ratio</td><td>Warning</td></tr>
+<tr><td>SUSPICIOUSLY LARGE</td><td>&gt; N× median area</td><td>Critical</td></tr>
+<tr><td>ADJACENT TO GAP</td><td>Within 10px of gap</td><td>Critical</td></tr>
+</table>
+
+<h2>Example Commands</h2>
+
+<h3>Basic Analysis</h3>
+<pre><code>python analyze_glass_pattern.py pattern.png -o ./output</code></pre>
+
+<h3>Full Analysis with Color</h3>
+<pre><code>python analyze_glass_pattern.py pattern.png \\
+    --panel-width 24 \\
+    --source-image tapestry.jpg \\
+    --num-colors 6 \\
+    --technique lead \\
+    -o ./output</code></pre>
+
+<h3>Copper Foil Project</h3>
+<pre><code>python analyze_glass_pattern.py pattern.png \\
+    --panel-width 12 \\
+    --technique foil \\
+    --zinc-channel-depth 0 \\
+    --zinc-face-width 0 \\
+    -o ./output</code></pre>
+
+<h3>Freehand Drawing with Relaxed Gap Detection</h3>
+<pre><code>python analyze_glass_pattern.py traced_pattern.png \\
+    --panel-width 24 \\
+    --max-gap 5 \\
+    --threshold 100 \\
+    -o ./output</code></pre>
+
+<h3>A4 Paper Templates</h3>
+<pre><code>python analyze_glass_pattern.py pattern.png \\
+    --panel-width 24 \\
+    --page-width 8.27 \\
+    --page-height 11.69 \\
+    -o ./output</code></pre>
+
+{footer_html()}
+</body>
+</html>"""
+
+    # ================================================================
+    # ALGORITHMS PAGE
+    # ================================================================
+    algorithms_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Algorithms — Stained Glass Pattern Analyzer</title>
+    {css}
+</head>
+<body>
+{nav_bar('Algorithms')}
+
+<h1>How It Works</h1>
+
+<p>This page explains the key algorithms used by the analyzer. Understanding 
+these helps with troubleshooting and knowing when to trust (or question) 
+the results.</p>
+
+<h2>Piece Detection</h2>
+
+<h3>Thresholding</h3>
+
+<p>The grayscale image (each pixel 0-255) is converted to pure binary: 
+each pixel is either line (black, 0) or glass (white, 255).</p>
+
+<pre><code>_, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)</code></pre>
+
+<p>Pixels darker than the threshold (default 128) become lines. For images 
+with faint lines, lower the threshold with <code>--threshold 100</code>.</p>
+
+<h3>Morphological Closing</h3>
+
+<p>JPEG compression and anti-aliasing can create tiny gaps in lines. 
+<strong>Morphological closing</strong> seals these:</p>
+
+<ol>
+    <li><strong>Dilate</strong> — expand every line pixel by 1-2 pixels in all directions. 
+    Small gaps get filled.</li>
+    <li><strong>Erode</strong> — shrink back by the same amount. Lines return to 
+    approximately original width.</li>
+</ol>
+
+<p>Net effect: gaps smaller than the kernel size get sealed, but line 
+width is preserved.</p>
+
+<h3>Contour Finding</h3>
+
+<p>OpenCV's <code>findContours</code> traces the boundary of each white region 
+in the binary image. Each closed boundary becomes a contour — a list of 
+(x,y) points defining the piece outline.</p>
+
+<p>The <strong>hierarchy</strong> information tells us which contours are inside 
+which, letting us distinguish:</p>
+
+<ul>
+    <li><strong>Background</strong> — the outermost white region</li>
+    <li><strong>Containers</strong> — white regions that contain other pieces inside them</li>
+    <li><strong>Pieces</strong> — leaf-level white regions with no significant children</li>
+</ul>
+
+<h3>Area Calculation</h3>
+
+<p>Piece area uses the <strong>Shoelace Formula</strong>. For a polygon with 
+vertices (x₁,y₁), (x₂,y₂), ..., (xₙ,yₙ):</p>
+
+<pre><code>Area = ½ |Σ(xᵢ × yᵢ₊₁ − xᵢ₊₁ × yᵢ)|</code></pre>
+
+<p>This is computed on the <strong>full-resolution contour</strong> (hundreds 
+of points tracing every pixel of the boundary), so it's very accurate 
+even for curved pieces. Conversion to square inches:</p>
+
+<pre><code>area_sq_inches = area_pixels / (DPI × DPI)</code></pre>
+
+<h3>Polygon Simplification</h3>
+
+<p>For angle and vertex counting (but NOT for area), the contour is 
+simplified using the <strong>Ramer-Douglas-Peucker algorithm</strong>:</p>
+
+<pre><code>epsilon = 0.015 × perimeter
+approx = cv2.approxPolyDP(contour, epsilon, True)</code></pre>
+
+<p>This finds the minimum number of vertices that approximate the shape 
+within epsilon tolerance. The epsilon of 1.5% of perimeter means curves 
+get reduced to a few straight segments, making angle measurement 
+meaningful.</p>
+
+<h2>Gap Detection</h2>
+
+<h3>The Problem</h3>
+
+<p>When lines don't quite meet in the pattern, the flood-fill algorithm 
+leaks through the gap, merging what should be separate pieces into one 
+large piece. We need to find where these gaps are.</p>
+
+<h3>Why Erosion Works</h3>
+
+<p>Earlier approaches (scanline scanning, line dilation) failed because:</p>
+
+<ul>
+    <li><strong>Scanline:</strong> Couldn't detect diagonal or curved gaps. 
+    Anti-aliased lines caused false positives.</li>
+    <li><strong>Dilation:</strong> Pieces were already merged through gaps, 
+    so thickening lines couldn't merge "separate" pieces — they were 
+    already connected.</li>
+</ul>
+
+<p>The <strong>erosion approach</strong> flips the logic: instead of trying 
+to bridge gaps, it <strong>closes</strong> them by thickening lines until 
+merged pieces <strong>split apart</strong>.</p>
+
+<h3>The Algorithm</h3>
+
+<ol>
+    <li><strong>Label</strong> all white regions in the original binary image. 
+    Each gets a unique number. A merged piece (leaked through gaps) is 
+    one large region.</li>
+    <li><strong>Progressively erode</strong> the white regions (= thicken black 
+    lines) by increasing amounts (radius 1, 2, 3, ...).</li>
+    <li><strong>Re-label</strong> after each erosion step.</li>
+    <li>When the <strong>count increases</strong>, a previously-single region 
+    has split into two — a gap was just closed by the thickened lines.</li>
+    <li><strong>Find the gap location</strong> by identifying which piece split 
+    and finding the closest boundary points between the two new pieces.</li>
+</ol>
+
+<h3>Finding the Split Point</h3>
+
+<p>When a piece splits, we identify it by checking which previous label 
+now maps to multiple new labels:</p>
+
+<pre><code>for prev_id in range(1, prev_count + 1):
+    prev_mask = (prev_labels == prev_id)
+    overlapping_new = np.unique(new_labels[prev_mask])
+    if len(overlapping_new) >= 2:
+        # This piece split!</code></pre>
+
+<p>Then we find the closest pair of boundary points between the two 
+halves — that's where the gap is. This uses a brute-force nearest-point 
+search on the contour points of each half.</p>
+
+<h2>Color Analysis</h2>
+
+<h3>Color Sampling</h3>
+
+<p>For each piece, the contour is used as a mask on the source image. 
+The mask is <strong>eroded</strong> before sampling to avoid picking up dark 
+pixels from lead lines at the edges.</p>
+
+<p>The <strong>median</strong> color (not mean) is used for robustness — if a 
+dark line crosses through the piece region, the median ignores it while 
+the mean would be pulled toward it.</p>
+
+<h3>K-Means Clustering</h3>
+
+<p>The 33 piece colors (one per piece) are grouped into K clusters using 
+<strong>K-Means</strong>. The algorithm:</p>
+
+<ol>
+    <li>Place K center points randomly in color space (BGR)</li>
+    <li>Assign each piece to the nearest center (Euclidean distance)</li>
+    <li>Move each center to the average of its assigned pieces</li>
+    <li>Repeat steps 2-3 until centers stop moving</li>
+</ol>
+
+<p>The result: K groups, each with a representative "center" color and 
+a list of pieces. The center color is what you'd match at the glass shop.</p>
+
+<h3>Color Naming</h3>
+
+<p>Colors are named using two strategies:</p>
+
+<ol>
+    <li><strong>Absolute naming:</strong> Convert to HSV color space. Classify 
+    by hue (red/blue/green/etc.), saturation (vivid vs grey), and value 
+    (light vs dark).</li>
+    <li><strong>Relative naming:</strong> If absolute names aren't distinctive enough 
+    (e.g., everything is "Medium Grey" for a muted source), fall back to 
+    ranking groups by brightness and warmth (R−B difference).</li>
+</ol>
+
+<p>The switch happens automatically: if fewer than 70% of group names 
+are unique, relative naming is used.</p>
+
+<h2>Width Measurement</h2>
+
+<p>Piece width uses two complementary strategies:</p>
+
+<h3>Rotated Rectangle</h3>
+
+<p>The minimum-area rotated bounding rectangle gives overall dimensions. 
+Good for convex, roughly rectangular pieces.</p>
+
+<h3>Distance Transform + Skeleton</h3>
+
+<p>For pieces with irregular shapes or narrow passages:</p>
+
+<ol>
+    <li><strong>Distance transform:</strong> For each white pixel inside the piece, 
+    calculate the distance to the nearest edge. The maximum distance × 2 
+    is the widest point.</li>
+    <li><strong>Skeletonize:</strong> Reduce the piece to a single-pixel-wide 
+    medial axis (like finding the center line).</li>
+    <li><strong>Sample distances along skeleton:</strong> The 10th percentile of 
+    distance-transform values along the skeleton gives the narrowest 
+    interior passage.</li>
+</ol>
+
+<p>This catches narrow necks that the rotated rectangle would miss.</p>
+
+<h2>Template Packing</h2>
+
+<h3>Shelf Packing with Rotation</h3>
+
+<p>Pieces are packed onto pages using a greedy algorithm:</p>
+
+<ol>
+    <li><strong>Sort</strong> pieces by height (tallest first)</li>
+    <li>For each piece, consider <strong>both orientations</strong> (normal and 
+    rotated 90°)</li>
+    <li>Place the piece on the current page, starting a new "shelf" 
+    (horizontal row) if it doesn't fit on the current one</li>
+    <li>After placing each piece, <strong>aggressively fill</strong> the remaining 
+    space on that page with smaller pieces from the remaining list</li>
+    <li>Start a new page only when nothing else fits</li>
+</ol>
+
+<p>The gap-filling pass checks:</p>
+<ul>
+    <li>Remaining horizontal space on each shelf</li>
+    <li>Remaining vertical space below the last shelf</li>
+    <li>Both orientations for each candidate piece</li>
+</ul>
+
+{footer_html()}
+</body>
+</html>"""
+
+    # ================================================================
+    # TIPS PAGE
+    # ================================================================
+    tips_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tips &amp; Tricks — Stained Glass Pattern Analyzer</title>
+    {css}
+</head>
+<body>
+{nav_bar('Tips &amp; Tricks')}
+
+<h1>Tips &amp; Tricks</h1>
+
+<h2>Drawing Tips</h2>
+
+<h3>Affinity Designer Workflow</h3>
+
+<ul>
+    <li><strong>Work in color, export in black.</strong> Use yellow or colored 
+    strokes while tracing over a reference image for visibility. Change all 
+    strokes to black before exporting.</li>
+    <li><strong>Use separate layers.</strong> Reference image on one layer, 
+    lead lines on another. Hide reference for export.</li>
+    <li><strong>Snap, snap, snap.</strong> Enable node and edge snapping. Most 
+    gap problems come from lines that <em>almost</em> connect.</li>
+    <li><strong>Add nodes to curves before connecting.</strong> When you need to 
+    connect a straight line to an ellipse or curve, first add a node to the 
+    curve at the connection point (Node Tool, click on path), then snap 
+    your line to that node.</li>
+</ul>
+
+<h3>Smoothing Polylines</h3>
+
+<ol>
+    <li>Select the curve with <strong>Node Tool (A)</strong></li>
+    <li>Select the nodes to smooth (<strong>Cmd+A</strong> for all, or Shift+click 
+    for specific nodes)</li>
+    <li>Click <strong>Smooth</strong> in the context toolbar</li>
+</ol>
+
+<div class="warning">
+    <strong>Caution:</strong> Don't smooth endpoint nodes where lines meet — 
+    this can pull them away from the intersection and create gaps.
+</div>
+
+<h3>Drawing Curves</h3>
+
+<p>With the Pen Tool, <strong>click and drag</strong> to create curved segments:</p>
+
+<ol>
+    <li>Click and drag at point A — sets the curve direction leaving A</li>
+    <li>Release</li>
+    <li>Click and drag at point B — sets the curve direction arriving at B</li>
+    <li>The curve between A and B is shaped by both drags</li>
+</ol>
+
+<p>For stained glass, the <strong>Ellipse Tool</strong> combined with 
+<strong>boolean operations</strong> (Add, Subtract, Divide) is often easier 
+than drawing curves freehand.</p>
+
+<h2>Troubleshooting</h2>
+
+<h3>Too Many Pieces Detected</h3>
+
+<ul>
+    <li>Small noise regions being counted as pieces</li>
+    <li>Increase <code>--min-area</code> (default 200 pixels)</li>
+    <li>Check <code>debug_01_binary.png</code> for artifacts</li>
+</ul>
+
+<h3>Too Few Pieces Detected</h3>
+
+<ul>
+    <li>Lines not connecting — pieces merging through gaps</li>
+    <li>Check the gap detection results</li>
+    <li>Look at <code>debug_02_lines_highlighted.png</code> to verify line detection</li>
+    <li>Try lowering <code>--threshold</code> if lines are faint</li>
+</ul>
+
+<h3>Lines Not Detected</h3>
+
+<ul>
+    <li>Lines might be colored (not black) — the tool expects black lines</li>
+    <li>Lines might be too faint — lower <code>--threshold</code></li>
+    <li>Check <code>debug_00_threshold_only.png</code> to see what the threshold 
+    is capturing</li>
+</ul>
+
+<h3>Gap Detection Too Aggressive</h3>
+
+<ul>
+    <li>For freehand drawings, curved intersections create many near-misses</li>
+    <li>Reduce <code>--max-gap 5</code> to only flag very small genuine gaps</li>
+    <li>The erosion-based detection only flags gaps that actually cause 
+    piece merging</li>
+</ul>
+
+<h3>Colors All Look the Same</h3>
+
+<ul>
+    <li>Muted source images produce narrow color ranges</li>
+    <li>The tool automatically boosts saturation and brightness for visualization</li>
+    <li>If groups still look similar, try fewer <code>--num-colors</code></li>
+    <li>The relative naming system ("Darkest Cool", "Light Warm") 
+    distinguishes groups even when actual colors are close</li>
+</ul>
+
+<h3>Template Prints at Wrong Size</h3>
+
+<ul>
+    <li>Make sure your print dialog says <strong>100%</strong> or <strong>Actual Size</strong></li>
+    <li>Do NOT use "Scale to Fit" or "Fit to Page"</li>
+    <li>The DPI metadata in the file should handle this, but some printers 
+    ignore it</li>
+    <li>Verify by measuring a known piece on the printout against the 
+    report dimensions</li>
+</ul>
+
+<h2>Performance Tips</h2>
+
+<ul>
+    <li><strong>Image resolution:</strong> Higher resolution = more accuracy but 
+    slower processing. 150 DPI is a good balance. Above 300 DPI the gap 
+    detection becomes slow.</li>
+    <li><strong>Gap detection:</strong> The erosion approach runs multiple labeling 
+    passes. <code>--max-gap 20</code> means 10 passes. Reduce for faster runs.</li>
+    <li><strong>Skip Bokeh:</strong> Use <code>--no-bokeh</code> if you only need 
+    the report and templates. The Bokeh visualization takes time to generate.</li>
+</ul>
+
+<h2>Design Guidelines for Stained Glass</h2>
+
+<h3>Angles</h3>
+
+<ul>
+    <li><strong>&gt; 45°:</strong> Easy to cut</li>
+    <li><strong>35-45°:</strong> Manageable with care</li>
+    <li><strong>20-35°:</strong> Difficult, may need grinding</li>
+    <li><strong>&lt; 20°:</strong> Redesign the intersection — the glass will likely 
+    chip or break at the tip</li>
+</ul>
+
+<h3>Piece Size</h3>
+
+<ul>
+    <li><strong>&gt; 1 sq in:</strong> Comfortable to cut and handle</li>
+    <li><strong>0.5-1 sq in:</strong> Small but doable, especially with copper foil</li>
+    <li><strong>0.25-0.5 sq in:</strong> Challenging — consider if the detail is worth it</li>
+    <li><strong>&lt; 0.25 sq in:</strong> Consider painting the detail instead of cutting</li>
+</ul>
+
+<h3>Width</h3>
+
+<ul>
+    <li><strong>&gt; 1/2":</strong> No problems</li>
+    <li><strong>1/4" - 1/2":</strong> Handle with care</li>
+    <li><strong>3/16" - 1/4":</strong> Fragile, easy to break during grinding or soldering</li>
+    <li><strong>&lt; 3/16":</strong> Likely to break — widen the piece or accept breakage</li>
+</ul>
+
+<h3>Complexity</h3>
+
+<ul>
+    <li>Every vertex = one score-and-break or one grinder pass</li>
+    <li>Pieces with &gt; 8 vertices take significantly longer to cut accurately</li>
+    <li>Curved pieces (many vertices from polygon approximation) are usually 
+    easier than they look — the grinder follows the curve naturally</li>
+</ul>
+
+{footer_html()}
+</body>
+</html>"""
+
+    # ================================================================
+    # Write all files
+    # ================================================================
+    pages = {
+        'index.html': index_html,
+        'quickstart.html': quickstart_html,
+        'userguide.html': userguide_html,
+        'reference.html': reference_html,
+        'algorithms.html': algorithms_html,
+        'tips.html': tips_html,
+    }
+
+    for filename, content in pages.items():
+        filepath = doc_dir / filename
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"  Saved: {filepath}")
+
+    print(f"\nDocumentation generated in: {doc_dir.resolve()}")
+    print(f"Open {doc_dir / 'index.html'} in a browser to view.")
+
+    return str(doc_dir)
+
+
 # =============================================================================
 # Command Line Interface
 # =============================================================================
@@ -3633,7 +4859,7 @@ Examples:
 
     # Required
     parser.add_argument(
-        'image',
+        'image', nargs='?', default=None,
         help='Path to pattern image (JPG, PNG, etc.)'
     )
 
@@ -3744,6 +4970,10 @@ Examples:
         '--printer-margin', type=float, default=0.25,
         help='Non-printable printer margin in inches (default: 0.25)'
     )
+    out_group.add_argument(
+        '--generate-docs', action='store_true',
+        help='Generate HTML documentation and exit'
+    )
 
     color_group = parser.add_argument_group('Color Analysis')
     color_group.add_argument(
@@ -3759,6 +4989,13 @@ Examples:
     # --- Run analysis pipeline ---
     print("Stained Glass Pattern Analyzer")
     print("=" * 40)
+
+    if args.generate_docs:
+        generate_documentation(args.output_dir)
+        return
+
+    if args.image is None:
+        parser.error("IMAGE is required (unless using --generate-docs)")
 
     analyzer = PatternAnalyzer(
         args.image,
