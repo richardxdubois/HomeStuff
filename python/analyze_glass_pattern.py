@@ -705,27 +705,6 @@ class PatternAnalyzer:
         clusters.sort(key=lambda g: g['distance_px'])
         return clusters
 
-    def _save_gap_debug_image(self):
-        """Save debug image showing detected gap locations.
-
-        Draws red circles at gap endpoints and red lines connecting
-        them, with distance labels.
-        """
-        ep_image = cv2.cvtColor(self.gray, cv2.COLOR_GRAY2BGR)
-
-        for gap in self.gaps:
-            pt1 = (int(gap['from'][0]), int(gap['from'][1]))
-            pt2 = (int(gap['to'][0]), int(gap['to'][1]))
-            cv2.circle(ep_image, pt1, 10, (0, 0, 255), 3)
-            cv2.circle(ep_image, pt2, 10, (0, 255, 0), 3)
-            cv2.line(ep_image, pt1, pt2, (0, 0, 255), 2)
-            mid_x = (pt1[0] + pt2[0]) // 2
-            mid_y = (pt1[1] + pt2[1]) // 2
-            label = f"{gap['distance_in']:.2f}\""
-            cv2.putText(ep_image, label, (mid_x + 10, mid_y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-
-        cv2.imwrite(self._output_path("debug_04_gaps_found.png"), ep_image)
 
     # =========================================================================
     # Quality Assurance
