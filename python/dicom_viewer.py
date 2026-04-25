@@ -828,13 +828,22 @@ class DicomViewer:
         )
         self.source.data["image"] = [self.processed_image]
         self.max_bright = float(np.max(self.processed_image))
+
+        # Refresh W/L since gamma changes the value space
+        self._refresh_wl_presets()
+
         self._log(f"Set gamma to {self.gamma:.1f}")
 
     def _window_cb(self, attr, old, new):
         """Handle legacy window slider change."""
         self.window = new
-        self.color_mapper.high = self.max_bright * new
-        self._log(f"Set window scale to {new:.2f}")
+        # Only apply if no W/L presets are active
+        if self.wl_preset_dropdown.value == WL_MANUAL_LABEL and not self.wl_presets:
+            self.color_mapper.high = self.max_bright * new
+            self._log(f"Set window scale to {new:.2f}")
+        else:
+            self._log(f"Legacy window ignored — using W/L controls "
+                      f"(scale={new:.2f})")
 
     def _refresh_rate_cb(self, attr, old, new):
         """Handle animation refresh rate change."""
@@ -897,6 +906,7 @@ class DicomViewer:
 
     def _reset_cb(self):
         """Reset gamma, window, and W/L to defaults."""
+        # Reset gamma
         self.gamma = self.config.gamma_def
         self.window = self.config.window_def
 
@@ -908,23 +918,15 @@ class DicomViewer:
         self.window_slider.value = self.window
         self.window_slider.on_change("value_throttled", self._window_cb)
 
+        # Reprocess image with default gamma
         self.processed_image = ImageProcessor.perform_gamma(
             self.clipped_image, self.gamma, self.original_dtype
         )
         self.max_bright = float(np.max(self.processed_image))
         self.source.data["image"] = [self.processed_image]
 
-        # Reset W/L: apply first preset or image range
-        if self.wl_presets:
-            self._apply_window_level(
-                self.wl_presets[0]["center"],
-                self.wl_presets[0]["width"],
-            )
-            self._refresh_wl_presets()
-        else:
-            self.color_mapper.low = float(np.min(self.processed_image))
-            self.color_mapper.high = self.max_bright * self.window
-            self._refresh_wl_presets()
+        # Reset W/L — let _refresh_wl_presets handle everything
+        self._refresh_wl_presets()
 
         self._log("Reset all adjustments to defaults")
 
@@ -1302,39 +1304,66 @@ class DicomViewer:
 
     def _refresh_wl_presets(self):
         """Update W/L controls for the current image's metadata."""
+        # Recalculate image range from current processed image
+        img_min = float(np.min(self.processed_image))
+        img_max = float(np.max(self.processed_image))
+        if img_max <= img_min:
+            img_max = img_min + 1.0
+
         # Update dropdown options
         options = self._build_wl_preset_options()
 
         self.wl_preset_dropdown.remove_on_change("value", self._wl_preset_cb)
         self.wl_preset_dropdown.options = options
 
-        # Update slider ranges based on image data
-        wl_center_max = max(WL_CENTER_SLIDER_MAX, self.max_bright)
-        wl_width_max = max(WL_WIDTH_SLIDER_MAX, self.max_bright * 2)
+        # Update slider ranges based on current image data
+        wl_center_min = min(WL_CENTER_SLIDER_MIN, img_min)
+        wl_center_max = max(WL_CENTER_SLIDER_MAX, img_max)
+        wl_width_max = max(WL_WIDTH_SLIDER_MAX, (img_max - img_min) * 2)
 
         self.wl_center_slider.remove_on_change("value_throttled", self._wl_manual_cb)
         self.wl_width_slider.remove_on_change("value_throttled", self._wl_manual_cb)
 
+        self.wl_center_slider.start = wl_center_min
         self.wl_center_slider.end = wl_center_max
         self.wl_width_slider.end = wl_width_max
 
         if self.wl_presets:
             # Apply first preset
             first = self.wl_presets[0]
-            self.wl_center_slider.value = first["center"]
-            self.wl_width_slider.value = first["width"]
+
+            # Preset values are in original DICOM value space.
+            # If gamma has been applied, we need to check whether
+            # the preset values are compatible with the displayed range.
+            # Use preset values directly — they set the color mapper
+            # range on the gamma-corrected data.
+            center = first["center"]
+            width = first["width"]
+
+            # Clamp preset values to be within the actual image range
+            # if they're wildly out of range (can happen when gamma
+            # transforms the value space)
+            if center < img_min or center > img_max:
+                # Preset is in a different value space — auto-calculate instead
+                center = (img_min + img_max) / 2.0
+                width = img_max - img_min
+                self._log(f"W/L preset out of range, using auto: "
+                          f"C:{center:.0f} W:{width:.0f}")
+            else:
+                self._log(f"W/L preset applied: {first['name']} "
+                          f"(C:{center:.0f} W:{width:.0f})")
+
+            self.wl_center_slider.value = center
+            self.wl_width_slider.value = width
             self.wl_preset_dropdown.value = options[1] if len(options) > 1 else WL_MANUAL_LABEL
-            self._apply_window_level(first["center"], first["width"])
-            self._log(f"W/L preset applied: {first['name']} "
-                      f"(C:{first['center']:.0f} W:{first['width']:.0f})")
+            self._apply_window_level(center, width)
         else:
             # No presets — use image range
-            img_min = float(np.min(self.processed_image))
-            img_max = self.max_bright
             center = (img_min + img_max) / 2.0
             width = img_max - img_min
             if width <= 0:
                 width = 1.0
+
             self.wl_center_slider.value = center
             self.wl_width_slider.value = width
             self.wl_preset_dropdown.value = WL_MANUAL_LABEL
