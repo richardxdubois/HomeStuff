@@ -257,7 +257,7 @@ footer {{
     <h1>{page.title}</h1>
     {body_html}
     <footer>
-        {manual.title} &copy; 2024. Built with Python, Bokeh, and pydicom.
+        {manual.title} &copy; 2026. A collaboration between Richard Dubois and Claude (Anthropic). Built with Python, Bokeh, and pydicom.
     </footer>
 </main>
 
@@ -285,7 +285,7 @@ def build_user_manual(output_dir: str) -> Manual:
 
     manual = Manual(
         title="DICOM Viewer User Manual",
-        subtitle="Version 2.1",
+        subtitle="Version 2.1 &mdash; April 2026",
         output_dir=os.path.join(output_dir, "user_manual"),
         accent_color="#2563eb",
         icon="&#x1F3E5;",
@@ -1600,7 +1600,7 @@ def build_reference_manual(output_dir: str) -> Manual:
 
     manual = Manual(
         title="DICOM Viewer Reference",
-        subtitle="Developer API &amp; Architecture Guide &mdash; Version 2.0",
+        subtitle="Developer API &amp; Architecture Guide &mdash; Version 2.1 &mdash; April 2026",
         output_dir=os.path.join(output_dir, "reference_manual"),
         accent_color="#7c3aed",
         icon="&#x1F527;",
