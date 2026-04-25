@@ -44,10 +44,12 @@ XRAY_SCALE = 0.5
 CT_SCALE = 1.5
 MRI_SCALE = 4.0
 US_SCALE = 1.5
+
 MRI_GAMMA = 2.0
 US_GAMMA = 2.0
 DEFAULT_GAMMA = 1.0
 DEFAULT_WINDOW = 1.0
+
 GAMMA_SLIDER_MAX = 10.0
 WINDOW_SLIDER_MAX = 2.0
 MAX_LOG_MESSAGES = 10
@@ -55,10 +57,21 @@ DEFAULT_REFRESH_MS = 500.0
 NORMAL_THRESHOLD = 0.95
 ANIMATION_SLICE_RESET = 0
 
+# Window/Level defaults (used when no DICOM presets available)
+WL_CENTER_DEFAULT = 2000.0
+WL_WIDTH_DEFAULT = 4000.0
+WL_CENTER_SLIDER_MIN = -2000.0
+WL_CENTER_SLIDER_MAX = 20000.0
+WL_WIDTH_SLIDER_MIN = 1.0
+WL_WIDTH_SLIDER_MAX = 40000.0
+WL_SLIDER_STEP = 10.0
+
 MODALITY_XRAY = "X-Ray"
 MODALITY_CT = "CT"
 MODALITY_MRI = "MRI"
 MODALITY_US = "US"
+
+WL_MANUAL_LABEL = "Manual"
 
 logger = logging.getLogger("dicom_viewer")
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +91,7 @@ class ViewerConfig:
 
     @classmethod
     def from_yaml(cls, path: str) -> "ViewerConfig":
+        """Load configuration from a YAML file."""
         with open(path, "r") as f:
             data = yaml.safe_load(f)
         return cls(
@@ -117,10 +131,8 @@ class ImageProcessor:
         """Ensure image is 2-D (handle multi-frame or RGB)."""
         if image.ndim == 3:
             if image.shape[2] <= 4:
-                # Likely RGB/RGBA – convert to grayscale
                 return np.mean(image, axis=2).astype(image.dtype)
             else:
-                # Likely multi-frame – take first frame
                 return image[0]
         return image
 
@@ -141,12 +153,45 @@ class ImageProcessor:
         return img
 
     @staticmethod
-    def apply_window_level(image: np.ndarray, window_center: float,
-                           window_width: float) -> np.ndarray:
-        """Apply standard DICOM window/level transform."""
-        lower = window_center - window_width / 2
-        upper = window_center + window_width / 2
-        return np.clip((image - lower) / (upper - lower + 1e-10), 0, 1)
+    def extract_wl_presets(ds: pydicom.Dataset) -> list:
+        """
+        Extract window/level presets from DICOM metadata.
+
+        Returns a list of dicts: [{"center": float, "width": float, "name": str}, ...]
+        Returns empty list if no presets found.
+        """
+        presets = []
+        try:
+            centers = ds[0x0028, 0x1050].value
+            widths = ds[0x0028, 0x1051].value
+
+            # Normalize to lists (can be single value or MultiValue)
+            if not isinstance(centers, (list, pydicom.multival.MultiValue)):
+                centers = [centers]
+                widths = [widths]
+
+            # Try to get descriptive names
+            try:
+                names = ds[0x0028, 0x1055].value
+                if not isinstance(names, (list, pydicom.multival.MultiValue)):
+                    names = [names]
+            except (KeyError, AttributeError):
+                names = [f"Preset {i + 1}" for i in range(len(centers))]
+
+            # Pad names if fewer than centers
+            while len(names) < len(centers):
+                names.append(f"Preset {len(names) + 1}")
+
+            for c, w, n in zip(centers, widths, names):
+                presets.append({
+                    "center": float(c),
+                    "width": float(w),
+                    "name": str(n),
+                })
+        except (KeyError, AttributeError):
+            pass
+
+        return presets
 
     @staticmethod
     def rotated_rectangle_properties(corners):
@@ -156,17 +201,14 @@ class ImageProcessor:
         Parameters
         ----------
         corners : list of [x, y] pairs
-            Four corner coordinates.
 
         Returns
         -------
-        tuple
-            (rotation_angle_degrees, min_x, max_x, min_y, max_y, center)
+        tuple : (rotation_angle_degrees, min_x, max_x, min_y, max_y, center)
         """
         corners = np.array(corners)
         center = np.mean(corners, axis=0)
 
-        # Find the two corners forming the longest side
         max_dist = 0
         corner1_index, corner2_index = 0, 1
         for i in range(4):
@@ -208,17 +250,15 @@ class ImageProcessor:
         max_y = np.max(rotated_corners[:, 1])
 
         logger.debug(
-            f"Rotation: {rotation_angle_degrees:.2f}°, "
+            f"Rotation: {rotation_angle_degrees:.2f} deg, "
             f"X:[{min_x:.1f},{max_x:.1f}], Y:[{min_y:.1f},{max_y:.1f}], "
             f"Center:{center}"
         )
         return rotation_angle_degrees, min_x, max_x, min_y, max_y, center
 
-    # ---------------------------------------------------------------------------
-    # Series manager
-    # ---------------------------------------------------------------------------
-
-
+# ---------------------------------------------------------------------------
+# Series manager
+# ---------------------------------------------------------------------------
 class SeriesManager:
     """Manages DICOM series metadata for CT/MRI datasets."""
 
@@ -229,22 +269,8 @@ class SeriesManager:
         self.series_pos_index: int = 2
 
     def categorize(self, images_list: list, data_dir: str,
-                   debug: bool = False,
-                   log_callback=None) -> None:
-        """
-        Read metadata from all DICOM files and organize by series.
-
-        Parameters
-        ----------
-        images_list : list of str
-            Filenames to scan.
-        data_dir : str
-            Directory containing the files.
-        debug : bool
-            If True, log additional information.
-        log_callback : callable, optional
-            Function to call with log messages.
-        """
+                   debug: bool = False, log_callback=None) -> None:
+        """Read metadata from all DICOM files and organize by series."""
         self.series_map = {}
         for name in images_list:
             path = os.path.join(data_dir, name)
@@ -288,7 +314,6 @@ class SeriesManager:
             ]
 
         self.series = sorted(self.series_map.keys(), key=self._key_func)
-
         self.series_extrema = {}
         for s in self.series_map:
             self.series_extrema[s] = self._get_position_range(s)
@@ -300,10 +325,7 @@ class SeriesManager:
 
     def _get_position_range(self, series: str) -> list:
         """Calculate min/max x, y, z positions for a series."""
-        positions = [
-            self.series_map[series][s][1]
-            for s in self.series_map[series]
-        ]
+        positions = [self.series_map[series][s][1] for s in self.series_map[series]]
         if not positions:
             return [0, 0, 0, 0, 0, 0]
         min_x = min(p[0] for p in positions)
@@ -315,11 +337,7 @@ class SeriesManager:
         return [min_x, max_x, min_y, max_y, min_z, max_z]
 
     def determine_axis(self, series_key: str, images: list) -> int:
-        """
-        Determine the principal imaging axis from slice normal vectors.
-
-        Returns 0 (x), 1 (y), or 2 (z).
-        """
+        """Determine the principal imaging axis from slice normals. Returns 0, 1, or 2."""
         if not images or series_key not in self.series_map:
             return 2
         first_image = images[0]
@@ -328,11 +346,8 @@ class SeriesManager:
         normal = self.series_map[series_key][first_image][3]
         if isinstance(normal, (list, tuple)):
             normal = np.array(normal)
-
         for axis, unit_vec in enumerate([
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
         ]):
             if abs(np.dot(normal, unit_vec)) > NORMAL_THRESHOLD:
                 return axis
@@ -340,7 +355,7 @@ class SeriesManager:
 
     @staticmethod
     def _key_func(filename: str) -> tuple:
-        """Natural sort key: split filename into (alpha, numeric) parts."""
+        """Natural sort key."""
         match = re.match(r"([a-zA-Z]*)(\d+)", str(filename))
         if not match:
             try:
@@ -349,19 +364,12 @@ class SeriesManager:
                 return (str(filename), 0)
         return (match.group(1), int(match.group(2)))
 
-    # ---------------------------------------------------------------------------
-    # Main viewer class
-    # ---------------------------------------------------------------------------
 
-
+# ---------------------------------------------------------------------------
+# Main viewer class
+# ---------------------------------------------------------------------------
 class DicomViewer:
-    """
-    Interactive DICOM medical image viewer built on Bokeh.
-
-    Supports X-Ray, CT, MRI, and Ultrasound modalities with gamma
-    correction, windowing, series navigation, animation, and
-    clip/rotate functionality.
-    """
+    """Interactive DICOM medical image viewer built on Bokeh."""
 
     def __init__(self):
         # Parse arguments and load config
@@ -392,8 +400,9 @@ class DicomViewer:
         self.message_log: list = []
         self.series_anim_cb_id: Optional[object] = None
         self.title_postfix: str = ""
+        self.wl_presets: list = []
 
-        # Image processor and series manager
+        # Helpers
         self.img_proc = ImageProcessor()
         self.series_mgr = SeriesManager()
 
@@ -412,8 +421,7 @@ class DicomViewer:
 
             if self.is_series:
                 self.series_mgr.categorize(
-                    self.images_list, self.data_dir,
-                    self.debug, self._log
+                    self.images_list, self.data_dir, self.debug, self._log
                 )
                 self.current_series = self.series_mgr.get_series_images(
                     self.series_mgr.series[0]
@@ -429,12 +437,19 @@ class DicomViewer:
             logger.error(f"Error reading DICOM file: {e}")
             exit(1)
 
-        # Color mapper
+        # Color mapper — initial range from image data
         low = float(np.min(self.processed_image))
         high = float(np.max(self.processed_image))
         self.color_mapper = LinearColorMapper(
             palette=Greys256, low=low, high=high
         )
+
+        # Apply first W/L preset if available
+        if self.wl_presets:
+            self._apply_window_level(
+                self.wl_presets[0]["center"],
+                self.wl_presets[0]["width"],
+            )
 
         # Build UI
         self._create_figures()
@@ -462,9 +477,7 @@ class DicomViewer:
         )
 
         hover = HoverTool(tooltips=[
-            ("x", "$x"),
-            ("y", "$y"),
-            ("value", "@image"),
+            ("x", "$x"), ("y", "$y"), ("value", "@image"),
         ])
         self.fig_image.add_tools(hover)
 
@@ -480,25 +493,17 @@ class DicomViewer:
 
         # Series positions scatter plot
         self.fig_series_positions = figure(
-            title="z positions",
-            height=500, width=640,
+            title="z positions", height=500, width=640,
             visible=self.is_series,
-            x_axis_label="position",
-            y_axis_label="instance",
+            x_axis_label="position", y_axis_label="instance",
         )
-        self.fig_MRI_source = ColumnDataSource(
-            data={"y": [], "x": []}
-        )
+        self.fig_MRI_source = ColumnDataSource(data={"y": [], "x": []})
         self.fig_series_positions.scatter(
-            x="x", y="y", color="blue",
-            source=self.fig_MRI_source,
+            x="x", y="y", color="blue", source=self.fig_MRI_source,
         )
-        self.fig_MRI_source_series = ColumnDataSource(
-            data={"y": [], "x": []}
-        )
+        self.fig_MRI_source_series = ColumnDataSource(data={"y": [], "x": []})
         self.fig_series_positions.scatter(
-            x="x", y="y", color="black",
-            source=self.fig_MRI_source_series,
+            x="x", y="y", color="black", source=self.fig_MRI_source_series,
         )
         self.fig_series_positions_titles = [
             "x positions vs image instance",
@@ -515,17 +520,14 @@ class DicomViewer:
         # Dataset selector
         db_list = list(self.data_db.keys())
         self.db_dropdown = Select(
-            title="Pick imaging",
-            value=self.starter_images,
-            options=db_list,
+            title="Pick imaging", value=self.starter_images, options=db_list,
         )
         self.db_dropdown.on_change("value", self._db_dropdown_cb)
 
-        # Modality mode indicator
+        # Modality indicator
         self.mode = RadioButtonGroup(
             labels=["XRay", "CT", "MRI", "US"],
-            active=self._modality_index(),
-            visible=True,
+            active=self._modality_index(), visible=True,
         )
         self.mode_div = Div(text="mode", visible=False)
 
@@ -533,22 +535,16 @@ class DicomViewer:
 
         # Series animation controls
         self.series_slider_slice = Slider(
-            start=0,
-            end=max(len(self.current_series), 1),
-            value=0,
-            step=1,
-            title="slice",
-            visible=ct_visible,
+            start=0, end=max(len(self.current_series), 1),
+            value=0, step=1, title="slice", visible=ct_visible,
         )
         self.series_slider_slice.on_change(
             "value_throttled", self._series_slider_slice_cb
         )
 
         self.series_toggle_anim = Toggle(
-            label="Start Animation",
-            button_type="success",
-            active=False,
-            visible=ct_visible,
+            label="Start Animation", button_type="success",
+            active=False, visible=ct_visible,
         )
         self.series_toggle_anim.on_click(self._series_toggle_anim_cb)
 
@@ -561,31 +557,22 @@ class DicomViewer:
 
         # Series selector
         self.series_pulldown = Select(
-            title="Pick series",
-            value="",
-            visible=self.is_series,
+            title="Pick series", value="", visible=self.is_series,
         )
 
-        # Increment / Decrement buttons
+        # Increment / Decrement
         self.increment_button = Button(
-            label="Increment",
-            button_type="success",
-            visible=self.is_series,
+            label="Increment", button_type="success", visible=self.is_series,
         )
         self.increment_button.on_click(self._increment_cb)
-
         self.decrement_button = Button(
-            label="Decrement",
-            button_type="danger",
-            visible=self.is_series,
+            label="Decrement", button_type="danger", visible=self.is_series,
         )
         self.decrement_button.on_click(self._decrement_cb)
 
         # Image name selector
         self.name_dropdown = Select(
-            title="Pick image",
-            value=self.image_name,
-            options=self.images_list,
+            title="Pick image", value=self.image_name, options=self.images_list,
         )
 
         if self.is_series:
@@ -605,18 +592,49 @@ class DicomViewer:
         # Gamma slider
         self.gamma_slider = Slider(
             start=0, end=GAMMA_SLIDER_MAX,
-            value=self.gamma, step=0.1,
-            title="Gamma",
+            value=self.gamma, step=0.1, title="Gamma",
         )
         self.gamma_slider.on_change("value_throttled", self._gamma_cb)
 
-        # Window slider
+        # Legacy window slider (simple brightness multiplier)
         self.window_slider = Slider(
             start=0, end=WINDOW_SLIDER_MAX,
-            value=self.window, step=0.05,
-            title="Window",
+            value=self.window, step=0.05, title="Window (legacy)",
         )
         self.window_slider.on_change("value_throttled", self._window_cb)
+
+        # --- Window/Level preset controls ---
+        self.wl_preset_dropdown = Select(
+            title="W/L Preset", value=WL_MANUAL_LABEL,
+            options=self._build_wl_preset_options(),
+        )
+        self.wl_preset_dropdown.on_change("value", self._wl_preset_cb)
+
+        # Determine initial W/L slider values
+        if self.wl_presets:
+            init_center = self.wl_presets[0]["center"]
+            init_width = self.wl_presets[0]["width"]
+        else:
+            init_center = self.max_bright / 2.0 if self.max_bright > 0 else WL_CENTER_DEFAULT
+            init_width = self.max_bright if self.max_bright > 0 else WL_WIDTH_DEFAULT
+
+        # Compute slider ranges from image data
+        wl_center_max = max(WL_CENTER_SLIDER_MAX, self.max_bright)
+        wl_width_max = max(WL_WIDTH_SLIDER_MAX, self.max_bright * 2)
+
+        self.wl_center_slider = Slider(
+            start=WL_CENTER_SLIDER_MIN, end=wl_center_max,
+            value=init_center, step=WL_SLIDER_STEP,
+            title="Window Center",
+        )
+        self.wl_center_slider.on_change("value_throttled", self._wl_manual_cb)
+
+        self.wl_width_slider = Slider(
+            start=WL_WIDTH_SLIDER_MIN, end=wl_width_max,
+            value=init_width, step=WL_SLIDER_STEP,
+            title="Window Width",
+        )
+        self.wl_width_slider.on_change("value_throttled", self._wl_manual_cb)
 
         # Reset button
         self.reset_button = Button(label="Reset", button_type="warning")
@@ -634,6 +652,9 @@ class DicomViewer:
         self.fig_image.add_tools(self.taptool)
         self.fig_image.on_event("tap", self._tap_callback)
 
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
     def _build_layout(self):
         """Assemble the Bokeh layout and attach to curdoc."""
         ct_layout = row(
@@ -643,6 +664,18 @@ class DicomViewer:
             self.increment_button,
             self.decrement_button,
         )
+
+        wl_controls = column(
+            self.wl_preset_dropdown,
+            self.wl_center_slider,
+            self.wl_width_slider,
+        )
+
+        adjustment_controls = column(
+            self.gamma_slider,
+            self.window_slider,
+        )
+
         control_widgets = row(
             column(
                 row(
@@ -651,7 +684,8 @@ class DicomViewer:
                     self.db_dropdown,
                     column(self.mode_div, self.mode),
                     self.clip_button,
-                    column(self.gamma_slider, self.window_slider),
+                    adjustment_controls,
+                    wl_controls,
                     self.name_dropdown,
                 ),
                 self.series_pulldown,
@@ -681,15 +715,15 @@ class DicomViewer:
         self.source.data["image"] = [self.processed_image]
         self._size_figures()
         self._set_image_fig_title(new)
+        self._refresh_wl_presets()
 
     def _db_dropdown_cb(self, attr, old, new):
-        """Handle dataset change — essentially a full reset."""
+        """Handle dataset change — full reset."""
         self.data_dir = self.data_db[new]
         self._find_images()
         self.image_name = self.images_list[0]
         self.path = os.path.join(self.data_dir, self.image_name)
 
-        # Temporarily remove callbacks to avoid triggering during reset
         self.name_dropdown.remove_on_change("value", self._name_cb)
         self.name_dropdown.options = self.images_list
         self.name_dropdown.value = self.image_name
@@ -699,14 +733,12 @@ class DicomViewer:
 
         if self.is_series:
             self.series_mgr.categorize(
-                self.images_list, self.data_dir,
-                self.debug, self._log,
+                self.images_list, self.data_dir, self.debug, self._log,
             )
             self.selected_series = self.series_mgr.series[0]
             self.current_series = self.series_mgr.get_series_images(
                 self.selected_series
             )
-
             self.series_pulldown.options = self.series_mgr.series
             self.current_slice = 0
 
@@ -738,6 +770,7 @@ class DicomViewer:
         self.mode.active = self._modality_index()
         self._set_image_fig_title(self.image_name)
         self.source.data["image"] = [self.processed_image]
+        self._refresh_wl_presets()
         self._log(f"Get new imaging {new}")
 
     def _series_cb(self, attr, old, new):
@@ -748,6 +781,7 @@ class DicomViewer:
         self.current_series = self.series_mgr.get_series_images(
             self.selected_series
         )
+
         self.name_dropdown.remove_on_change("value", self._name_cb)
         self.name_dropdown.options = self.current_series
         if self.current_series:
@@ -756,9 +790,11 @@ class DicomViewer:
 
         if self.current_series:
             self.path = os.path.join(self.data_dir, self.current_series[0])
+
         self._histogram_positions()
         if self.current_series:
             self._series_scatter_pos(self.current_series[0])
+
         self.fig_series_positions.title.text = (
             self.fig_series_positions_titles[self.series_mgr.series_pos_index]
         )
@@ -780,6 +816,8 @@ class DicomViewer:
         self.series_slider_slice.on_change(
             "value_throttled", self._series_slider_slice_cb
         )
+
+        self._refresh_wl_presets()
         self._log(f"Selected new series {new}")
 
     def _gamma_cb(self, attr, old, new):
@@ -789,10 +827,11 @@ class DicomViewer:
             self.clipped_image, self.gamma, self.original_dtype
         )
         self.source.data["image"] = [self.processed_image]
+        self.max_bright = float(np.max(self.processed_image))
         self._log(f"Set gamma to {self.gamma:.1f}")
 
     def _window_cb(self, attr, old, new):
-        """Handle window slider change."""
+        """Handle legacy window slider change."""
         self.window = new
         self.color_mapper.high = self.max_bright * new
         self._log(f"Set window scale to {new:.2f}")
@@ -809,8 +848,55 @@ class DicomViewer:
         except ValueError:
             self._log(f"Invalid refresh rate: {new}")
 
+    # --- Window/Level callbacks ---
+
+    def _wl_preset_cb(self, attr, old, new):
+        """Handle window/level preset dropdown selection."""
+        if new == WL_MANUAL_LABEL:
+            self._log("Switched to manual window/level")
+            return
+
+        for p in self.wl_presets:
+            label = self._wl_preset_label(p)
+            if label == new:
+                # Update sliders without triggering their callbacks
+                self.wl_center_slider.remove_on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+                self.wl_width_slider.remove_on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+
+                self.wl_center_slider.value = p["center"]
+                self.wl_width_slider.value = p["width"]
+
+                self.wl_center_slider.on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+                self.wl_width_slider.on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+
+                self._apply_window_level(p["center"], p["width"])
+                self._log(f"W/L preset: {p['name']} "
+                          f"(C:{p['center']:.0f} W:{p['width']:.0f})")
+                break
+
+    def _wl_manual_cb(self, attr, old, new):
+        """Handle manual window center/width slider changes."""
+        center = self.wl_center_slider.value
+        width = self.wl_width_slider.value
+        self._apply_window_level(center, width)
+
+        # Switch dropdown to Manual since user is overriding presets
+        self.wl_preset_dropdown.remove_on_change("value", self._wl_preset_cb)
+        self.wl_preset_dropdown.value = WL_MANUAL_LABEL
+        self.wl_preset_dropdown.on_change("value", self._wl_preset_cb)
+
+        self._log(f"Manual W/L: center={center:.0f}, width={width:.0f}")
+
     def _reset_cb(self):
-        """Reset gamma and window to defaults."""
+        """Reset gamma, window, and W/L to defaults."""
         self.gamma = self.config.gamma_def
         self.window = self.config.window_def
 
@@ -826,9 +912,21 @@ class DicomViewer:
             self.clipped_image, self.gamma, self.original_dtype
         )
         self.max_bright = float(np.max(self.processed_image))
-        self.color_mapper.high = self.max_bright * self.window
         self.source.data["image"] = [self.processed_image]
-        self._log("Reset gamma and window to defaults")
+
+        # Reset W/L: apply first preset or image range
+        if self.wl_presets:
+            self._apply_window_level(
+                self.wl_presets[0]["center"],
+                self.wl_presets[0]["width"],
+            )
+            self._refresh_wl_presets()
+        else:
+            self.color_mapper.low = float(np.min(self.processed_image))
+            self.color_mapper.high = self.max_bright * self.window
+            self._refresh_wl_presets()
+
+        self._log("Reset all adjustments to defaults")
 
     def _clip_reset_cb(self):
         """Reset clip state."""
@@ -870,7 +968,6 @@ class DicomViewer:
         """Periodic callback to advance animation one frame."""
         if not self.series_toggle_anim.active:
             return
-
         images = self.current_series if self.is_series else self.images_list
         if not images:
             return
@@ -900,8 +997,7 @@ class DicomViewer:
             self.series_toggle_anim.button_type = "danger"
             self.series_toggle_anim.label = "Stop Animation"
             self.series_anim_cb_id = curdoc().add_periodic_callback(
-                self._animate_series,
-                int(self.series_animate_refresh_rate),
+                self._animate_series, int(self.series_animate_refresh_rate),
             )
         else:
             self.series_toggle_anim.button_type = "success"
@@ -911,7 +1007,7 @@ class DicomViewer:
                 self.series_anim_cb_id = None
 
     # ------------------------------------------------------------------
-    # Tap / clip callback
+    # Tap / clip
     # ------------------------------------------------------------------
     def _tap_callback(self, event):
         """Handle tap event for clip-and-rotate (4 corners)."""
@@ -946,15 +1042,12 @@ class DicomViewer:
             dw = int(max_x - min_x)
             dh = int(max_y - min_y)
 
-            # Replace old image renderer
             self.fig_image.renderers = [
                 r for r in self.fig_image.renderers if r != self.f_img
             ]
             self.f_img = self.fig_image.image(
-                image="image", x=min_x, y=min_y,
-                dw=dw, dh=dh,
-                source=self.source,
-                color_mapper=self.color_mapper,
+                image="image", x=min_x, y=min_y, dw=dw, dh=dh,
+                source=self.source, color_mapper=self.color_mapper,
             )
 
             self.fig_image.height = dh
@@ -965,11 +1058,8 @@ class DicomViewer:
             self.fig_image.x_range.end = max_x
 
             self.source.data["image"] = [self.processed_image]
-            self._log(
-                f"Clipped and rotated by {rotation_angle:.2f} degrees"
-            )
+            self._log(f"Clipped and rotated by {rotation_angle:.2f} degrees")
 
-            # Reset clip state
             self.clipee = 0
             self.clip_points = []
             self.source.selected.image_indices = []
@@ -988,16 +1078,13 @@ class DicomViewer:
         curdoc().add_next_tick_callback(self._exit_server)
 
     async def _async_update_log(self, message: str):
-        """Async log update for shutdown sequence."""
         self.log_div.text = message
 
     async def _exit_server(self):
-        """Stop the Tornado IOLoop."""
         logger.info("Server is shutting down...")
         IOLoop.current().stop()
 
     async def _async_change_button(self, button, color: str):
-        """Async button color change."""
         button.button_type = color
 
     # ------------------------------------------------------------------
@@ -1019,14 +1106,10 @@ class DicomViewer:
         self.dicom_image = ImageProcessor.ensure_2d(self.dicom_image)
 
         # Apply rescale slope/intercept
-        self.dicom_image = ImageProcessor.apply_rescale(
-            self.dicom_image, self.ds
-        )
+        self.dicom_image = ImageProcessor.apply_rescale(self.dicom_image, self.ds)
 
         # Apply photometric interpretation
-        self.clipped_image = ImageProcessor.apply_photometric(
-            self.dicom_image, self.ds
-        )
+        self.clipped_image = ImageProcessor.apply_photometric(self.dicom_image, self.ds)
 
         # Flip vertically for display
         self.clipped_image = np.flipud(self.clipped_image)
@@ -1059,6 +1142,9 @@ class DicomViewer:
             self.clipped_image, self.gamma, self.original_dtype
         )
         self.max_bright = float(np.max(self.processed_image))
+
+        # Extract W/L presets from this image's metadata
+        self.wl_presets = ImageProcessor.extract_wl_presets(self.ds)
 
     def _size_figures(self):
         """Update figure dimensions to match current image."""
@@ -1097,10 +1183,17 @@ class DicomViewer:
         images = self.current_series if self.is_series else self.images_list
         if not images or self.current_slice >= len(images):
             return
-        self.path = os.path.join(self.data_dir, images[self.current_slice])
+        image_name = images[self.current_slice]
+        self.path = os.path.join(self.data_dir, image_name)
         self._prepare_images()
-        self._set_image_fig_title(images[self.current_slice])
+        self._set_image_fig_title(image_name)
         self.source.data["image"] = [self.processed_image]
+
+        # Apply current W/L settings to new image
+        # (preserve user's current slider positions)
+        center = self.wl_center_slider.value
+        width = self.wl_width_slider.value
+        self._apply_window_level(center, width)
 
     def _sync_slice_slider(self):
         """Update the slice slider without triggering its callback."""
@@ -1127,8 +1220,8 @@ class DicomViewer:
             if img not in sm.series_map.get(self.selected_series, {}):
                 continue
             entry = sm.series_map[self.selected_series][img]
-            i_n.append(entry[0])  # instance number
-            z_i.append(entry[1][axis])  # position along axis
+            i_n.append(entry[0])
+            z_i.append(entry[1][axis])
 
         self.fig_MRI_source_series.data = {"x": z_i, "y": i_n}
 
@@ -1142,7 +1235,6 @@ class DicomViewer:
         entry = sm.series_map[self.selected_series][image_name]
         z_i = entry[1][sm.series_pos_index]
         i_n = entry[0]
-
         self.fig_MRI_source.data = {"x": [z_i], "y": [i_n]}
 
     def _find_images(self):
@@ -1157,10 +1249,8 @@ class DicomViewer:
     def _modality_index(self) -> int:
         """Return RadioButtonGroup index for current modality."""
         mapping = {
-            MODALITY_XRAY: 0,
-            MODALITY_CT: 1,
-            MODALITY_MRI: 2,
-            MODALITY_US: 3,
+            MODALITY_XRAY: 0, MODALITY_CT: 1,
+            MODALITY_MRI: 2, MODALITY_US: 3,
         }
         return mapping.get(self.image_type, 0)
 
@@ -1187,6 +1277,72 @@ class DicomViewer:
         self.window_slider.remove_on_change("value_throttled", self._window_cb)
         self.window_slider.value = self.window
         self.window_slider.on_change("value_throttled", self._window_cb)
+
+    # ------------------------------------------------------------------
+    # Window/Level helpers
+    # ------------------------------------------------------------------
+    def _apply_window_level(self, center: float, width: float):
+        """Apply window/level by adjusting the color mapper range."""
+        low = center - width / 2.0
+        high = center + width / 2.0
+        self.color_mapper.low = low
+        self.color_mapper.high = high
+
+    @staticmethod
+    def _wl_preset_label(preset: dict) -> str:
+        """Generate a display label for a W/L preset."""
+        return f"{preset['name']} (C:{preset['center']:.0f} W:{preset['width']:.0f})"
+
+    def _build_wl_preset_options(self) -> list:
+        """Build the options list for the W/L preset dropdown."""
+        options = [WL_MANUAL_LABEL]
+        for p in self.wl_presets:
+            options.append(self._wl_preset_label(p))
+        return options
+
+    def _refresh_wl_presets(self):
+        """Update W/L controls for the current image's metadata."""
+        # Update dropdown options
+        options = self._build_wl_preset_options()
+
+        self.wl_preset_dropdown.remove_on_change("value", self._wl_preset_cb)
+        self.wl_preset_dropdown.options = options
+
+        # Update slider ranges based on image data
+        wl_center_max = max(WL_CENTER_SLIDER_MAX, self.max_bright)
+        wl_width_max = max(WL_WIDTH_SLIDER_MAX, self.max_bright * 2)
+
+        self.wl_center_slider.remove_on_change("value_throttled", self._wl_manual_cb)
+        self.wl_width_slider.remove_on_change("value_throttled", self._wl_manual_cb)
+
+        self.wl_center_slider.end = wl_center_max
+        self.wl_width_slider.end = wl_width_max
+
+        if self.wl_presets:
+            # Apply first preset
+            first = self.wl_presets[0]
+            self.wl_center_slider.value = first["center"]
+            self.wl_width_slider.value = first["width"]
+            self.wl_preset_dropdown.value = options[1] if len(options) > 1 else WL_MANUAL_LABEL
+            self._apply_window_level(first["center"], first["width"])
+            self._log(f"W/L preset applied: {first['name']} "
+                      f"(C:{first['center']:.0f} W:{first['width']:.0f})")
+        else:
+            # No presets — use image range
+            img_min = float(np.min(self.processed_image))
+            img_max = self.max_bright
+            center = (img_min + img_max) / 2.0
+            width = img_max - img_min
+            if width <= 0:
+                width = 1.0
+            self.wl_center_slider.value = center
+            self.wl_width_slider.value = width
+            self.wl_preset_dropdown.value = WL_MANUAL_LABEL
+            self._apply_window_level(center, width)
+
+        self.wl_center_slider.on_change("value_throttled", self._wl_manual_cb)
+        self.wl_width_slider.on_change("value_throttled", self._wl_manual_cb)
+        self.wl_preset_dropdown.on_change("value", self._wl_preset_cb)
 
     def _log(self, message: str):
         """Add a message to the on-screen log."""
