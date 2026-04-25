@@ -1,4 +1,21 @@
+"""
+DICOM Medical Image Viewer
+===========================
+A Bokeh-based interactive medical image viewer supporting X-Ray, CT, MRI,
+and Ultrasound DICOM files.
+
+Conda env: pydicom
+Requirements: pydicom (conda); pylibjpeg[all] (pip); scikit-image; bokeh; pyyaml
+
+Invoke:
+    bokeh serve dicom_viewer.py --args --app_config "/Volumes/Data/Home/dicom_viewer.yaml"
+
+View in browser at:
+    localhost:5006/dicom_viewer
+"""
+
 import os
+import logging
 import numpy as np
 import pydicom
 from tornado.ioloop import IOLoop
@@ -8,898 +25,150 @@ import argparse
 from pathlib import Path
 import pylibjpeg
 import re
+from dataclasses import dataclass, field
+from typing import Optional
 
-from bokeh.plotting import figure, show, curdoc
+from bokeh.plotting import figure, curdoc
 from bokeh.layouts import column, row, layout
-from bokeh.models import (ColumnDataSource, LinearColorMapper, ColorBar, HoverTool, Button, Slider, Div, TapTool,
-                          Select, RadioButtonGroup, Toggle, TextInput, Range1d, LinearAxis)
+from bokeh.models import (
+    ColumnDataSource, LinearColorMapper, ColorBar, HoverTool,
+    Button, Slider, Div, TapTool, Select, RadioButtonGroup,
+    Toggle, TextInput, Range1d
+)
+from bokeh.palettes import Greys256
 
-from bokeh.palettes import Greys256  # For grayscale
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+XRAY_SCALE = 0.5
+CT_SCALE = 1.5
+MRI_SCALE = 4.0
+US_SCALE = 1.5
+MRI_GAMMA = 2.0
+US_GAMMA = 2.0
+DEFAULT_GAMMA = 1.0
+DEFAULT_WINDOW = 1.0
+GAMMA_SLIDER_MAX = 10.0
+WINDOW_SLIDER_MAX = 2.0
+MAX_LOG_MESSAGES = 10
+DEFAULT_REFRESH_MS = 500.0
+NORMAL_THRESHOLD = 0.95
+ANIMATION_SLICE_RESET = 0
 
-# pydicom.github.io/pydicom/stable/index.html
+MODALITY_XRAY = "X-Ray"
+MODALITY_CT = "CT"
+MODALITY_MRI = "MRI"
+MODALITY_US = "US"
 
-#   Conda env: pydicom
-#   Requirements:  pydicom (conda); ppylibjpeg[all] (pip install); scikit-image; bokeh
-#
-#   Invoke: bokeh serve dicom_viewer.py --args --app_config "/Volumes/Data/Home/dicom_viewer.yaml"
-#
-#   View in browser at: localhost:5006/dicom_viewer
+logger = logging.getLogger("dicom_viewer")
+logging.basicConfig(level=logging.INFO)
 
 
-class dicom_viewer():
-    def __init__(self):
-        parser = argparse.ArgumentParser()
+# ---------------------------------------------------------------------------
+# Configuration dataclass
+# ---------------------------------------------------------------------------
+@dataclass
+class ViewerConfig:
+    """Holds application configuration loaded from YAML."""
+    debug: bool = False
+    gamma_def: float = DEFAULT_GAMMA
+    window_def: float = DEFAULT_WINDOW
+    starter_images: str = ""
+    data_db: dict = field(default_factory=dict)
 
-        parser.add_argument('--app_config',
-                            default="/Volumes/Data/Home/dicom_viewer.yaml",
-                            help="overall app config file")
-        args = parser.parse_args()
-
-        with open(args.app_config, "r") as f:
+    @classmethod
+    def from_yaml(cls, path: str) -> "ViewerConfig":
+        with open(path, "r") as f:
             data = yaml.safe_load(f)
-
-        self.debug = data["debug"]
-
-        self.clip_points = []
-        self.clipee = 0
-        self.clipped = False
-
-        self.image_type = "X-Ray"
-        self.image_scale = 4.
-
-        self.current_slice = 0
-        self.series_animate_refresh_rate = 500.
-
-        self.current_series = []
-
-        self.gamma_def = data["gamma_def"]
-        self.gamma = self.gamma_def
-
-        self.window_def = data["window_def"]
-        self.window = self.window_def
-
-        self.message_log = []
-
-        # 1. Load the DICOM image
-        try:
-            self.data_db = data["data_db"]
-            self.starter_images = data["starter_images"]
-
-            self.data_dir = self.data_db[self.starter_images]
-
-            rc = self.find_images()
-
-            self.image_name = self.images_list[0]
-            self.path = self.data_dir + self.image_name
-
-            rc = self.prepare_images()
-            data = {'image': [self.processed_image]}
-
-            self.source = ColumnDataSource(data)
-
-            if self.is_series:
-                rc = self.categorize_series()
-
-            if self.debug:
-                print(self.ds)
-
-        except FileNotFoundError:
-            print("Error: DICOM file not found. Please specify the correct path.")
-            exit()
-        except Exception as e:
-            print(f"Error reading DICOM file: {e}")
-            exit()
-
-        # 3. Create a LinearColorMapper for grayscale mapping
-        try:
-            low = np.min(self.processed_image)
-            high = np.max(self.processed_image)
-
-            self.color_mapper = LinearColorMapper(palette=Greys256, low=low, high=high) #Use Greys256 for grayscale
-        except Exception as e:
-            print(f"Error creating color mapper: {e}")
-            exit()
+        return cls(
+            debug=data.get("debug", False),
+            gamma_def=data.get("gamma_def", DEFAULT_GAMMA),
+            window_def=data.get("window_def", DEFAULT_WINDOW),
+            starter_images=data.get("starter_images", ""),
+            data_db=data.get("data_db", {}),
+        )
 
 
-        # Create the Bokeh figure
+# ---------------------------------------------------------------------------
+# Image processing helpers
+# ---------------------------------------------------------------------------
+class ImageProcessor:
+    """Stateless image processing utilities for DICOM images."""
 
-        self.fig_image = figure(width=self.width_scl, height=self.height_scl, title="",
-                                x_range=(0, self.width_scl), y_range=(0, self.height_scl))
-        rc = self.set_image_fig_title(self.image_name)
-
-
-        # Add the image to the plot
-        self.f_img = self.fig_image.image(image='image', x=0, y=0, dw=self.width_scl, dh=self.height_scl, source=self.source,
-                             color_mapper=self.color_mapper)
-
-        # Add a HoverTool
-        hover = HoverTool(tooltips=[
-            ("x", "$x"),
-            ("y", "$y"),
-            ("value", f"@image"),
-        ])
-        self.fig_image.add_tools(hover)
-
-        # 6. Add a color bar (optional)
-        self.color_bar = ColorBar(color_mapper=self.color_mapper, label_standoff=12)
-        self.fig_image.add_layout(self.color_bar, 'right')
-
-        # Remove grid lines and axis ticks
-        self.fig_image.grid.grid_line_color = None
-        self.fig_image.axis.axis_line_color = None
-        self.fig_image.axis.major_tick_line_color = None
-        self.fig_image.axis.major_label_standoff = 0
-
-        self.fig_series_positions = figure(title="z positions", height=500, width=640, visible=False,
-                                        x_axis_label="position", y_axis_label="instance")
-        self.fig_MRI_source = ColumnDataSource(data=dict({"y": [], "x": []}))
-        self.fig_series_positions.scatter(x="x", y="y", color="blue", source=self.fig_MRI_source)
-        self.fig_MRI_source_series = ColumnDataSource(data=dict({"y": [], "x": []}))
-        self.fig_series_positions.scatter(x="x", y="y", color="black", source=self.fig_MRI_source_series)
-        self.fig_series_positions_titles = ["x positions vs image instance", "y positions vs image instance",
-                                            "z positions vs image instance"]
-
-        self.fig_series_positions.visible = self.is_series
-
-        rc = self.create_widgets()
-
-        CT_layout = row(self.series_toggle_anim, self.CT_text_refresh, self.series_slider_slice,
-                        self.increment_button, self.decrement_button)
-        control_widgets = row(column(row(self.exit_button, self.db_dropdown, column(self.mode_div, self.mode),
-                                         self.clip_button,
-                                     column(self.gamma_slider, self.window_slider), self.name_dropdown),
-                                     self.series_pulldown, CT_layout),
-                              self.log_div)
-
-        image_glyph = row(self.fig_image, column(self.fig_series_positions))
-        canvas_layout = layout(column(control_widgets, image_glyph))
-
-        # Add the layout to the current document
-
-        curdoc().clear()
-        curdoc().add_root(canvas_layout)
-        curdoc().title = "DICOM viewer"
-
-    def size_figures(self):
-
-        self.fig_image.x_range.end = self.width_scl
-        self.fig_image.y_range.end = self.height_scl
-
-        self.f_img.glyph.dw = self.width_scl
-        self.f_img.glyph.dh = self.height_scl
-
-    def prepare_images(self):
-
-        self.ds = pydicom.dcmread(self.path)
-        self.ds_SOP = self.ds.file_meta[0x0002, 0x0002].value
-        self.sop_class_name = pydicom.uid.UID(self.ds_SOP).name
-
-        if self.debug:
-            print(self.sop_class_name)
-
-        self.dicom_image = self.ds.pixel_array
-
-        if self.dicom_image.ndim == 3:
-            # Multi-frame: take first frame, or RGB: convert to grayscale
-            if self.dicom_image.shape[0] < self.dicom_image.shape[2]:
-                self.dicom_image = self.dicom_image[0]  # first frame
-            else:
-                self.dicom_image = np.mean(self.dicom_image, axis=2).astype(self.dicom_image.dtype)
-
-        # Invert the grayscale?
-
-        # FIXED:
-        photometric = self.ds.get("PhotometricInterpretation", "MONOCHROME2")
+    @staticmethod
+    def apply_photometric(image: np.ndarray, ds: pydicom.Dataset) -> np.ndarray:
+        """Invert grayscale only for MONOCHROME1 images."""
+        photometric = ds.get("PhotometricInterpretation", "MONOCHROME2")
         if photometric == "MONOCHROME1":
-            self.clipped_image = np.max(self.dicom_image) - self.dicom_image
-        else:
-            self.clipped_image = self.dicom_image.copy()
-        self.clipped_image = np.flipud(self.clipped_image)
+            return np.max(image) - image
+        return image.copy()
 
-        # Flip the image vertically
-        self.clipped_image = np.flipud(self.clipped_image)
-
-        # rescale for visibility
-
-        if "X-Ray" in self.sop_class_name:
-            self.image_scale = 0.5
-            self.image_type = "X-Ray"
-        elif "CT" in self.sop_class_name:
-            self.image_scale = 1.5
-            self.image_type = "CT"
-        elif "MR" in self.sop_class_name:
-            self.image_scale = 4.
-            self.gamma = 2.
-            self.image_type = "MRI"
-        else:
-            self.image_scale = 1.5
-            self.gamma = 2.
-            self.image_type = "US"
-
-        self.is_series = (self.image_type != "X-Ray")
-
-        self.height, self.width = self.clipped_image.shape
-        self.height_scl = int(self.height * self.image_scale)
-        self.width_scl = int(self.width * self.image_scale)
-        self.max_bright = np.max(self.clipped_image)
-
-        # Define clip ranges
-        width_start = 0
-        width_end = self.width
-        height_start = 0
-        height_end = self.height
-
-        # Clip the image
-        self.clipped_image = self.clipped_image[height_start:height_end, width_start:width_end]
-
-        # Gamma Correction
-        self.processed_image = self.perform_gamma(self.clipped_image)
-        self.max_bright = np.max(self.processed_image)
-
-    def categorize_series(self):
-        """
-        categorize MRI/CT by series and instance. Outcome in self.series_map.
-        :return:
-        """
-        self.series_map = {}
-
-        for n in self.images_list:
-            p = self.data_dir + n
-
-            ds = pydicom.dcmread(p)
-
-            # some images may not be actual images
-            try:
-                series = str(ds[0x0020, 0x0011].value)
-            except (KeyError, AttributeError):
-                continue
-
-            self.series_map.setdefault(series, {})
-
-            instance = str(ds[0x0020, 0x0013].value)
-            try:
-                image_pos = ds[0x0020, 0x0032].value
-            except (KeyError, AttributeError):
-                image_pos = ["-999", "-999", "-999"]
-                if self.debug:
-                    self.generate_log_message(self.log_div, f"image_pos not available: {n, instance}")
-
-            try:
-                image_dir = ds[0x0020, 0x0037].value
-                row_direction = np.array(image_dir[:3])
-                col_direction = np.array(image_dir[3:])
-                normal_direction = np.cross(row_direction, col_direction)
-                if self.debug:
-                    self.generate_log_message(self.log_div, f"directions not available: {n, instance}")
-
-            except:
-                image_dir = [1., 1., 1.]
-                normal_direction = [0, 0, 0]
-
-            self.series_map[series][n] = [instance, image_pos, image_dir, normal_direction]
-
-        self.series = []
-        for s in self.series_map:
-            self.series.append(str(s))
-
-        self.series = sorted(self.series, key=self.key_func)
-
-        current_series = []
-        for i in self.series_map[self.series[0]]:
-            current_series.append(str(i))
-
-        self.series_extrema = {}
-
-        for i in self.series_map:
-            extrema = self.get_position_range(i)
-            self.series_extrema[i] = extrema
-
-        self.current_series = current_series
-
-    def get_position_range(self, series):
-        """Calculates the range of positions within a series of DICOM slices."""
-        positions = [self.series_map[series][s][1] for s in self.series_map[series]]
-
-        min_x = min(p[0] for p in positions)
-        max_x = max(p[0] for p in positions)
-        min_y = min(p[1] for p in positions)
-        max_y = max(p[1] for p in positions)
-        min_z = min(p[2] for p in positions)
-        max_z = max(p[2] for p in positions)
-        return [min_x, max_x, min_y, max_y, min_z, max_z]
-
-    def perform_gamma(self, image):
-        """
-        apply gamma correction to image
-
-        :param image:
-        :return:
-        """
-        # Normalize to range 0-1
-        image = image.astype(np.float64) / np.max(image)  # Important: Normalize *before* gamma
-
-        # Gamma Correction
-        image = image ** (self.gamma)
-
-        # Scale back to original range (Crucial after gamma)
-        image = (image * np.iinfo(self.ds.pixel_array.dtype).max).astype(self.ds.pixel_array.dtype)
-
+    @staticmethod
+    def apply_rescale(image: np.ndarray, ds: pydicom.Dataset) -> np.ndarray:
+        """Apply DICOM RescaleSlope and RescaleIntercept (e.g. CT Hounsfield)."""
+        slope = getattr(ds, "RescaleSlope", None)
+        intercept = getattr(ds, "RescaleIntercept", None)
+        if slope is not None and intercept is not None:
+            image = image.astype(np.float64) * float(slope) + float(intercept)
         return image
 
-    def create_widgets(self):
-        """
-        define all the widgets and declare callbacks
-
-        :return:
-        """
-
-        db_list = list(self.data_db.keys())
-        self.db_dropdown = Select(title="Pick imaging", value=self.starter_images, options=db_list)
-        self.db_dropdown.on_change("value", self.db_dropdown_cb)
-
-        self.mode = RadioButtonGroup(labels=["XRay", "CT", "MRI", "US"], active=0, visible=True)
-        self.mode_div = Div(text="mode", visible=False)
-
-        ct_visible = False
-
-        if "X-Ray" in self.sop_class_name:
-            self.mode.active = 0
-        elif "CT" in self.sop_class_name:
-            self.mode.active = 1
-            ct_visible = True
-        elif "MR" in self.sop_class_name:
-            self.mode.active = 2
-            ct_visible = True
-        elif "Ultra" in self.sop_class_name:
-            self.mode.active = 3
-            ct_visible = True
-
-        #if self.is_series:
-        #    rc = self.categorize_series()
-
-        # CT animation
-
-        # Create a slider for CT refresh rate
-        #step = len(self.images_list)/100.
-        step = 1
-        
-        self.series_slider_slice = Slider(start=0, end=len(self.images_list), value=0, step=step,
-                                     title="slice", visible=ct_visible)
-        self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
-
-        # Create a Toggle button for CT start/stop
-        self.series_toggle_anim = Toggle(label="Start Animation", button_type="success", active=False, visible=ct_visible)
-        self.series_toggle_anim.on_click(self.series_toggle_anim_cb)
-
-        self.CT_text_refresh = TextInput(title="refresh (ms)",
-                                         value=str(self.series_animate_refresh_rate), visible=ct_visible)
-
-        self.series_pulldown = Select(title="Pick series", value=None,
-                                          visible=self.is_series)
-
-        self.increment_button = Button(label="Increment", button_type="success", visible=self.is_series)
-        self.increment_button.on_click(self.increment_cb)
-        self.decrement_button = Button(label="Decrement", button_type="danger", visible=self.is_series)
-        self.decrement_button.on_click(self.decrement_cb)
-
-
-        self.name_dropdown = Select(title="Pick image", value=self.image_name, options=self.images_list)
-
-        if self.is_series:
-            self.series_pulldown.options = self.series
-            self.series_pulldown.value = self.series[0]
-            self.selected_series = self.series[0]
-            self.name_dropdown.options = self.current_series
-            self.histogram_positions()
-            self.series_scatter_pos(self.image_name)
-
-        self.series_pulldown.on_change("value", self.series_cb)
-        self.name_dropdown.on_change('value', self.name_cb)
-
-        self.clip_button = Button(label="Clip", button_type="danger")
-
-        self.gamma_slider = Slider(start=0, end=10, value=self.gamma, step=0.1, title="Gamma")
-        self.gamma_slider.on_change('value_throttled', self.gamma_cb)
-
-        step = 0.05
-        self.window_slider = Slider(start=0, end=2., value=self.window, step=step, title="Window")
-        self.window_slider.on_change('value_throttled', self.window_cb)
-
-        self.log_div = Div(text="Log:<br>", width=400, height=200)
-
-        self.exit_button = Button(label="Exit", button_type="danger")
-        self.exit_button.on_click(self.stop_server)
-
-        # Attach the callback to the TapTool's event
-        self.taptool = TapTool()
-
-        self.fig_image.add_tools(self.taptool)
-        self.fig_image.on_event('tap', self.tap_callback)
-
-    def histogram_positions(self):
-
-        i_n = []
-        z_i = []
-
-        once = True
-        self.series_pos_index = 2
-        unit_normal = [0., 0., 1.]
-
-        for i in self.current_series:
-            if once:
-                # decide which direction the image was taken in
-                normal = self.series_map[self.selected_series][i][3]
-                unit_normal = [0., 0., 1.]
-                n_dot_z = np.dot(normal, unit_normal)
-                if n_dot_z > 0.95:
-                    self.series_pos_index = 2
-                else:
-                    unit_normal = [0., 1., 0.]
-                    n_dot_y = np.dot(normal, unit_normal)
-                    if n_dot_y > 0.95:
-                        self.series_pos_index = 1
-                    else:
-                        unit_normal = [1., 0., 0.]
-                        n_dot_x = np.dot(normal, unit_normal)
-                        if n_dot_x > 0.95:
-                            self.series_pos_index = 0
-
-            sel_key_list = list(self.series_map[self.selected_series].keys())
-            normal = self.series_map[self.selected_series][i][3]
-            try:
-                #i_n.append(float(i))
-                i_n.append(self.series_map[self.selected_series][i][0])
-            except ValueError:
-                i_floated = float(sel_key_list.index(i))
-                i_n.append(i_floated)
-
-            z_i.append(self.series_map[self.selected_series][i][1][self.series_pos_index])
-
-        self.fig_MRI_source_series.data = dict({"x": z_i, "y": i_n})
-
-    def series_scatter_pos(self, image_name):
-
-        sel_key_list = list(self.series_map[self.selected_series].keys())
-
-        z_i = self.series_map[self.selected_series][image_name][1][self.series_pos_index]
-        i_n = image_name
-        try:
-            #i_n = float(image_name)
-            i_n = self.series_map[self.selected_series][image_name][0]
-        except ValueError:
-            i_n = float(sel_key_list.index(image_name))
-
-        self.fig_MRI_source.data = dict(x=[z_i], y=[i_n])
-        self.fig_series_positions.scatter(x="x", y="y", source=self.fig_MRI_source, color='red', size=6)
-
-    def name_cb(self, attr, old, new):
-        self.image_name = new
-        self.generate_log_message(self.log_div, f"Get new file {self.image_name}")
-
-        self.path = self.data_dir + self.image_name
-        rc = self.prepare_images()
-        self.source.data["image"] = [self.processed_image]
-        self.size_figures()
-
-        rc = self.set_image_fig_title(new)
-
-    def set_image_fig_title(self, image_name):
-        """
-        set the title on the imaging figure using metadata the current image. image_name is provided for the title
-        :param image_name:
-        :return:
-        """
-
-        patient = self.ds.PatientName.given_name + " " + self.ds.PatientName.family_name
-        try:
-            proc_date = self.ds.PerformedProcedureStepStartDate
-        except:
-            proc_date = "1971-01-01"
-        try:
-            protocol = self.ds.ProtocolName
-        except:
-            protocol = "unknown"
-
-        self.title_postfix = (" " + patient + " " + proc_date + " " +
-                              protocol)
-        self.fig_image.title.text = image_name + self.title_postfix
-
-    def db_dropdown_cb(self, attr, old, new):
-        """
-        Change in dataset means essentially a restart and reset to most things
-
-        :param attr:
-        :param old:
-        :param new:
-        :return:
-        """
-        self.data_dir = self.data_db[new]
-
-        rc = self.find_images()
-
-        self.image_name = self.images_list[0]
-        self.path = self.data_dir + self.image_name
-        self.name_dropdown.options = self.images_list
-        self.name_dropdown.remove_on_change("value", self.name_cb)
-        self.name_dropdown.value = self.image_name
-        self.name_dropdown.on_change("value", self.name_cb)
-
-        rc = self.prepare_images()
-
-        if self.is_series:
-            rc = self.categorize_series()
-
-            self.selected_series = self.series[0]
-            self.series_pulldown.options = self.series
-            self.current_slice = 0
-            self.histogram_positions()
-            self.series_scatter_pos(self.current_series[0])
-
-            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
-            self.series_slider_slice.value = self.current_slice
-            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
-            self.series_slider_slice.end = len(self.current_series)
-
-            self.series_pulldown.remove_on_change("value", self.series_cb)
-            self.series_pulldown.value = self.current_series[0]
-            self.series_pulldown.on_change("value", self.series_cb)
-
-            self.name_dropdown.options = self.current_series
-
-        self.size_figures()
-
-        self.series_pulldown.visible = (self.is_series)
-        self.series_toggle_anim.button_type = "success"
-
-        self.gamma_slider.remove_on_change("value_throttled", self.gamma_cb)
-        self.window_slider.remove_on_change("value_throttled", self.window_cb)
-
-        self.gamma_slider.value = self.gamma_def
-        self.window_slider.value = self.window_def
-        self.gamma = self.gamma_def
-        self.window = self.window_def
-
-        self.gamma_slider.on_change("value_throttled", self.gamma_cb)
-        self.window_slider.on_change("value_throttled", self.window_cb)
-
-        self.CT_text_refresh.visible = self.is_series
-        self.series_toggle_anim.visible = self.is_series
-        self.series_slider_slice.visible = self.is_series
-        self.fig_series_positions.visible = self.is_series
-        self.increment_button.visible = self.is_series
-        self.decrement_button.visible = self.is_series
-
-        if "X-Ray" in self.sop_class_name:
-            self.mode.active = 0
-        elif "CT" in self.sop_class_name:
-            self.mode.active = 1
-        elif "MR" in self.sop_class_name:
-            self.mode.active = 2
-        else:  # ultrasound
-            self.mode.active = 3
-
-        rc = self.set_image_fig_title(self.image_name)
-
-        self.source.data["image"] = [self.processed_image]
-
-        self.generate_log_message(self.log_div, f"Get new imaging {new}")
-
-    def series_cb(self, attr, old, new):
-        """
-        Select a new series. Set up for first image in that series.
-
-        :param attr:
-        :param old:
-        :param new:
-        :return:
-        """
-        self.selected_series = new
-        self.generate_log_message(self.log_div, f"Get new series {self.selected_series}")
-
-        #rc = self.categorize_series()
-
-        current_series = []
-        for i in self.series_map[self.selected_series]:
-            current_series.append(str(i))
-
-        self.current_series = current_series
-        self.name_dropdown.options = self.current_series
-        self.path = self.data_dir + self.current_series[0]
-
-        self.histogram_positions()
-        self.series_scatter_pos(self.current_series[0])
-        self.fig_series_positions.title.text = self.fig_series_positions_titles[self.series_pos_index]
-        self.series_toggle_anim.button_type = "success"
-
-        rc = self.prepare_images()
-        rc = self.set_image_fig_title(self.current_series[0])
-
-        self.current_slice = 0
-        self.size_figures()
-
-        self.source.data["image"] = [self.processed_image]
-
-        self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
-
-        self.series_slider_slice.value = self.current_slice
-        self.series_slider_slice.end = len(self.current_series)
-
-        self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
-
-        self.generate_log_message(self.log_div, f"select new MRI series {new}")
-
-    def gamma_cb(self, attr, old, new):
-        """
-        callback for gamma slider
-
-        :param attr:
-        :param old:
-        :param new:
-        :return:
-        """
-        self.gamma = new
-        self.processed_image = self.perform_gamma(self.clipped_image)
-        self.source.data["image"] = [self.processed_image]
-        self.generate_log_message(self.log_div, f"set gamma to {self.gamma}")
-
-    def window_cb(self, attr, old, new):
-        """
-        callback for window slider
-
-        :param attr:
-        :param old:
-        :param new:
-        :return:
-        """
-        self.color_mapper.high = self.max_bright * new
-        self.generate_log_message(self.log_div, f"set window scale to {new}")
-
-    def stop_server(self):
-        """
-         Stops the Bokeh server gracefully.
-
-         This method updates the log message, changes the button color,
-         and then stops the Tornado IOLoop to shut down the server.
-         """
-
-        curdoc().add_next_tick_callback(lambda: self.async_generate_log_message(self.log_div,
-                                                                                "Server is shutting down..."))
-        curdoc().add_next_tick_callback(lambda: self.change_button_color(self.exit_button, "light"))
-        curdoc().add_next_tick_callback(self.exit_server)
-
-    def generate_log_message(self, log_div, message):
-        self.message_log.append(message)
-
-        if len(self.message_log) > 10:
-            self.message_log.pop(0)
-
-        self.log_div.text = "Log: <br>" + "<br>".join(self.message_log)
-        curdoc().add_next_tick_callback(lambda: None)
-
-    async def async_generate_log_message(self, log_div, message):
-        """
-        Asynchronously updates the log message in the Div widget.
-
-        Args:
-            log_div (Div): The Div widget to update.
-            message (str): The message to display in the log_div.
-        """
-        log_div.text = message
-
-    async def exit_server(self):
-        """
-        Stops the Tornado IOLoop, effectively shutting down the server.
-        """
-
-        print("Server is shutting down...")
-        IOLoop.current().stop()
-
-    async def change_button_color(self, button, color):
-        """
-        Asynchronously changes the button color.
-
-        Args:
-            button (Button): The button widget whose color will be changed.
-            color (str): The new color for the button.
-        """
-        button.button_type = color
-
-    def tap_callback(self, event):
-        """
-        Handles the tap event: click on 4 corners of rectangle
-        """
-        selected = self.source.selected
-        try:
-            selected_index = [self.source.selected.image_indices[self.clipee]["i"],
-                              self.source.selected.image_indices[self.clipee]["j"]]
-            self.clip_points.append(selected_index)
-            self.clipee = self.clipee + 1
-
-            self.generate_log_message(self.log_div, f"Selected point {self.clipee} : {selected_index}")
-
-            if self.clipee == 4:
-                rotation_angle_degrees, min_x, max_x, min_y, max_y, center = (
-                    self.rotated_rectangle_properties(self.clip_points))
-
-                self.clipped_image = transform.rotate(image=self.clipped_image, angle=-rotation_angle_degrees*0.6,
-                                                        center=(center[1], center[0]), preserve_range=True)
-
-                self.processed_image = self.perform_gamma(self.clipped_image)
-
-                dw = int(max_x - min_x)
-                dh = int(max_y - min_y)
-
-                print(dw, dh)
-                self.fig_image.renderers = [r for r in self.fig_image.renderers if r != self.f_img]
-                self.f_img = self.fig_image.image(image='image', x=min_x, y=min_y, dw=dw, dh=dh, source=self.source,
-                                     color_mapper=self.color_mapper)
-                self.fig_image.height = dh
-                self.fig_image.y_range.start = min_y
-                self.fig_image.y_range.end = max_y
-
-                self.fig_image.width = dw
-                self.fig_image.x_range.end = max_x
-                self.fig_image.x_range.start = min_x
-
-                self.source.data["image"] = [self.processed_image]
-                self.generate_log_message(self.log_div, f"clipped and rotated by {rotation_angle_degrees:.2f}")
-                self.clipee = 0
-                self.clip_points = []
-                self.source.selected.image_indices = []
-
-        except IndexError:
-            self.generate_log_message(self.log_div, "Hit whitespace! Try again")
-            return
-
-    def get_new_image(self):
-        """
-        does the boilerplate for a new image
-        :return:
-        """
-        if not self.is_series:
-            images_list = self.images_list
-        else:
-            images_list = self.current_series
-
-        self.path = self.data_dir + images_list[self.current_slice]
-
-        rc = self.prepare_images()
-        rc = self.set_image_fig_title(images_list[self.current_slice])
-
-        self.source.data["image"] = [self.processed_image]
-
-    def increment_cb(self):
-        """
-        callback to increment the current image slice
-
-        """
-        if self.current_slice < len(self.current_series) -1:
-            self.current_slice += 1
-
-            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
-            self.series_slider_slice.value = self.current_slice
-            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
-
-            self.get_new_image()
-            self.generate_log_message(self.log_div, f"Increment image to {self.current_slice}")
-        else:
-            self.generate_log_message(self.log_div, f"No increment. At max image {self.current_slice}")
-
-    def decrement_cb(self):
-        """
-        callback to decrement the current image slice
-        :return:
-        """
-        if self.current_slice > 0:
-            self.current_slice -= 1
-            self.get_new_image()
-
-            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
-            self.series_slider_slice.value = self.current_slice
-            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
-
-            self.generate_log_message(self.log_div, f"Decrement image to {self.current_slice}")
-        else:
-            self.generate_log_message(self.log_div, f"No decrement. At min image {self.current_slice}")
-
-    def series_slider_slice_cb(self, attr, old, new):
-        """
-        callback to update the slice slider
-        :param attr:
-        :param old:
-        :param new:
-        :return:
-        """
-        self.current_slice = int(new)
-
-        self.get_new_image()
-
-        self.generate_log_message(self.log_div, f"Slider reset to {self.current_slice}")
-
-    def animate_series(self):
-        """
-        callback to instrument the animation
-
-        :return:
-        """
-        if self.series_toggle_anim.active:
-            if not self.is_series:
-                images_list = self.images_list
+    @staticmethod
+    def ensure_2d(image: np.ndarray) -> np.ndarray:
+        """Ensure image is 2-D (handle multi-frame or RGB)."""
+        if image.ndim == 3:
+            if image.shape[2] <= 4:
+                # Likely RGB/RGBA – convert to grayscale
+                return np.mean(image, axis=2).astype(image.dtype)
             else:
-                images_list = self.current_series
+                # Likely multi-frame – take first frame
+                return image[0]
+        return image
 
-            self.name_dropdown.options = images_list
-
-            image_name = images_list[self.current_slice]
-            self.path = self.data_dir + image_name
-            rc = self.prepare_images()
-
-            if self.is_series:
-                self.series_scatter_pos(image_name)
-
-            self.fig_image.title.text = image_name + self.title_postfix
-            self.source.data["image"] = [self.processed_image]
-
-            self.current_slice += 1
-            if self.current_slice >= len(images_list):
-                self.current_slice = 0
-
-            self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
-
-            self.series_slider_slice.value = self.current_slice
-
-            self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
-
-            if self.debug:
-                self.generate_log_message(self.log_div, f"Animation image {image_name}")
-
-    def series_toggle_anim_cb(self, active):
-        """
-        callback to drive the amimation using curdoc's periodic_callback
-
-        :param active:
-        :return:
-        """
-        self.series_toggle_active = active
-
-        if self.series_toggle_active:
-            self.series_toggle_anim.button_type = "danger"
-            self.series_toggle_anim.label = "Stop Animation"
-            self.series_anim_cb_ID = curdoc().add_periodic_callback(self.animate_series, int(self.series_animate_refresh_rate))
+    @staticmethod
+    def perform_gamma(image: np.ndarray, gamma: float,
+                      original_dtype: np.dtype) -> np.ndarray:
+        """Apply gamma correction to image."""
+        img = image.astype(np.float64)
+        max_val = np.max(img)
+        if max_val == 0:
+            return image
+        img = img / max_val
+        img = img ** gamma
+        if np.issubdtype(original_dtype, np.integer):
+            img = (img * np.iinfo(original_dtype).max).astype(original_dtype)
         else:
-            self.series_toggle_anim.button_type = "success"
-            self.series_toggle_anim.label = "Start Animation"
-            curdoc().remove_periodic_callback(self.series_anim_cb_ID)
+            img = (img * max_val).astype(original_dtype)
+        return img
 
-    def rotated_rectangle_properties(self, corners):
+    @staticmethod
+    def apply_window_level(image: np.ndarray, window_center: float,
+                           window_width: float) -> np.ndarray:
+        """Apply standard DICOM window/level transform."""
+        lower = window_center - window_width / 2
+        upper = window_center + window_width / 2
+        return np.clip((image - lower) / (upper - lower + 1e-10), 0, 1)
+
+    @staticmethod
+    def rotated_rectangle_properties(corners):
         """
-        Calculates the rotation angle, and min/max x and y values of a rotated rectangle.
+        Calculate rotation angle and bounding box from 4 corner points.
 
-        Args:
-          corners: A list of four (x, y) tuples representing the corners of the rectangle,
-                   in any order.  The order doesn't matter as long as they define a rectangle.
+        Parameters
+        ----------
+        corners : list of [x, y] pairs
+            Four corner coordinates.
 
-        Returns:
-          A tuple containing:
-            - rotation_angle: The rotation angle in degrees (float).  The angle will be
-                              in the range -90 to +90 degrees.
-            - min_x: The minimum x-coordinate of the rotated rectangle (float).
-            - max_x: The maximum x-coordinate of the rotated rectangle (float).
-            - min_y: The minimum y-coordinate of the rotated rectangle (float).
-            - max_y: The maximum y-coordinate of the rotated rectangle (float).
+        Returns
+        -------
+        tuple
+            (rotation_angle_degrees, min_x, max_x, min_y, max_y, center)
         """
-
-        # 1. Convert corners to a NumPy array
         corners = np.array(corners)
-
-        # 2. Calculate the center of the rectangle
         center = np.mean(corners, axis=0)
 
-        # 3. Find the two corners that form (approximately) the longer side.
-        # This is done by finding the maximum distance between corners.
+        # Find the two corners forming the longest side
         max_dist = 0
-        corner1_index = 0
-        corner2_index = 1
+        corner1_index, corner2_index = 0, 1
         for i in range(4):
             for j in range(i + 1, 4):
                 dist = np.linalg.norm(corners[i] - corners[j])
@@ -911,76 +180,1024 @@ class dicom_viewer():
         corner1 = corners[corner1_index]
         corner2 = corners[corner2_index]
 
-        # 4. Calculate the rotation angle
         dx = corner2[0] - corner1[0]
         dy = corner2[1] - corner1[1]
-        rotation_angle_radians = np.arctan2(dy, dx)
-        rotation_angle_degrees = np.degrees(rotation_angle_radians)
+        rotation_angle_degrees = np.degrees(np.arctan2(dy, dx))
 
-        # Adjust the angle to be within the range of -90 to +90
         if rotation_angle_degrees > 90:
             rotation_angle_degrees -= 180
         elif rotation_angle_degrees < -90:
             rotation_angle_degrees += 180
 
-        # 5. Create a rotation matrix
         angle_rad = np.radians(rotation_angle_degrees)
-        rotation_matrix = np.array([[np.cos(angle_rad), -np.sin(angle_rad)],
-                                    [np.sin(angle_rad), np.cos(angle_rad)]])
+        rotation_matrix = np.array([
+            [np.cos(angle_rad), -np.sin(angle_rad)],
+            [np.sin(angle_rad),  np.cos(angle_rad)],
+        ])
 
-        # 6. Rotate the corners around the center
         rotated_corners = []
         for corner in corners:
             v = corner - center
             rotated_v = np.dot(rotation_matrix, v)
-            rotated_corner = rotated_v + center
-            rotated_corners.append(rotated_corner)
+            rotated_corners.append(rotated_v + center)
         rotated_corners = np.array(rotated_corners)
 
-        # 7. Find the min/max x and y values of the rotated rectangle
         min_x = np.min(rotated_corners[:, 0])
         max_x = np.max(rotated_corners[:, 0])
         min_y = np.min(rotated_corners[:, 1])
         max_y = np.max(rotated_corners[:, 1])
 
-        print(f"Rotation Angle: {rotation_angle_degrees:.2f} degrees")
-        print(f"Min X: {min_x:.2f}")
-        print(f"Max X: {max_x:.2f}")
-        print(f"Min Y: {min_y:.2f}")
-        print(f"Max Y: {max_y:.2f}")
-        print("Center: ", center)
-
+        logger.debug(
+            f"Rotation: {rotation_angle_degrees:.2f}°, "
+            f"X:[{min_x:.1f},{max_x:.1f}], Y:[{min_y:.1f},{max_y:.1f}], "
+            f"Center:{center}"
+        )
         return rotation_angle_degrees, min_x, max_x, min_y, max_y, center
 
-    def key_func(self, filename):
+    # ---------------------------------------------------------------------------
+    # Series manager
+    # ---------------------------------------------------------------------------
+
+
+class SeriesManager:
+    """Manages DICOM series metadata for CT/MRI datasets."""
+
+    def __init__(self):
+        self.series_map: dict = {}
+        self.series: list = []
+        self.series_extrema: dict = {}
+        self.series_pos_index: int = 2
+
+    def categorize(self, images_list: list, data_dir: str,
+                   debug: bool = False,
+                   log_callback=None) -> None:
         """
-        Extracts the character and number parts from the filename (if present)
-        and returns a tuple that can be used for sorting.
+        Read metadata from all DICOM files and organize by series.
+
+        Parameters
+        ----------
+        images_list : list of str
+            Filenames to scan.
+        data_dir : str
+            Directory containing the files.
+        debug : bool
+            If True, log additional information.
+        log_callback : callable, optional
+            Function to call with log messages.
         """
-        match = re.match(r"([a-zA-Z]*)(\d+)", filename)  # Allow for optional characters
+        self.series_map = {}
+        for name in images_list:
+            path = os.path.join(data_dir, name)
+            try:
+                ds = pydicom.dcmread(path, stop_before_pixels=True)
+            except Exception as e:
+                logger.warning(f"Could not read {name}: {e}")
+                continue
+
+            try:
+                series = str(ds[0x0020, 0x0011].value)
+            except (KeyError, AttributeError):
+                continue
+
+            self.series_map.setdefault(series, {})
+            try:
+                instance = str(ds[0x0020, 0x0013].value)
+            except (KeyError, AttributeError):
+                instance = "0"
+
+            try:
+                image_pos = list(ds[0x0020, 0x0032].value)
+            except (KeyError, AttributeError):
+                image_pos = [-999.0, -999.0, -999.0]
+                if debug and log_callback:
+                    log_callback(f"image_pos not available: {name}, instance {instance}")
+
+            try:
+                image_dir = list(ds[0x0020, 0x0037].value)
+                row_direction = np.array(image_dir[:3])
+                col_direction = np.array(image_dir[3:])
+                normal_direction = np.cross(row_direction, col_direction)
+            except (KeyError, AttributeError):
+                image_dir = [1.0, 1.0, 1.0]
+                normal_direction = np.array([0.0, 0.0, 0.0])
+                if debug and log_callback:
+                    log_callback(f"directions not available: {name}, instance {instance}")
+
+            self.series_map[series][name] = [
+                instance, image_pos, image_dir, normal_direction
+            ]
+
+        self.series = sorted(self.series_map.keys(), key=self._key_func)
+
+        self.series_extrema = {}
+        for s in self.series_map:
+            self.series_extrema[s] = self._get_position_range(s)
+
+    def get_series_images(self, series_key: str) -> list:
+        """Return sorted list of image filenames in a series."""
+        return sorted(self.series_map.get(series_key, {}).keys(),
+                      key=self._key_func)
+
+    def _get_position_range(self, series: str) -> list:
+        """Calculate min/max x, y, z positions for a series."""
+        positions = [
+            self.series_map[series][s][1]
+            for s in self.series_map[series]
+        ]
+        if not positions:
+            return [0, 0, 0, 0, 0, 0]
+        min_x = min(p[0] for p in positions)
+        max_x = max(p[0] for p in positions)
+        min_y = min(p[1] for p in positions)
+        max_y = max(p[1] for p in positions)
+        min_z = min(p[2] for p in positions)
+        max_z = max(p[2] for p in positions)
+        return [min_x, max_x, min_y, max_y, min_z, max_z]
+
+    def determine_axis(self, series_key: str, images: list) -> int:
+        """
+        Determine the principal imaging axis from slice normal vectors.
+
+        Returns 0 (x), 1 (y), or 2 (z).
+        """
+        if not images or series_key not in self.series_map:
+            return 2
+        first_image = images[0]
+        if first_image not in self.series_map[series_key]:
+            return 2
+        normal = self.series_map[series_key][first_image][3]
+        if isinstance(normal, (list, tuple)):
+            normal = np.array(normal)
+
+        for axis, unit_vec in enumerate([
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]):
+            if abs(np.dot(normal, unit_vec)) > NORMAL_THRESHOLD:
+                return axis
+        return 2
+
+    @staticmethod
+    def _key_func(filename: str) -> tuple:
+        """Natural sort key: split filename into (alpha, numeric) parts."""
+        match = re.match(r"([a-zA-Z]*)(\d+)", str(filename))
         if not match:
             try:
-                # Try converting the filename to an integer directly if it's purely numeric
-                num = int(filename)
-                return ("", num)  # Treat as having empty characters and a number
+                return ("", int(filename))
             except ValueError:
-                # Handle filenames that are neither character+number nor purely numeric
-                return (filename, 0)  # Assign a low sort value
-        chars = match.group(1)
-        nums = int(match.group(2))
-        return (chars, nums)
+                return (str(filename), 0)
+        return (match.group(1), int(match.group(2)))
 
-    def find_images(self):
-        """
-        locate all the pickle files in the data dir
-        :return:
-        """
+    # ---------------------------------------------------------------------------
+    # Main viewer class
+    # ---------------------------------------------------------------------------
+
+
+class DicomViewer:
+    """
+    Interactive DICOM medical image viewer built on Bokeh.
+
+    Supports X-Ray, CT, MRI, and Ultrasound modalities with gamma
+    correction, windowing, series navigation, animation, and
+    clip/rotate functionality.
+    """
+
+    def __init__(self):
+        # Parse arguments and load config
+        parser = argparse.ArgumentParser(description="DICOM Image Viewer")
+        parser.add_argument(
+            "--app_config",
+            default="/Volumes/Data/Home/dicom_viewer.yaml",
+            help="Path to YAML configuration file",
+        )
+        args = parser.parse_args()
+        self.config = ViewerConfig.from_yaml(args.app_config)
+        self.debug = self.config.debug
+
+        if self.debug:
+            logging.getLogger("dicom_viewer").setLevel(logging.DEBUG)
+
+        # State initialization
+        self.clip_points: list = []
+        self.clipee: int = 0
+        self.image_type: str = MODALITY_XRAY
+        self.image_scale: float = MRI_SCALE
+        self.current_slice: int = 0
+        self.series_animate_refresh_rate: float = DEFAULT_REFRESH_MS
+        self.current_series: list = []
+        self.selected_series: str = ""
+        self.gamma: float = self.config.gamma_def
+        self.window: float = self.config.window_def
+        self.message_log: list = []
+        self.series_anim_cb_id: Optional[object] = None
+        self.title_postfix: str = ""
+
+        # Image processor and series manager
+        self.img_proc = ImageProcessor()
+        self.series_mgr = SeriesManager()
+
+        # Load initial dataset
+        try:
+            self.data_db = self.config.data_db
+            self.starter_images = self.config.starter_images
+            self.data_dir = self.data_db[self.starter_images]
+            self._find_images()
+            self.image_name = self.images_list[0]
+            self.path = os.path.join(self.data_dir, self.image_name)
+            self._prepare_images()
+
+            data = {"image": [self.processed_image]}
+            self.source = ColumnDataSource(data)
+
+            if self.is_series:
+                self.series_mgr.categorize(
+                    self.images_list, self.data_dir,
+                    self.debug, self._log
+                )
+                self.current_series = self.series_mgr.get_series_images(
+                    self.series_mgr.series[0]
+                )
+                self.selected_series = self.series_mgr.series[0]
+
+            if self.debug:
+                logger.debug(str(self.ds))
+        except FileNotFoundError:
+            logger.error("DICOM file not found. Check your configuration.")
+            exit(1)
+        except Exception as e:
+            logger.error(f"Error reading DICOM file: {e}")
+            exit(1)
+
+        # Color mapper
+        low = float(np.min(self.processed_image))
+        high = float(np.max(self.processed_image))
+        self.color_mapper = LinearColorMapper(
+            palette=Greys256, low=low, high=high
+        )
+
+        # Build UI
+        self._create_figures()
+        self._create_widgets()
+        self._build_layout()
+
+    # ------------------------------------------------------------------
+    # Figure creation
+    # ------------------------------------------------------------------
+    def _create_figures(self):
+        """Create Bokeh figure objects."""
+        self.fig_image = figure(
+            width=self.width_scl, height=self.height_scl,
+            title="",
+            x_range=(0, self.width_scl),
+            y_range=(0, self.height_scl),
+        )
+        self._set_image_fig_title(self.image_name)
+
+        self.f_img = self.fig_image.image(
+            image="image", x=0, y=0,
+            dw=self.width_scl, dh=self.height_scl,
+            source=self.source,
+            color_mapper=self.color_mapper,
+        )
+
+        hover = HoverTool(tooltips=[
+            ("x", "$x"),
+            ("y", "$y"),
+            ("value", "@image"),
+        ])
+        self.fig_image.add_tools(hover)
+
+        self.color_bar = ColorBar(
+            color_mapper=self.color_mapper, label_standoff=12
+        )
+        self.fig_image.add_layout(self.color_bar, "right")
+
+        self.fig_image.grid.grid_line_color = None
+        self.fig_image.axis.axis_line_color = None
+        self.fig_image.axis.major_tick_line_color = None
+        self.fig_image.axis.major_label_standoff = 0
+
+        # Series positions scatter plot
+        self.fig_series_positions = figure(
+            title="z positions",
+            height=500, width=640,
+            visible=self.is_series,
+            x_axis_label="position",
+            y_axis_label="instance",
+        )
+        self.fig_MRI_source = ColumnDataSource(
+            data={"y": [], "x": []}
+        )
+        self.fig_series_positions.scatter(
+            x="x", y="y", color="blue",
+            source=self.fig_MRI_source,
+        )
+        self.fig_MRI_source_series = ColumnDataSource(
+            data={"y": [], "x": []}
+        )
+        self.fig_series_positions.scatter(
+            x="x", y="y", color="black",
+            source=self.fig_MRI_source_series,
+        )
+        self.fig_series_positions_titles = [
+            "x positions vs image instance",
+            "y positions vs image instance",
+            "z positions vs image instance",
+        ]
+
+    # ------------------------------------------------------------------
+    # Widget creation
+    # ------------------------------------------------------------------
+    def _create_widgets(self):
+        """Create all Bokeh widgets and register callbacks."""
+
+        # Dataset selector
+        db_list = list(self.data_db.keys())
+        self.db_dropdown = Select(
+            title="Pick imaging",
+            value=self.starter_images,
+            options=db_list,
+        )
+        self.db_dropdown.on_change("value", self._db_dropdown_cb)
+
+        # Modality mode indicator
+        self.mode = RadioButtonGroup(
+            labels=["XRay", "CT", "MRI", "US"],
+            active=self._modality_index(),
+            visible=True,
+        )
+        self.mode_div = Div(text="mode", visible=False)
+
+        ct_visible = self.is_series
+
+        # Series animation controls
+        self.series_slider_slice = Slider(
+            start=0,
+            end=max(len(self.current_series), 1),
+            value=0,
+            step=1,
+            title="slice",
+            visible=ct_visible,
+        )
+        self.series_slider_slice.on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+
+        self.series_toggle_anim = Toggle(
+            label="Start Animation",
+            button_type="success",
+            active=False,
+            visible=ct_visible,
+        )
+        self.series_toggle_anim.on_click(self._series_toggle_anim_cb)
+
+        self.CT_text_refresh = TextInput(
+            title="refresh (ms)",
+            value=str(int(self.series_animate_refresh_rate)),
+            visible=ct_visible,
+        )
+        self.CT_text_refresh.on_change("value", self._refresh_rate_cb)
+
+        # Series selector
+        self.series_pulldown = Select(
+            title="Pick series",
+            value="",
+            visible=self.is_series,
+        )
+
+        # Increment / Decrement buttons
+        self.increment_button = Button(
+            label="Increment",
+            button_type="success",
+            visible=self.is_series,
+        )
+        self.increment_button.on_click(self._increment_cb)
+
+        self.decrement_button = Button(
+            label="Decrement",
+            button_type="danger",
+            visible=self.is_series,
+        )
+        self.decrement_button.on_click(self._decrement_cb)
+
+        # Image name selector
+        self.name_dropdown = Select(
+            title="Pick image",
+            value=self.image_name,
+            options=self.images_list,
+        )
+
+        if self.is_series:
+            self.series_pulldown.options = self.series_mgr.series
+            self.series_pulldown.value = self.series_mgr.series[0]
+            self.name_dropdown.options = self.current_series
+            self._histogram_positions()
+            self._series_scatter_pos(self.image_name)
+
+        self.series_pulldown.on_change("value", self._series_cb)
+        self.name_dropdown.on_change("value", self._name_cb)
+
+        # Clip button
+        self.clip_button = Button(label="Clip", button_type="danger")
+        self.clip_button.on_click(self._clip_reset_cb)
+
+        # Gamma slider
+        self.gamma_slider = Slider(
+            start=0, end=GAMMA_SLIDER_MAX,
+            value=self.gamma, step=0.1,
+            title="Gamma",
+        )
+        self.gamma_slider.on_change("value_throttled", self._gamma_cb)
+
+        # Window slider
+        self.window_slider = Slider(
+            start=0, end=WINDOW_SLIDER_MAX,
+            value=self.window, step=0.05,
+            title="Window",
+        )
+        self.window_slider.on_change("value_throttled", self._window_cb)
+
+        # Reset button
+        self.reset_button = Button(label="Reset", button_type="warning")
+        self.reset_button.on_click(self._reset_cb)
+
+        # Log display
+        self.log_div = Div(text="Log:<br>", width=400, height=200)
+
+        # Exit button
+        self.exit_button = Button(label="Exit", button_type="danger")
+        self.exit_button.on_click(self._stop_server)
+
+        # Tap tool for clipping
+        self.taptool = TapTool()
+        self.fig_image.add_tools(self.taptool)
+        self.fig_image.on_event("tap", self._tap_callback)
+
+    def _build_layout(self):
+        """Assemble the Bokeh layout and attach to curdoc."""
+        ct_layout = row(
+            self.series_toggle_anim,
+            self.CT_text_refresh,
+            self.series_slider_slice,
+            self.increment_button,
+            self.decrement_button,
+        )
+        control_widgets = row(
+            column(
+                row(
+                    self.exit_button,
+                    self.reset_button,
+                    self.db_dropdown,
+                    column(self.mode_div, self.mode),
+                    self.clip_button,
+                    column(self.gamma_slider, self.window_slider),
+                    self.name_dropdown,
+                ),
+                self.series_pulldown,
+                ct_layout,
+            ),
+            self.log_div,
+        )
+        image_glyph = row(
+            self.fig_image,
+            column(self.fig_series_positions),
+        )
+        canvas_layout = layout(column(control_widgets, image_glyph))
+
+        curdoc().clear()
+        curdoc().add_root(canvas_layout)
+        curdoc().title = "DICOM Viewer"
+
+    # ------------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------------
+    def _name_cb(self, attr, old, new):
+        """Handle image selection change."""
+        self.image_name = new
+        self._log(f"Get new file {self.image_name}")
+        self.path = os.path.join(self.data_dir, self.image_name)
+        self._prepare_images()
+        self.source.data["image"] = [self.processed_image]
+        self._size_figures()
+        self._set_image_fig_title(new)
+
+    def _db_dropdown_cb(self, attr, old, new):
+        """Handle dataset change — essentially a full reset."""
+        self.data_dir = self.data_db[new]
+        self._find_images()
+        self.image_name = self.images_list[0]
+        self.path = os.path.join(self.data_dir, self.image_name)
+
+        # Temporarily remove callbacks to avoid triggering during reset
+        self.name_dropdown.remove_on_change("value", self._name_cb)
+        self.name_dropdown.options = self.images_list
+        self.name_dropdown.value = self.image_name
+        self.name_dropdown.on_change("value", self._name_cb)
+
+        self._prepare_images()
+
+        if self.is_series:
+            self.series_mgr.categorize(
+                self.images_list, self.data_dir,
+                self.debug, self._log,
+            )
+            self.selected_series = self.series_mgr.series[0]
+            self.current_series = self.series_mgr.get_series_images(
+                self.selected_series
+            )
+
+            self.series_pulldown.options = self.series_mgr.series
+            self.current_slice = 0
+
+            self._histogram_positions()
+            self._series_scatter_pos(self.current_series[0])
+
+            self.series_slider_slice.remove_on_change(
+                "value_throttled", self._series_slider_slice_cb
+            )
+            self.series_slider_slice.value = self.current_slice
+            self.series_slider_slice.end = len(self.current_series)
+            self.series_slider_slice.on_change(
+                "value_throttled", self._series_slider_slice_cb
+            )
+
+            self.series_pulldown.remove_on_change("value", self._series_cb)
+            self.series_pulldown.value = self.selected_series
+            self.series_pulldown.on_change("value", self._series_cb)
+
+            self.name_dropdown.remove_on_change("value", self._name_cb)
+            self.name_dropdown.options = self.current_series
+            self.name_dropdown.value = self.current_series[0]
+            self.name_dropdown.on_change("value", self._name_cb)
+
+        self._size_figures()
+        self._update_visibility()
+        self._reset_adjustments()
+
+        self.mode.active = self._modality_index()
+        self._set_image_fig_title(self.image_name)
+        self.source.data["image"] = [self.processed_image]
+        self._log(f"Get new imaging {new}")
+
+    def _series_cb(self, attr, old, new):
+        """Handle series selection change."""
+        self.selected_series = new
+        self._log(f"Get new series {self.selected_series}")
+
+        self.current_series = self.series_mgr.get_series_images(
+            self.selected_series
+        )
+        self.name_dropdown.remove_on_change("value", self._name_cb)
+        self.name_dropdown.options = self.current_series
+        if self.current_series:
+            self.name_dropdown.value = self.current_series[0]
+        self.name_dropdown.on_change("value", self._name_cb)
+
+        if self.current_series:
+            self.path = os.path.join(self.data_dir, self.current_series[0])
+        self._histogram_positions()
+        if self.current_series:
+            self._series_scatter_pos(self.current_series[0])
+        self.fig_series_positions.title.text = (
+            self.fig_series_positions_titles[self.series_mgr.series_pos_index]
+        )
+
+        self.series_toggle_anim.button_type = "success"
+        self.series_toggle_anim.label = "Start Animation"
+        self._prepare_images()
+        if self.current_series:
+            self._set_image_fig_title(self.current_series[0])
+        self.current_slice = 0
+        self._size_figures()
+        self.source.data["image"] = [self.processed_image]
+
+        self.series_slider_slice.remove_on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+        self.series_slider_slice.value = self.current_slice
+        self.series_slider_slice.end = max(len(self.current_series), 1)
+        self.series_slider_slice.on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+        self._log(f"Selected new series {new}")
+
+    def _gamma_cb(self, attr, old, new):
+        """Handle gamma slider change."""
+        self.gamma = new
+        self.processed_image = ImageProcessor.perform_gamma(
+            self.clipped_image, self.gamma, self.original_dtype
+        )
+        self.source.data["image"] = [self.processed_image]
+        self._log(f"Set gamma to {self.gamma:.1f}")
+
+    def _window_cb(self, attr, old, new):
+        """Handle window slider change."""
+        self.window = new
+        self.color_mapper.high = self.max_bright * new
+        self._log(f"Set window scale to {new:.2f}")
+
+    def _refresh_rate_cb(self, attr, old, new):
+        """Handle animation refresh rate change."""
+        try:
+            rate = float(new)
+            if rate > 0:
+                self.series_animate_refresh_rate = rate
+                self._log(f"Refresh rate set to {rate:.0f} ms")
+            else:
+                self._log("Refresh rate must be positive")
+        except ValueError:
+            self._log(f"Invalid refresh rate: {new}")
+
+    def _reset_cb(self):
+        """Reset gamma and window to defaults."""
+        self.gamma = self.config.gamma_def
+        self.window = self.config.window_def
+
+        self.gamma_slider.remove_on_change("value_throttled", self._gamma_cb)
+        self.gamma_slider.value = self.gamma
+        self.gamma_slider.on_change("value_throttled", self._gamma_cb)
+
+        self.window_slider.remove_on_change("value_throttled", self._window_cb)
+        self.window_slider.value = self.window
+        self.window_slider.on_change("value_throttled", self._window_cb)
+
+        self.processed_image = ImageProcessor.perform_gamma(
+            self.clipped_image, self.gamma, self.original_dtype
+        )
+        self.max_bright = float(np.max(self.processed_image))
+        self.color_mapper.high = self.max_bright * self.window
+        self.source.data["image"] = [self.processed_image]
+        self._log("Reset gamma and window to defaults")
+
+    def _clip_reset_cb(self):
+        """Reset clip state."""
+        self.clip_points = []
+        self.clipee = 0
+        self._log("Clip mode reset. Tap 4 corners on the image.")
+
+    # ------------------------------------------------------------------
+    # Series animation
+    # ------------------------------------------------------------------
+    def _increment_cb(self):
+        """Advance one slice forward."""
+        images = self.current_series if self.is_series else self.images_list
+        if self.current_slice < len(images) - 1:
+            self.current_slice += 1
+            self._sync_slice_slider()
+            self._get_new_image()
+            self._log(f"Increment image to {self.current_slice}")
+        else:
+            self._log(f"At max image {self.current_slice}")
+
+    def _decrement_cb(self):
+        """Go back one slice."""
+        if self.current_slice > 0:
+            self.current_slice -= 1
+            self._sync_slice_slider()
+            self._get_new_image()
+            self._log(f"Decrement image to {self.current_slice}")
+        else:
+            self._log(f"At min image {self.current_slice}")
+
+    def _series_slider_slice_cb(self, attr, old, new):
+        """Handle slice slider change."""
+        self.current_slice = int(new)
+        self._get_new_image()
+        self._log(f"Slider set to {self.current_slice}")
+
+    def _animate_series(self):
+        """Periodic callback to advance animation one frame."""
+        if not self.series_toggle_anim.active:
+            return
+
+        images = self.current_series if self.is_series else self.images_list
+        if not images:
+            return
+
+        image_name = images[self.current_slice]
+        self.path = os.path.join(self.data_dir, image_name)
+        self._prepare_images()
+
+        if self.is_series:
+            self._series_scatter_pos(image_name)
+
+        self.fig_image.title.text = image_name + self.title_postfix
+        self.source.data["image"] = [self.processed_image]
+
+        self.current_slice += 1
+        if self.current_slice >= len(images):
+            self.current_slice = ANIMATION_SLICE_RESET
+
+        self._sync_slice_slider()
+
+        if self.debug:
+            self._log(f"Animation image {image_name}")
+
+    def _series_toggle_anim_cb(self, active):
+        """Start or stop animation."""
+        if active:
+            self.series_toggle_anim.button_type = "danger"
+            self.series_toggle_anim.label = "Stop Animation"
+            self.series_anim_cb_id = curdoc().add_periodic_callback(
+                self._animate_series,
+                int(self.series_animate_refresh_rate),
+            )
+        else:
+            self.series_toggle_anim.button_type = "success"
+            self.series_toggle_anim.label = "Start Animation"
+            if self.series_anim_cb_id is not None:
+                curdoc().remove_periodic_callback(self.series_anim_cb_id)
+                self.series_anim_cb_id = None
+
+    # ------------------------------------------------------------------
+    # Tap / clip callback
+    # ------------------------------------------------------------------
+    def _tap_callback(self, event):
+        """Handle tap event for clip-and-rotate (4 corners)."""
+        try:
+            selected_index = [
+                self.source.selected.image_indices[self.clipee]["i"],
+                self.source.selected.image_indices[self.clipee]["j"],
+            ]
+        except (IndexError, KeyError):
+            self._log("Hit whitespace! Try again")
+            return
+
+        self.clip_points.append(selected_index)
+        self.clipee += 1
+        self._log(f"Selected point {self.clipee}: {selected_index}")
+
+        if self.clipee == 4:
+            rotation_angle, min_x, max_x, min_y, max_y, center = (
+                ImageProcessor.rotated_rectangle_properties(self.clip_points)
+            )
+
+            self.clipped_image = transform.rotate(
+                image=self.clipped_image,
+                angle=-rotation_angle * 0.6,
+                center=(center[1], center[0]),
+                preserve_range=True,
+            )
+            self.processed_image = ImageProcessor.perform_gamma(
+                self.clipped_image, self.gamma, self.original_dtype
+            )
+
+            dw = int(max_x - min_x)
+            dh = int(max_y - min_y)
+
+            # Replace old image renderer
+            self.fig_image.renderers = [
+                r for r in self.fig_image.renderers if r != self.f_img
+            ]
+            self.f_img = self.fig_image.image(
+                image="image", x=min_x, y=min_y,
+                dw=dw, dh=dh,
+                source=self.source,
+                color_mapper=self.color_mapper,
+            )
+
+            self.fig_image.height = dh
+            self.fig_image.y_range.start = min_y
+            self.fig_image.y_range.end = max_y
+            self.fig_image.width = dw
+            self.fig_image.x_range.start = min_x
+            self.fig_image.x_range.end = max_x
+
+            self.source.data["image"] = [self.processed_image]
+            self._log(
+                f"Clipped and rotated by {rotation_angle:.2f} degrees"
+            )
+
+            # Reset clip state
+            self.clipee = 0
+            self.clip_points = []
+            self.source.selected.image_indices = []
+
+    # ------------------------------------------------------------------
+    # Server control
+    # ------------------------------------------------------------------
+    def _stop_server(self):
+        """Gracefully shut down the Bokeh server."""
+        curdoc().add_next_tick_callback(
+            lambda: self._async_update_log("Server is shutting down...")
+        )
+        curdoc().add_next_tick_callback(
+            lambda: self._async_change_button(self.exit_button, "light")
+        )
+        curdoc().add_next_tick_callback(self._exit_server)
+
+    async def _async_update_log(self, message: str):
+        """Async log update for shutdown sequence."""
+        self.log_div.text = message
+
+    async def _exit_server(self):
+        """Stop the Tornado IOLoop."""
+        logger.info("Server is shutting down...")
+        IOLoop.current().stop()
+
+    async def _async_change_button(self, button, color: str):
+        """Async button color change."""
+        button.button_type = color
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _prepare_images(self):
+        """Read and process the current DICOM file."""
+        self.ds = pydicom.dcmread(self.path)
+        self.ds_SOP = self.ds.file_meta[0x0002, 0x0002].value
+        self.sop_class_name = pydicom.uid.UID(self.ds_SOP).name
+
+        if self.debug:
+            logger.debug(self.sop_class_name)
+
+        self.dicom_image = self.ds.pixel_array
+        self.original_dtype = self.dicom_image.dtype
+
+        # Handle multi-frame / RGB
+        self.dicom_image = ImageProcessor.ensure_2d(self.dicom_image)
+
+        # Apply rescale slope/intercept
+        self.dicom_image = ImageProcessor.apply_rescale(
+            self.dicom_image, self.ds
+        )
+
+        # Apply photometric interpretation
+        self.clipped_image = ImageProcessor.apply_photometric(
+            self.dicom_image, self.ds
+        )
+
+        # Flip vertically for display
+        self.clipped_image = np.flipud(self.clipped_image)
+
+        # Determine modality and scale
+        if "X-Ray" in self.sop_class_name:
+            self.image_scale = XRAY_SCALE
+            self.image_type = MODALITY_XRAY
+        elif "CT" in self.sop_class_name:
+            self.image_scale = CT_SCALE
+            self.image_type = MODALITY_CT
+        elif "MR" in self.sop_class_name:
+            self.image_scale = MRI_SCALE
+            self.image_type = MODALITY_MRI
+            if self.gamma == self.config.gamma_def:
+                self.gamma = MRI_GAMMA
+        else:
+            self.image_scale = US_SCALE
+            self.image_type = MODALITY_US
+            if self.gamma == self.config.gamma_def:
+                self.gamma = US_GAMMA
+
+        self.is_series = (self.image_type != MODALITY_XRAY)
+        self.height, self.width = self.clipped_image.shape
+        self.height_scl = int(self.height * self.image_scale)
+        self.width_scl = int(self.width * self.image_scale)
+
+        # Apply gamma correction
+        self.processed_image = ImageProcessor.perform_gamma(
+            self.clipped_image, self.gamma, self.original_dtype
+        )
+        self.max_bright = float(np.max(self.processed_image))
+
+    def _size_figures(self):
+        """Update figure dimensions to match current image."""
+        self.fig_image.x_range.end = self.width_scl
+        self.fig_image.y_range.end = self.height_scl
+        self.fig_image.width = self.width_scl
+        self.fig_image.height = self.height_scl
+        self.f_img.glyph.dw = self.width_scl
+        self.f_img.glyph.dh = self.height_scl
+
+    def _set_image_fig_title(self, image_name: str):
+        """Set figure title with patient metadata."""
+        try:
+            patient = (
+                self.ds.PatientName.given_name + " " +
+                self.ds.PatientName.family_name
+            )
+        except (AttributeError, TypeError):
+            patient = "Unknown"
+
+        try:
+            proc_date = self.ds.PerformedProcedureStepStartDate
+        except AttributeError:
+            proc_date = "Unknown date"
+
+        try:
+            protocol = self.ds.ProtocolName
+        except AttributeError:
+            protocol = "Unknown protocol"
+
+        self.title_postfix = f" {patient} {proc_date} {protocol}"
+        self.fig_image.title.text = image_name + self.title_postfix
+
+    def _get_new_image(self):
+        """Load and display the image at current_slice."""
+        images = self.current_series if self.is_series else self.images_list
+        if not images or self.current_slice >= len(images):
+            return
+        self.path = os.path.join(self.data_dir, images[self.current_slice])
+        self._prepare_images()
+        self._set_image_fig_title(images[self.current_slice])
+        self.source.data["image"] = [self.processed_image]
+
+    def _sync_slice_slider(self):
+        """Update the slice slider without triggering its callback."""
+        self.series_slider_slice.remove_on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+        self.series_slider_slice.value = self.current_slice
+        self.series_slider_slice.on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+
+    def _histogram_positions(self):
+        """Populate the series position scatter plot data."""
+        if not self.current_series or not self.selected_series:
+            return
+
+        sm = self.series_mgr
+        axis = sm.determine_axis(self.selected_series, self.current_series)
+        sm.series_pos_index = axis
+
+        i_n = []
+        z_i = []
+        for img in self.current_series:
+            if img not in sm.series_map.get(self.selected_series, {}):
+                continue
+            entry = sm.series_map[self.selected_series][img]
+            i_n.append(entry[0])  # instance number
+            z_i.append(entry[1][axis])  # position along axis
+
+        self.fig_MRI_source_series.data = {"x": z_i, "y": i_n}
+
+    def _series_scatter_pos(self, image_name: str):
+        """Highlight the current slice on the position scatter plot."""
+        sm = self.series_mgr
+        if (self.selected_series not in sm.series_map or
+                image_name not in sm.series_map[self.selected_series]):
+            return
+
+        entry = sm.series_map[self.selected_series][image_name]
+        z_i = entry[1][sm.series_pos_index]
+        i_n = entry[0]
+
+        self.fig_MRI_source.data = {"x": [z_i], "y": [i_n]}
+
+    def _find_images(self):
+        """Scan data directory for image files."""
         path = Path(self.data_dir)
-        img_list = list(path.glob('*'))  # '*/' for non-recursive
+        files = [
+            f.name for f in path.iterdir()
+            if f.is_file() and not f.name.startswith(".")
+        ]
+        self.images_list = sorted(files, key=SeriesManager._key_func)
 
-        posix_list = np.sort([Path(file.as_posix()).name for file in img_list])
-        files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-        self.images_list = sorted(files, key=self.key_func)
+    def _modality_index(self) -> int:
+        """Return RadioButtonGroup index for current modality."""
+        mapping = {
+            MODALITY_XRAY: 0,
+            MODALITY_CT: 1,
+            MODALITY_MRI: 2,
+            MODALITY_US: 3,
+        }
+        return mapping.get(self.image_type, 0)
+
+    def _update_visibility(self):
+        """Update widget visibility based on current modality."""
+        is_s = self.is_series
+        self.series_pulldown.visible = is_s
+        self.series_toggle_anim.visible = is_s
+        self.series_slider_slice.visible = is_s
+        self.CT_text_refresh.visible = is_s
+        self.fig_series_positions.visible = is_s
+        self.increment_button.visible = is_s
+        self.decrement_button.visible = is_s
+
+    def _reset_adjustments(self):
+        """Reset gamma and window sliders to defaults."""
+        self.gamma = self.config.gamma_def
+        self.window = self.config.window_def
+
+        self.gamma_slider.remove_on_change("value_throttled", self._gamma_cb)
+        self.gamma_slider.value = self.gamma
+        self.gamma_slider.on_change("value_throttled", self._gamma_cb)
+
+        self.window_slider.remove_on_change("value_throttled", self._window_cb)
+        self.window_slider.value = self.window
+        self.window_slider.on_change("value_throttled", self._window_cb)
+
+    def _log(self, message: str):
+        """Add a message to the on-screen log."""
+        self.message_log.append(message)
+        if len(self.message_log) > MAX_LOG_MESSAGES:
+            self.message_log.pop(0)
+        self.log_div.text = "Log:<br>" + "<br>".join(self.message_log)
+        logger.info(message)
 
 
-d = dicom_viewer()
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+viewer = DicomViewer()
