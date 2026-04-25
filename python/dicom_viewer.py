@@ -16,14 +16,14 @@ from bokeh.models import (ColumnDataSource, LinearColorMapper, ColorBar, HoverTo
 
 from bokeh.palettes import Greys256  # For grayscale
 
-# https://pydicom.github.io/pydicom/stable/index.html
+# pydicom.github.io/pydicom/stable/index.html
 
 #   Conda env: pydicom
 #   Requirements:  pydicom (conda); ppylibjpeg[all] (pip install); scikit-image; bokeh
 #
 #   Invoke: bokeh serve dicom_viewer.py --args --app_config "/Volumes/Data/Home/dicom_viewer.yaml"
 #
-#   View in browser at: http://localhost:5006/dicom_viewer
+#   View in browser at: localhost:5006/dicom_viewer
 
 
 class dicom_viewer():
@@ -179,8 +179,22 @@ class dicom_viewer():
 
         self.dicom_image = self.ds.pixel_array
 
-        # Invert the grayscale
-        self.clipped_image = np.max(self.dicom_image) - self.dicom_image  # Subtract image from the maximum value
+        if self.dicom_image.ndim == 3:
+            # Multi-frame: take first frame, or RGB: convert to grayscale
+            if self.dicom_image.shape[0] < self.dicom_image.shape[2]:
+                self.dicom_image = self.dicom_image[0]  # first frame
+            else:
+                self.dicom_image = np.mean(self.dicom_image, axis=2).astype(self.dicom_image.dtype)
+
+        # Invert the grayscale?
+
+        # FIXED:
+        photometric = self.ds.get("PhotometricInterpretation", "MONOCHROME2")
+        if photometric == "MONOCHROME1":
+            self.clipped_image = np.max(self.dicom_image) - self.dicom_image
+        else:
+            self.clipped_image = self.dicom_image.copy()
+        self.clipped_image = np.flipud(self.clipped_image)
 
         # Flip the image vertically
         self.clipped_image = np.flipud(self.clipped_image)
@@ -237,7 +251,7 @@ class dicom_viewer():
             # some images may not be actual images
             try:
                 series = str(ds[0x0020, 0x0011].value)
-            except:
+            except (KeyError, AttributeError):
                 continue
 
             self.series_map.setdefault(series, {})
@@ -245,7 +259,7 @@ class dicom_viewer():
             instance = str(ds[0x0020, 0x0013].value)
             try:
                 image_pos = ds[0x0020, 0x0032].value
-            except:
+            except (KeyError, AttributeError):
                 image_pos = ["-999", "-999", "-999"]
                 if self.debug:
                     self.generate_log_message(self.log_div, f"image_pos not available: {n, instance}")
@@ -346,7 +360,9 @@ class dicom_viewer():
         # CT animation
 
         # Create a slider for CT refresh rate
-        step = len(self.images_list)/100.
+        #step = len(self.images_list)/100.
+        step = 1
+        
         self.series_slider_slice = Slider(start=0, end=len(self.images_list), value=0, step=step,
                                      title="slice", visible=ct_visible)
         self.series_slider_slice.on_change("value_throttled", self.series_slider_slice_cb)
@@ -540,6 +556,8 @@ class dicom_viewer():
 
         self.gamma_slider.value = self.gamma_def
         self.window_slider.value = self.window_def
+        self.gamma = self.gamma_def
+        self.window = self.window_def
 
         self.gamma_slider.on_change("value_throttled", self.gamma_cb)
         self.window_slider.on_change("value_throttled", self.window_cb)
@@ -755,7 +773,7 @@ class dicom_viewer():
         callback to increment the current image slice
 
         """
-        if self.current_slice < len(self.current_series):
+        if self.current_slice < len(self.current_series) -1:
             self.current_slice += 1
 
             self.series_slider_slice.remove_on_change("value_throttled", self.series_slider_slice_cb)
@@ -845,10 +863,12 @@ class dicom_viewer():
         self.series_toggle_active = active
 
         if self.series_toggle_active:
-            self.series_toggle_anim.button_type = "success"
+            self.series_toggle_anim.button_type = "danger"
+            self.series_toggle_anim.label = "Stop Animation"
             self.series_anim_cb_ID = curdoc().add_periodic_callback(self.animate_series, int(self.series_animate_refresh_rate))
         else:
-            self.series_toggle_anim.button_type = "danger"
+            self.series_toggle_anim.button_type = "success"
+            self.series_toggle_anim.label = "Start Animation"
             curdoc().remove_periodic_callback(self.series_anim_cb_ID)
 
     def rotated_rectangle_properties(self, corners):
