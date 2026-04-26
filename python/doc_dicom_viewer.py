@@ -285,7 +285,7 @@ def build_user_manual(output_dir: str) -> Manual:
 
     manual = Manual(
         title="DICOM Viewer User Manual",
-        subtitle="Version 2.1 &mdash; April 2026",
+        subtitle="Version 2.2 &mdash; April 2026",
         output_dir=os.path.join(output_dir, "user_manual"),
         accent_color="#2563eb",
         icon="&#x1F3E5;",
@@ -297,7 +297,7 @@ def build_user_manual(output_dir: str) -> Manual:
         title="Overview",
         nav_title="Overview",
         raw_content="""
-<p class="subtitle">User Manual &mdash; Version 2.1</p>
+<p class="subtitle">User Manual &mdash; Version 2.2 &mdash; April 2026</p>
 
 <div class="card">
 <p>The DICOM Medical Image Viewer is an interactive, browser-based application for viewing
@@ -314,8 +314,12 @@ medical images stored in DICOM format. It supports the following modalities:</p>
 <ul>
     <li>Interactive image display with hover pixel readout</li>
     <li>Gamma correction and brightness windowing</li>
-    <li><strong>DICOM Window/Level presets</strong> &mdash; auto-loaded from image metadata</li>
+    <li>DICOM Window/Level presets auto-loaded from image metadata</li>
     <li>Manual Window Center / Width sliders for fine-tuned control</li>
+    <li><strong>10 color maps</strong> including Grayscale, Inferno, Viridis, Hot, and PET</li>
+    <li><strong>Image inversion</strong> (positive/negative toggle)</li>
+    <li><strong>Zoom/pan lock</strong> &mdash; preserves your view when stepping through slices</li>
+    <li><strong>Position-sorted slices</strong> &mdash; anatomically correct slice ordering</li>
     <li>Multi-series navigation for CT and MRI</li>
     <li>Animated slice playback with adjustable speed</li>
     <li>Clip-and-rotate tool for region-of-interest extraction</li>
@@ -331,17 +335,29 @@ medical images stored in DICOM format. It supports the following modalities:</p>
     <li>Open your browser to <code>localhost:5006/dicom_viewer</code></li>
 </ol>
 
-<h2>What's New in Version 2.1</h2>
+<h2>What's New in Version 2.2</h2>
 <div class="info">
     <ul>
-        <li><strong>Window/Level Presets:</strong> The viewer now reads DICOM tags (0028,1050)
-            and (0028,1051) to provide radiologist-defined brightness presets.</li>
-        <li><strong>Manual W/L Sliders:</strong> Fine-tune Window Center and Width with
-            dedicated sliders that auto-adjust their range to each image.</li>
-        <li><strong>Automatic Preset Application:</strong> The first available W/L preset
-            is applied automatically when loading an image.</li>
+        <li><strong>Color Maps:</strong> 10 color lookup tables including clinical PET and
+            Hot colormaps, plus scientific palettes (Inferno, Viridis, Plasma, etc.).</li>
+        <li><strong>Image Inversion:</strong> Toggle between positive and negative display.
+            Works with any color map.</li>
+        <li><strong>Zoom/Pan Lock:</strong> Lock your current zoom and pan position. The view
+            is preserved as you scroll through slices or animate.</li>
+        <li><strong>Position-Sorted Slices:</strong> CT and MRI slices are now sorted by their
+            DICOM spatial position by default, ensuring correct anatomical ordering regardless
+            of filename conventions.</li>
     </ul>
 </div>
+
+<h2>Version History</h2>
+<table>
+    <tr><th>Version</th><th>Date</th><th>Highlights</th></tr>
+    <tr><td>2.2</td><td>April 2026</td><td>Color maps, invert, zoom lock, position sorting</td></tr>
+    <tr><td>2.1</td><td>April 2026</td><td>DICOM Window/Level presets, center/width sliders</td></tr>
+    <tr><td>2.0</td><td>April 2026</td><td>Refactored architecture, bug fixes, MONOCHROME support</td></tr>
+    <tr><td>1.0</td><td>2024</td><td>Initial release</td></tr>
+</table>
 """,
     ))
 
@@ -381,11 +397,6 @@ pip install "pylibjpeg[all]"</code></pre>
 <h2>Verify Installation</h2>
 <pre><code>python -c "import pydicom, bokeh, skimage, yaml; print('All packages OK')"</code></pre>
 
-<div class="info">
-    <strong>Note:</strong> The <code>pylibjpeg[all]</code> package is required for
-    viewing JPEG and JPEG2000 compressed DICOM files, which are common in clinical data.
-</div>
-
 <h2>Required Packages Summary</h2>
 <table>
     <tr><th>Package</th><th>Install Method</th><th>Purpose</th></tr>
@@ -406,8 +417,7 @@ pip install "pylibjpeg[all]"</code></pre>
         nav_title="Configuration",
         raw_content="""
 <h2>Configuration File</h2>
-<p>The viewer is configured via a YAML file. Create a file (e.g., <code>dicom_viewer.yaml</code>):</p>
-
+<p>The viewer is configured via a YAML file:</p>
 <pre><code># dicom_viewer.yaml
 debug: false
 gamma_def: 1.0
@@ -425,49 +435,23 @@ data_db:
     <tr><td><code>debug</code></td><td>boolean</td><td><code>false</code></td>
         <td>Enable verbose debug output to the terminal</td></tr>
     <tr><td><code>gamma_def</code></td><td>float</td><td><code>1.0</code></td>
-        <td>Default gamma correction value. 1.0 = no correction. Higher values darken midtones.</td></tr>
+        <td>Default gamma correction value</td></tr>
     <tr><td><code>window_def</code></td><td>float</td><td><code>1.0</code></td>
-        <td>Default brightness window multiplier (legacy control). 1.0 = full range.</td></tr>
+        <td>Default brightness window multiplier (legacy control)</td></tr>
     <tr><td><code>starter_images</code></td><td>string</td><td>&mdash;</td>
         <td>Key from <code>data_db</code> to load on startup</td></tr>
     <tr><td><code>data_db</code></td><td>dict</td><td>&mdash;</td>
-        <td>Named datasets: maps a label to a directory path containing DICOM files</td></tr>
+        <td>Named datasets mapping to directory paths</td></tr>
 </table>
 
-<h2>Directory Requirements</h2>
 <div class="warning">
     <strong>Important:</strong>
     <ul>
-        <li>Each directory in <code>data_db</code> should contain only DICOM files</li>
+        <li>Each directory should contain only DICOM files</li>
         <li>Hidden files (starting with <code>.</code>) are automatically excluded</li>
-        <li>Paths must be absolute</li>
-        <li>Paths should end with a trailing slash <code>/</code></li>
-        <li>All DICOM files in a directory are assumed to belong to the same study</li>
+        <li>Paths must be absolute and end with a trailing slash</li>
     </ul>
 </div>
-
-<h2>Example Configurations</h2>
-
-<h3>Minimal Configuration</h3>
-<pre><code>debug: false
-gamma_def: 1.0
-window_def: 1.0
-starter_images: "xrays"
-data_db:
-  xrays: "/Users/me/dicom_data/xrays/"</code></pre>
-
-<h3>Multi-Dataset Configuration</h3>
-<pre><code>debug: true
-gamma_def: 1.5
-window_def: 1.0
-starter_images: "brain_mri"
-data_db:
-  hand_xray: "/Volumes/Data/DICOM/hand/"
-  chest_xray: "/Volumes/Data/DICOM/chest/"
-  brain_mri: "/Volumes/Data/DICOM/brain_mri/"
-  knee_mri: "/Volumes/Data/DICOM/knee_mri/"
-  abdominal_ct: "/Volumes/Data/DICOM/abd_ct/"
-  cardiac_us: "/Volumes/Data/DICOM/cardiac_us/"</code></pre>
 """,
     ))
 
@@ -481,35 +465,20 @@ data_db:
 <pre><code>bokeh serve dicom_viewer.py --args --app_config "/path/to/dicom_viewer.yaml"</code></pre>
 
 <h2>Opening in Browser</h2>
-<p>After the server starts, open your browser to:</p>
 <pre><code>localhost:5006/dicom_viewer</code></pre>
-
-<div class="info">
-    <strong>Tip:</strong> The Bokeh server prints the exact URL to the terminal when it starts.
-    Look for a line like: <code>Bokeh app running at: ...</code>
-</div>
-
-<h2>Command-Line Options</h2>
-<table>
-    <tr><th>Option</th><th>Description</th></tr>
-    <tr><td><code>--app_config PATH</code></td>
-        <td>Path to the YAML configuration file. Defaults to
-        <code>/Volumes/Data/Home/dicom_viewer.yaml</code></td></tr>
-</table>
 
 <h2>Running on a Specific Port</h2>
 <pre><code>bokeh serve dicom_viewer.py --port 8080 --args --app_config "config.yaml"</code></pre>
-<p>Then open <code>localhost:8080/dicom_viewer</code></p>
 
 <h2>Stopping the Server</h2>
 <ul>
-    <li>Click the <strong>Exit</strong> button in the viewer interface</li>
-    <li>Press <code>Ctrl+C</code> in the terminal where the server is running</li>
+    <li>Click <strong>Exit</strong> in the viewer</li>
+    <li>Press <code>Ctrl+C</code> in the terminal</li>
 </ul>
 """,
     ))
 
-    # ---- Interface Guide (UPDATED with W/L controls) ----
+    # ---- Interface Guide (UPDATED with Phase 1) ----
     manual.pages.append(Page(
         filename="interface.html",
         title="User Interface Guide",
@@ -517,7 +486,6 @@ data_db:
         raw_content="""
 <h2>Layout Overview</h2>
 <div class="card">
-    <p>The interface is divided into three areas:</p>
     <ul>
         <li><strong>Top row:</strong> Control widgets (buttons, dropdowns, sliders)</li>
         <li><strong>Bottom-left:</strong> Main image display with color bar</li>
@@ -529,110 +497,143 @@ data_db:
 <table>
     <tr><th>Widget</th><th>Description</th></tr>
     <tr><td><strong>Exit</strong></td>
-        <td>Shuts down the Bokeh server. Button turns light to confirm shutdown.</td></tr>
+        <td>Shuts down the Bokeh server.</td></tr>
     <tr><td><strong>Reset</strong></td>
-        <td>Restores gamma, window, and W/L settings to their defaults.
-            If DICOM presets exist, the first preset is reapplied.</td></tr>
+        <td>Restores all settings to defaults: gamma, window, W/L, color map,
+            inversion, and zoom lock.</td></tr>
     <tr><td><strong>Pick Imaging</strong></td>
-        <td>Dropdown to switch between datasets defined in your YAML config.</td></tr>
+        <td>Switch between datasets in your YAML config.</td></tr>
     <tr><td><strong>Mode</strong></td>
-        <td>Shows auto-detected modality (XRay / CT / MRI / US). Read-only indicator.</td></tr>
+        <td>Auto-detected modality indicator (XRay / CT / MRI / US).</td></tr>
     <tr><td><strong>Clip</strong></td>
-        <td>Resets clip mode. After clicking, tap 4 corners on the image to clip and rotate.</td></tr>
+        <td>Reset clip mode. Tap 4 corners on the image to clip and rotate.</td></tr>
     <tr><td><strong>Gamma</strong></td>
-        <td>Slider (0&ndash;10). Controls gamma correction curve. Higher values darken midtones.</td></tr>
+        <td>Slider (0&ndash;10). Gamma correction curve.</td></tr>
     <tr><td><strong>Window (legacy)</strong></td>
-        <td>Slider (0&ndash;2). Simple brightness multiplier on the color map high value.</td></tr>
+        <td>Slider (0&ndash;2). Simple brightness multiplier.</td></tr>
     <tr><td><strong>W/L Preset</strong></td>
-        <td>Dropdown showing DICOM-defined window/level presets for the current image.
-            Selecting a preset sets the Window Center and Width automatically.
-            Shows "Manual" when using the sliders directly.</td></tr>
+        <td>DICOM-defined window/level presets for the current image.</td></tr>
     <tr><td><strong>Window Center</strong></td>
-        <td>Slider controlling the center of the displayed value range.
-            Shifts which brightness values are visible. Range auto-adjusts per image.</td></tr>
+        <td>Center of the displayed value range.</td></tr>
     <tr><td><strong>Window Width</strong></td>
-        <td>Slider controlling the width of the displayed value range.
-            Narrower = higher contrast. Range auto-adjusts per image.</td></tr>
+        <td>Width of the displayed value range.</td></tr>
+    <tr><td><strong>Color Map</strong></td>
+        <td>Dropdown to select a color lookup table. Options: Grayscale, Grayscale (Inverted),
+            Inferno, Viridis, Turbo, Cividis, Plasma, Magma, Hot, PET.</td></tr>
+    <tr><td><strong>Invert</strong></td>
+        <td>Toggle to reverse the current color map (positive/negative). Works with
+            any color map. Button turns orange when active.</td></tr>
+    <tr><td><strong>Lock Zoom</strong></td>
+        <td>Toggle to preserve your current zoom and pan position when navigating
+            between slices. Button turns green when locked. Automatically unlocks
+            on dataset change.</td></tr>
     <tr><td><strong>Pick Image</strong></td>
-        <td>Dropdown to select a specific image file from the current dataset or series.</td></tr>
+        <td>Select a specific image file.</td></tr>
     <tr><td><strong>Pick Series</strong></td>
-        <td>Dropdown to select a series (CT/MRI only).</td></tr>
+        <td>Select a series (CT/MRI only).</td></tr>
     <tr><td><strong>Start/Stop Animation</strong></td>
-        <td>Toggle to auto-play through slices.
-            Green = ready to start. Red = click to stop.</td></tr>
+        <td>Auto-play through slices.</td></tr>
     <tr><td><strong>Refresh (ms)</strong></td>
-        <td>Animation speed in milliseconds. Type a new value and press Enter.</td></tr>
+        <td>Animation speed in milliseconds.</td></tr>
     <tr><td><strong>Slice Slider</strong></td>
-        <td>Scrub through slices manually by dragging.</td></tr>
+        <td>Scrub through slices manually.</td></tr>
     <tr><td><strong>Increment / Decrement</strong></td>
-        <td>Step forward or backward by exactly one slice.</td></tr>
+        <td>Step forward or backward by one slice.</td></tr>
+    <tr><td><strong>Sort by Position / Filename</strong></td>
+        <td>Toggle between sorting slices by DICOM spatial position (anatomically correct)
+            or by filename. Green when position-sorting is active. Only visible for
+            CT/MRI/Ultrasound.</td></tr>
 </table>
 
-<h2>Image Display Features</h2>
-<ul>
-    <li><strong>Hover:</strong> Move your mouse over the image to see pixel coordinates and intensity.</li>
-    <li><strong>Zoom:</strong> Use the scroll wheel or Bokeh's toolbar tools.</li>
-    <li><strong>Pan:</strong> Click and drag to pan.</li>
-    <li><strong>Color bar:</strong> Shows the grayscale value mapping.
-        The range updates when W/L settings change.</li>
-    <li><strong>Title:</strong> Shows filename, patient name, procedure date, and protocol.</li>
-</ul>
-
-<h2>Understanding the Brightness Controls</h2>
+<h2>Understanding the Visual Controls</h2>
 <div class="card">
-    <p>The viewer provides <strong>three layers</strong> of brightness control that work together:</p>
+    <h3>Color Maps</h3>
+    <p>Color maps change how pixel intensity values are mapped to colors on screen.
+    Different maps highlight different features:</p>
+    <table>
+        <tr><th>Color Map</th><th>Best For</th><th>Description</th></tr>
+        <tr><td><strong>Grayscale</strong></td><td>General viewing</td>
+            <td>Standard black-to-white mapping. Default for medical imaging.</td></tr>
+        <tr><td><strong>Grayscale (Inverted)</strong></td><td>Alternative viewing</td>
+            <td>White-to-black. Some radiologists prefer this for certain structures.</td></tr>
+        <tr><td><strong>Hot</strong></td><td>Highlighting intensity</td>
+            <td>Black &rarr; Red &rarr; Yellow &rarr; White. Good for seeing hot spots.</td></tr>
+        <tr><td><strong>PET</strong></td><td>Nuclear medicine</td>
+            <td>Black &rarr; Blue &rarr; Green &rarr; Yellow &rarr; Red &rarr; White.
+                Standard for PET imaging overlays.</td></tr>
+        <tr><td><strong>Inferno</strong></td><td>Scientific visualization</td>
+            <td>Perceptually uniform dark-to-light. Colorblind friendly.</td></tr>
+        <tr><td><strong>Viridis</strong></td><td>Scientific visualization</td>
+            <td>Perceptually uniform purple-to-yellow. Colorblind friendly.</td></tr>
+        <tr><td><strong>Turbo</strong></td><td>Rainbow-like</td>
+            <td>Improved rainbow colormap with better perceptual properties.</td></tr>
+        <tr><td><strong>Plasma</strong></td><td>Scientific visualization</td>
+            <td>Purple-to-yellow warm palette.</td></tr>
+        <tr><td><strong>Magma</strong></td><td>Scientific visualization</td>
+            <td>Black-to-light warm palette.</td></tr>
+        <tr><td><strong>Cividis</strong></td><td>Colorblind-safe</td>
+            <td>Blue-to-yellow. Designed for deuteranomaly (red-green colorblindness).</td></tr>
+    </table>
+
+    <h3>Inversion</h3>
+    <p>The <strong>Invert</strong> toggle reverses whatever color map is currently selected.
+    For Grayscale, this gives a negative (white-on-black) view. For color maps, it reverses
+    the entire color ramp.</p>
+
+    <h3>Zoom Lock</h3>
+    <p>When you zoom into a region of interest and want to examine the same area across
+    multiple slices:</p>
+    <ol>
+        <li>Zoom and pan to the area of interest</li>
+        <li>Click <strong>Lock Zoom</strong> (button turns green)</li>
+        <li>Use Increment/Decrement, the slice slider, or animation</li>
+        <li>Your zoom and pan position is preserved on every slice</li>
+        <li>Click again to unlock and return to auto-fitting</li>
+    </ol>
+
+    <h3>Position Sorting</h3>
+    <p>By default, CT and MRI slices are sorted by their DICOM spatial position
+    (<code>ImagePositionPatient</code> tag). This ensures anatomically correct ordering
+    regardless of how files are named. Toggle to "Sort by Filename" if you prefer
+    the original file order.</p>
+</div>
+
+<h2>Brightness Controls</h2>
+<div class="card">
     <table>
         <tr><th>Control</th><th>What It Does</th><th>When to Use</th></tr>
         <tr>
             <td><strong>Gamma</strong></td>
-            <td>Adjusts the brightness <em>curve shape</em>. Changes how
-                midtone values are mapped relative to darks and lights.</td>
-            <td>When you want to see more detail in dark or bright areas
-                without changing the overall range.</td>
+            <td>Adjusts brightness curve shape</td>
+            <td>Enhance dark or bright area detail</td>
         </tr>
         <tr>
             <td><strong>Window (legacy)</strong></td>
-            <td>Simple multiplier on the color map maximum.
-                Scales the top of the brightness range up or down.</td>
-            <td>Quick brightness adjustment. Good for images without
-                DICOM W/L metadata.</td>
+            <td>Simple brightness multiplier</td>
+            <td>Quick adjustment; images without W/L metadata</td>
         </tr>
         <tr>
             <td><strong>W/L Center &amp; Width</strong></td>
-            <td>Controls which <em>range of pixel values</em> maps to the
-                display range. Center sets the midpoint; Width sets how
-                much range is visible.</td>
-            <td>Standard radiological viewing. Use presets for common
-                tissue types (bone, soft tissue, lung, brain, etc.).</td>
+            <td>Controls which value range is displayed</td>
+            <td>Standard radiological viewing (recommended for CT/MRI)</td>
         </tr>
     </table>
 </div>
 
-<div class="info">
-    <strong>Tip:</strong> For the best results with CT and MRI images, use the
-    <strong>W/L Preset</strong> dropdown first, then fine-tune with the
-    Center/Width sliders. The legacy Window slider and Gamma are supplementary.
-</div>
-
 <h2>Series Position Plot</h2>
-<p>
-    For CT and MRI datasets, a scatter plot appears on the right showing the spatial position
-    of each slice in the series:
-</p>
+<p>For CT/MRI, shows spatial position of each slice:</p>
 <ul>
-    <li><span style="color:black;font-weight:bold;">Black / Blue</span> &mdash; all slices in the series</li>
-    <li><span style="color:red;font-weight:bold;">Red</span> &mdash; the currently displayed slice</li>
+    <li><span style="color:black;font-weight:bold;">Black / Blue</span> &mdash; all slices</li>
+    <li><span style="color:red;font-weight:bold;">Red</span> &mdash; current slice</li>
 </ul>
 
 <h2>Log Panel</h2>
-<p>
-    The log panel shows the last 10 actions including W/L preset changes,
-    slider adjustments, image loads, and error messages.
-</p>
+<p>Shows the last 10 actions including color map changes, zoom lock events,
+sort mode changes, and all other operations.</p>
 """,
     ))
 
-    # ---- Workflows (UPDATED with W/L workflows) ----
+    # ---- Workflows (UPDATED with Phase 1) ----
     manual.pages.append(Page(
         filename="workflows.html",
         title="Common Workflows",
@@ -642,121 +643,105 @@ data_db:
 <ol>
     <li>Select your X-Ray dataset from <strong>Pick Imaging</strong>.</li>
     <li>Choose a specific image from <strong>Pick Image</strong>.</li>
-    <li>If a W/L preset is available, it will be applied automatically.</li>
-    <li>Adjust <strong>Gamma</strong> and <strong>Window Center/Width</strong> for optimal visibility.</li>
-    <li>Hover over areas of interest to read pixel intensity values.</li>
+    <li>Adjust brightness using W/L presets or Gamma/Window sliders.</li>
+    <li>Try different <strong>Color Maps</strong> to highlight features.</li>
+    <li>Use <strong>Invert</strong> for a negative view.</li>
 </ol>
 
 <h2>Browsing a CT/MRI Series</h2>
 <ol>
-    <li>Select your CT or MRI dataset from <strong>Pick Imaging</strong>.</li>
+    <li>Select your dataset from <strong>Pick Imaging</strong>.</li>
     <li>Choose a series from <strong>Pick Series</strong>.</li>
-    <li>Use <strong>Increment/Decrement</strong> buttons or the <strong>Slice slider</strong> to browse.</li>
-    <li>Your current W/L settings are preserved as you step through slices.</li>
-    <li>Watch the position plot update to show your current spatial location.</li>
+    <li>Slices are sorted by spatial position by default (anatomically correct).</li>
+    <li>Zoom into the area of interest.</li>
+    <li>Click <strong>Lock Zoom</strong> to preserve your view.</li>
+    <li>Use <strong>Increment/Decrement</strong> or the slider to browse slices.</li>
+    <li>Your zoom position is maintained across all slices.</li>
 </ol>
 
-<h2>Using Window/Level Presets</h2>
+<h2>Tracking a Structure Through Slices</h2>
 <div class="card">
-    <h3>What Are W/L Presets?</h3>
-    <p>DICOM images often contain one or more <strong>Window/Level presets</strong> embedded
-    in their metadata. These are brightness settings chosen by the scanner manufacturer or
-    radiologist to optimize viewing of specific tissue types.</p>
+    <p>This is one of the most common radiological tasks &mdash; following a structure
+    (vessel, lesion, organ boundary) through sequential slices:</p>
+    <ol>
+        <li>Ensure <strong>Sort by Position</strong> is active (green) for correct ordering.</li>
+        <li>Navigate to a slice where the structure is visible.</li>
+        <li>Zoom in to the structure.</li>
+        <li>Click <strong>Lock Zoom</strong>.</li>
+        <li>Set an appropriate <strong>W/L Preset</strong> (e.g., "Soft Tissue" for vessels).</li>
+        <li>Use <strong>Increment/Decrement</strong> to step through slices.</li>
+        <li>The structure remains centered and at the same zoom level.</li>
+    </ol>
+</div>
 
-    <p>Common CT presets include:</p>
+<h2>Using Color Maps for Enhanced Visualization</h2>
+<div class="card">
+    <h3>Recommended Color Maps by Use Case</h3>
     <table>
-        <tr><th>Preset Name</th><th>Typical Center</th><th>Typical Width</th><th>Best For</th></tr>
-        <tr><td>Bone</td><td>400</td><td>1500</td><td>Skeletal structures</td></tr>
-        <tr><td>Soft Tissue</td><td>40</td><td>350</td><td>Organs, muscles</td></tr>
-        <tr><td>Lung</td><td>-600</td><td>1500</td><td>Lung parenchyma</td></tr>
-        <tr><td>Brain</td><td>40</td><td>80</td><td>Brain tissue</td></tr>
-        <tr><td>Abdomen</td><td>60</td><td>400</td><td>Abdominal organs</td></tr>
+        <tr><th>Use Case</th><th>Recommended Map</th><th>Why</th></tr>
+        <tr><td>Standard diagnostic reading</td><td>Grayscale</td>
+            <td>Industry standard; radiologists are trained on grayscale</td></tr>
+        <tr><td>Bone vs. soft tissue contrast</td><td>Hot</td>
+            <td>High-intensity structures (bone) appear bright yellow/white</td></tr>
+        <tr><td>PET/nuclear medicine</td><td>PET</td>
+            <td>Standard nuclear medicine color scale</td></tr>
+        <tr><td>Subtle density differences</td><td>Inferno or Viridis</td>
+            <td>Perceptually uniform &mdash; equal steps in data appear as equal
+                steps in color</td></tr>
+        <tr><td>Presentations / colorblind viewers</td><td>Cividis</td>
+            <td>Specifically designed for deuteranomaly accessibility</td></tr>
+        <tr><td>Quick positive/negative toggle</td><td>Grayscale + Invert</td>
+            <td>Fastest way to check for subtle features</td></tr>
     </table>
 
-    <h3>How to Use Presets</h3>
-    <ol>
-        <li>Load an image &mdash; the first available preset is applied automatically.</li>
-        <li>Open the <strong>W/L Preset</strong> dropdown to see all available presets.
-            Each shows its name and (Center, Width) values.</li>
-        <li>Select a different preset to switch views (e.g., from "Soft Tissue" to "Bone").</li>
-        <li>The Window Center and Width sliders update to match the preset.</li>
-    </ol>
-
-    <h3>Fine-Tuning</h3>
-    <ol>
-        <li>Start with a preset that's close to what you want.</li>
-        <li>Drag the <strong>Window Center</strong> slider to shift the brightness midpoint.</li>
-        <li>Drag the <strong>Window Width</strong> slider to increase or decrease contrast.</li>
-        <li>The dropdown switches to "Manual" to indicate you've overridden the preset.</li>
-    </ol>
+    <h3>Combining Color Maps with Inversion</h3>
+    <p>The <strong>Invert</strong> toggle works with <em>any</em> color map. For example:</p>
+    <ul>
+        <li><strong>Hot + Invert:</strong> White &rarr; Yellow &rarr; Red &rarr; Black
+            (bright areas become dark)</li>
+        <li><strong>Viridis + Invert:</strong> Yellow &rarr; Green &rarr; Purple
+            (reversed scientific palette)</li>
+    </ul>
 </div>
 
-<div class="info">
-    <strong>Note:</strong> Not all DICOM images contain W/L presets. When no presets are
-    available, the viewer automatically calculates initial W/L values from the image data range.
-    The dropdown will show only "Manual" in this case.
-</div>
+<h2>Using Window/Level Presets</h2>
+<ol>
+    <li>Load an image &mdash; the first preset is applied automatically.</li>
+    <li>Open <strong>W/L Preset</strong> to see available presets.</li>
+    <li>Select a preset to switch views (e.g., "Soft Tissue" to "Bone").</li>
+    <li>Fine-tune with <strong>Window Center</strong> and <strong>Width</strong> sliders.</li>
+</ol>
 
 <h2>Animating Through Slices</h2>
 <ol>
-    <li>Navigate to the desired series.</li>
-    <li>Set your preferred W/L first &mdash; it will be preserved during animation.</li>
-    <li>Optionally set the <strong>Refresh (ms)</strong> rate.</li>
-    <li>Click <strong>Start Animation</strong>. The button turns red.</li>
-    <li>Click again to stop.</li>
+    <li>Set your preferred W/L, color map, and zoom level first.</li>
+    <li>Click <strong>Lock Zoom</strong> if you want to preserve your view.</li>
+    <li>Set the <strong>Refresh (ms)</strong> rate.</li>
+    <li>Click <strong>Start Animation</strong>.</li>
+    <li>All visual settings (W/L, color map, zoom) are preserved during animation.</li>
+    <li>Click <strong>Stop Animation</strong> when done.</li>
 </ol>
 
 <h2>Clipping and Rotating a Region</h2>
 <ol>
-    <li>Click the <strong>Clip</strong> button to enter clip mode.</li>
-    <li>Click on <strong>four corners</strong> of the region of interest on the image.</li>
-    <li>The image is automatically rotated and cropped.</li>
-    <li>The log confirms each point and the final rotation angle.</li>
+    <li>Click <strong>Clip</strong> to enter clip mode.</li>
+    <li>Tap <strong>four corners</strong> on the image.</li>
+    <li>The image is rotated and cropped automatically.</li>
 </ol>
 <div class="warning">
-    <strong>Note:</strong> The clip operation cannot be undone. Select a different image
-    or dataset to restore the original view.
+    <strong>Note:</strong> Clip cannot be undone. Select a different image to restore.
 </div>
 
 <h2>Switching Datasets</h2>
 <ol>
-    <li>Use <strong>Pick Imaging</strong> to select a different dataset.</li>
-    <li>All controls reset automatically (gamma, window, W/L, slice position, animation).</li>
-    <li>W/L presets update to reflect the new image's DICOM metadata.</li>
-    <li>The modality indicator and series controls update automatically.</li>
+    <li>Use <strong>Pick Imaging</strong> to change datasets.</li>
+    <li>All settings reset (gamma, window, W/L, color map, zoom lock, sort mode).</li>
+    <li>Modality detection and series controls update automatically.</li>
 </ol>
-
-<h2>Adjusting Image Quality</h2>
-<div class="card">
-    <h3>Gamma Correction</h3>
-    <ul>
-        <li><strong>Gamma = 1.0:</strong> Linear (no correction)</li>
-        <li><strong>Gamma &lt; 1.0:</strong> Brightens dark areas</li>
-        <li><strong>Gamma &gt; 1.0:</strong> Darkens midtones, increases contrast</li>
-    </ul>
-    <p>MRI images default to gamma = 2.0.</p>
-
-    <h3>Window Center / Width (Recommended for CT/MRI)</h3>
-    <ul>
-        <li><strong>Narrower Width:</strong> Higher contrast (fewer gray levels visible)</li>
-        <li><strong>Wider Width:</strong> Lower contrast (more gray levels visible)</li>
-        <li><strong>Higher Center:</strong> Biases display toward brighter structures</li>
-        <li><strong>Lower Center:</strong> Biases display toward darker structures</li>
-    </ul>
-
-    <h3>Legacy Window</h3>
-    <ul>
-        <li><strong>Window = 1.0:</strong> Full dynamic range</li>
-        <li><strong>Window &lt; 1.0:</strong> Brighter image</li>
-        <li><strong>Window &gt; 1.0:</strong> Darker image</li>
-    </ul>
-
-    <p>Click <strong>Reset</strong> at any time to restore all settings to defaults.</p>
-</div>
 """,
     ))
 
-    # ---- Troubleshooting (UPDATED with W/L items) ----
+    # ---- Troubleshooting (UPDATED with Phase 1) ----
     manual.pages.append(Page(
         filename="troubleshooting.html",
         title="Troubleshooting",
@@ -767,80 +752,79 @@ data_db:
     <tr><th>Problem</th><th>Solution</th></tr>
     <tr>
         <td>Blank or white image</td>
-        <td>Try selecting a different <strong>W/L Preset</strong> from the dropdown.
-            If none available, drag the <strong>Window Width</strong> slider wider and
-            adjust <strong>Window Center</strong>. Click <strong>Reset</strong> to restore defaults.</td>
+        <td>Try a different <strong>W/L Preset</strong>. Adjust <strong>Window Width</strong>
+            wider and <strong>Window Center</strong>. Click <strong>Reset</strong>.</td>
     </tr>
     <tr>
         <td>Image too dark</td>
         <td>Decrease <strong>Window Center</strong> or increase <strong>Window Width</strong>.
-            For quick adjustment, try the legacy <strong>Window</strong> slider below 1.0.
-            Lower <strong>Gamma</strong> below 1.0 to brighten dark areas.</td>
+            Lower <strong>Gamma</strong> below 1.0. Try the <strong>Invert</strong> toggle.</td>
     </tr>
     <tr>
         <td>Image too bright / washed out</td>
         <td>Increase <strong>Window Center</strong> or decrease <strong>Window Width</strong>.
-            Increase <strong>Gamma</strong> above 1.0 to darken midtones.</td>
+            Increase <strong>Gamma</strong> above 1.0.</td>
+    </tr>
+    <tr>
+        <td>Colors look wrong</td>
+        <td>Check the <strong>Color Map</strong> dropdown &mdash; you may have a non-Grayscale
+            map selected. Check if <strong>Invert</strong> is toggled on (button is orange).
+            Click <strong>Reset</strong> to restore Grayscale.</td>
+    </tr>
+    <tr>
+        <td>Zoom resets when changing slices</td>
+        <td>Click <strong>Lock Zoom</strong> before navigating. The button turns green when
+            active. Your zoom and pan position will be preserved.</td>
+    </tr>
+    <tr>
+        <td>Slices appear out of anatomical order</td>
+        <td>Ensure <strong>Sort by Position</strong> is active (green button). If the toggle
+            shows "Sort by Filename", click it to switch to position-based sorting.</td>
+    </tr>
+    <tr>
+        <td>Position sorting doesn't change anything</td>
+        <td>Some DICOM files lack <code>ImagePositionPatient</code> metadata. In this case,
+            position sorting falls back to filename sorting. The log panel will indicate
+            if position data is unavailable.</td>
     </tr>
     <tr>
         <td>W/L Preset dropdown shows only "Manual"</td>
-        <td>The current DICOM image does not contain Window Center/Width metadata tags
-            (0028,1050) and (0028,1051). The viewer falls back to auto-calculated values
-            from the image data range. This is normal for some modalities.</td>
+        <td>The current DICOM image lacks Window Center/Width metadata. The viewer
+            uses auto-calculated values from the image data range.</td>
     </tr>
     <tr>
-        <td>W/L presets don't look right</td>
-        <td>The presets are read directly from DICOM metadata. Try adjusting the
-            <strong>Gamma</strong> slider as well &mdash; gamma correction changes how
-            values within the W/L window are displayed. A gamma of 1.0 gives the most
-            faithful representation of the preset.</td>
+        <td>Image appears inverted unexpectedly</td>
+        <td>Check if <strong>Invert</strong> is toggled on (orange button) or if you have
+            "Grayscale (Inverted)" selected in the <strong>Color Map</strong> dropdown.</td>
     </tr>
     <tr>
-        <td>Image appears inverted (negative)</td>
-        <td>The viewer auto-detects MONOCHROME1 vs MONOCHROME2 photometric interpretation.
-            If an image still appears inverted, the DICOM metadata may be incorrect.</td>
-    </tr>
-    <tr>
-        <td>Series controls not visible</td>
-        <td>Series controls only appear for CT, MRI, and Ultrasound modalities.</td>
-    </tr>
-    <tr>
-        <td>Animation stutters or is slow</td>
-        <td>Increase the <strong>Refresh (ms)</strong> value. 500-1000ms works well for large files.</td>
+        <td>Animation stutters</td>
+        <td>Increase <strong>Refresh (ms)</strong>. 500-1000ms works well for large files.
+            Color maps other than Grayscale may be slightly slower.</td>
     </tr>
     <tr>
         <td>"Hit whitespace" error when clipping</td>
-        <td>Your click landed outside the image data area. Click directly on visible image content.</td>
+        <td>Click directly on visible image content, not the background.</td>
     </tr>
     <tr>
         <td>Server won't start</td>
         <td>Check YAML config path, verify directories exist, ensure DICOM files are present.</td>
     </tr>
-    <tr>
-        <td>"No module named pylibjpeg" error</td>
-        <td>Run <code>pip install "pylibjpeg[all]"</code></td>
-    </tr>
-    <tr>
-        <td>CT values look wrong</td>
-        <td>The viewer applies RescaleSlope/Intercept for Hounsfield units.
-            Use a <strong>W/L Preset</strong> or set Center to ~40, Width to ~350
-            for soft tissue viewing.</td>
-    </tr>
 </table>
 
 <h2>Enabling Debug Mode</h2>
-<p>Set <code>debug: true</code> in your YAML configuration for verbose terminal output.</p>
+<p>Set <code>debug: true</code> in your YAML config for verbose terminal output.</p>
 
 <h2>Getting Help</h2>
 <div class="info">
     <strong>Diagnostic checklist:</strong>
     <ol>
         <li>Enable <code>debug: true</code> in the YAML config</li>
-        <li>Check the terminal for Python error messages</li>
-        <li>Check the in-app Log panel for application messages</li>
-        <li>Verify DICOM files open correctly in another viewer</li>
+        <li>Check terminal for Python errors</li>
+        <li>Check the in-app Log panel</li>
+        <li>Verify DICOM files work in another viewer</li>
+        <li>Click <strong>Reset</strong> to restore all defaults</li>
         <li>Try a different dataset to isolate the issue</li>
-        <li>Check the Log panel for W/L preset messages when loading images</li>
     </ol>
 </div>
 """,
@@ -852,65 +836,66 @@ data_db:
 # Reference Manual content definition (UPDATED with W/L documentation)
 # ---------------------------------------------------------------------------
 def build_reference_manual(output_dir: str) -> Manual:
-    """Build the complete Developer Reference Manual content structure."""
+    """Build the complete Developer Reference Manual."""
 
     manual = Manual(
         title="DICOM Viewer Reference",
-        subtitle="Developer API &amp; Architecture Guide &mdash; Version 2.1",
+        subtitle="Developer API &amp; Architecture Guide &mdash; Version 2.2 &mdash; April 2026",
         output_dir=os.path.join(output_dir, "reference_manual"),
         accent_color="#7c3aed",
         icon="&#x1F527;",
     )
 
-    # ---- Architecture (UPDATED) ----
+    # ---- Architecture ----
     manual.pages.append(Page(
         filename="index.html",
         title="Architecture Overview",
         nav_title="Architecture",
         raw_content="""
-<p class="subtitle">Developer API &amp; Architecture Guide &mdash; Version 2.1</p>
+<p class="subtitle">Developer API &amp; Architecture Guide &mdash; Version 2.2</p>
 
 <h2>Module Structure</h2>
 <table>
-    <tr><th>Component</th><th>File Role</th><th>Responsibility</th></tr>
-    <tr><td><code>ViewerConfig</code></td><td>Configuration</td>
-        <td>Dataclass for loading and validating YAML configuration</td></tr>
-    <tr><td><code>ImageProcessor</code></td><td>Processing</td>
-        <td>Stateless image processing and DICOM metadata extraction (all static methods)</td></tr>
-    <tr><td><code>SeriesManager</code></td><td>Data Management</td>
-        <td>DICOM series metadata organization and spatial analysis</td></tr>
-    <tr><td><code>DicomViewer</code></td><td>Application</td>
-        <td>Main UI class: state management, Bokeh widgets, callbacks, W/L preset management</td></tr>
+    <tr><th>Component</th><th>Responsibility</th></tr>
+    <tr><td><code>ViewerConfig</code></td>
+        <td>Dataclass for YAML configuration</td></tr>
+    <tr><td><code>ImageProcessor</code></td>
+        <td>Stateless image processing and metadata extraction</td></tr>
+    <tr><td><code>SeriesManager</code></td>
+        <td>Series metadata, spatial analysis, position and filename sorting</td></tr>
+    <tr><td><code>DicomViewer</code></td>
+        <td>Main UI: state, widgets, callbacks, color maps, zoom persistence</td></tr>
+</table>
+
+<h2>Module-Level Functions</h2>
+<table>
+    <tr><th>Function</th><th>Purpose</th></tr>
+    <tr><td><code>_build_hot_palette(n=256)</code></td>
+        <td>Generates a black&rarr;red&rarr;yellow&rarr;white "Hot" color palette</td></tr>
+    <tr><td><code>_build_pet_palette(n=256)</code></td>
+        <td>Generates a PET-style multi-color palette</td></tr>
+</table>
+
+<h2>Module-Level Data</h2>
+<table>
+    <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>COLOR_LUTS</code></td><td>dict</td>
+        <td>Maps color map names to 256-element palette lists</td></tr>
 </table>
 
 <h2>Design Principles</h2>
 <ul>
-    <li><strong>Separation of concerns:</strong> Image processing and metadata extraction are
-        stateless and testable independently.</li>
-    <li><strong>Named constants:</strong> All magic numbers are defined as module-level constants.</li>
-    <li><strong>Specific exceptions:</strong> All <code>try/except</code> blocks catch specific types.</li>
-    <li><strong>Python logging:</strong> Uses the standard <code>logging</code> module.</li>
-    <li><strong>DICOM compliance:</strong> Reads standard tags for photometric interpretation,
-        rescale, and window/level presets.</li>
-    <li><strong>Private methods:</strong> <code>_prefix</code> convention. Callbacks use <code>_name_cb</code>.</li>
+    <li><strong>Separation of concerns:</strong> Processing, metadata, and UI are separated</li>
+    <li><strong>Named constants:</strong> All magic numbers are module-level constants</li>
+    <li><strong>Specific exceptions:</strong> No bare <code>except</code> clauses</li>
+    <li><strong>Zoom state management:</strong> View ranges saved/restored explicitly</li>
+    <li><strong>Sort abstraction:</strong> Sorting logic in <code>SeriesManager</code>, UI in <code>DicomViewer</code></li>
+    <li><strong>LUT composability:</strong> Inversion works as a modifier on any base palette</li>
 </ul>
-
-<h2>Runtime Model</h2>
-<div class="card">
-    <p>The application runs as a <strong>Bokeh server app</strong>:</p>
-    <ol>
-        <li>Bokeh's Tornado server loads <code>dicom_viewer.py</code> as a module</li>
-        <li>A single <code>DicomViewer</code> instance is created at module scope</li>
-        <li>The constructor builds the UI layout and attaches it to <code>curdoc()</code></li>
-        <li>DICOM W/L presets are extracted and applied on each image load</li>
-        <li>User interactions trigger registered Python callbacks</li>
-        <li>Callbacks update Bokeh model properties, which sync to the browser via WebSocket</li>
-    </ol>
-</div>
 """,
     ))
 
-    # ---- Dependencies (unchanged) ----
+    # ---- Dependencies ----
     manual.pages.append(Page(
         filename="dependencies.html",
         title="Dependencies",
@@ -919,105 +904,82 @@ def build_reference_manual(output_dir: str) -> Manual:
 <h2>Required Packages</h2>
 <table>
     <tr><th>Package</th><th>Min Version</th><th>Purpose</th></tr>
-    <tr><td><code>pydicom</code></td><td>&ge; 2.0</td>
-        <td>DICOM file reading, metadata access, MultiValue support</td></tr>
-    <tr><td><code>pylibjpeg[all]</code></td><td>&ge; 1.0</td>
-        <td>JPEG / JPEG2000 compressed DICOM transfer syntax support</td></tr>
-    <tr><td><code>numpy</code></td><td>&ge; 1.20</td>
-        <td>Array operations, image manipulation, linear algebra</td></tr>
-    <tr><td><code>scikit-image</code></td><td>&ge; 0.18</td>
-        <td>Image rotation via <code>skimage.transform.rotate</code></td></tr>
-    <tr><td><code>bokeh</code></td><td>&ge; 3.0</td>
-        <td>Interactive web UI: figures, widgets, server, WebSocket sync</td></tr>
-    <tr><td><code>pyyaml</code></td><td>&ge; 5.0</td>
-        <td>YAML configuration file parsing</td></tr>
-    <tr><td><code>tornado</code></td><td>(via bokeh)</td>
-        <td>Async web server; <code>IOLoop</code> for graceful shutdown</td></tr>
+    <tr><td><code>pydicom</code></td><td>&ge; 2.0</td><td>DICOM file reading</td></tr>
+    <tr><td><code>pylibjpeg[all]</code></td><td>&ge; 1.0</td><td>JPEG DICOM support</td></tr>
+    <tr><td><code>numpy</code></td><td>&ge; 1.20</td><td>Array operations</td></tr>
+    <tr><td><code>scikit-image</code></td><td>&ge; 0.18</td><td>Image rotation</td></tr>
+    <tr><td><code>bokeh</code></td><td>&ge; 3.0</td><td>Web UI and server</td></tr>
+    <tr><td><code>pyyaml</code></td><td>&ge; 5.0</td><td>YAML parsing</td></tr>
 </table>
 
-<h2>Import Map</h2>
-<pre><code>import os, re, logging, argparse
-import numpy as np
-import pydicom, pylibjpeg
-from tornado.ioloop import IOLoop
-from skimage import transform
-import yaml
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional
-
-from bokeh.plotting import figure, curdoc
-from bokeh.layouts import column, row, layout
-from bokeh.models import (
-    ColumnDataSource, LinearColorMapper, ColorBar,
-    HoverTool, Button, Slider, Div, TapTool,
-    Select, RadioButtonGroup, Toggle, TextInput
-)
-from bokeh.palettes import Greys256</code></pre>
+<h2>Bokeh Palettes Used</h2>
+<p>The following Bokeh built-in palettes are imported:</p>
+<pre><code>from bokeh.palettes import (
+    Greys256, Inferno256, Viridis256, Turbo256,
+    Cividis256, Plasma256, Magma256
+)</code></pre>
+<p>Two additional palettes (<code>Hot</code> and <code>PET</code>) are generated
+algorithmically by module-level functions.</p>
 """,
     ))
 
-    # ---- Constants (UPDATED with W/L constants) ----
+    # ---- Constants (UPDATED) ----
     manual.pages.append(Page(
         filename="constants.html",
         title="Module Constants",
         nav_title="Constants",
         raw_content="""
-<h2>Display Scale Constants</h2>
+<h2>Display Scale</h2>
 <table>
     <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>XRAY_SCALE</code></td><td>0.5</td><td>Display scale for X-Ray</td></tr>
-    <tr><td><code>CT_SCALE</code></td><td>1.5</td><td>Display scale for CT</td></tr>
-    <tr><td><code>MRI_SCALE</code></td><td>4.0</td><td>Display scale for MRI</td></tr>
-    <tr><td><code>US_SCALE</code></td><td>1.5</td><td>Display scale for Ultrasound</td></tr>
+    <tr><td><code>XRAY_SCALE</code></td><td>0.5</td><td>X-Ray display scale</td></tr>
+    <tr><td><code>CT_SCALE</code></td><td>1.5</td><td>CT display scale</td></tr>
+    <tr><td><code>MRI_SCALE</code></td><td>4.0</td><td>MRI display scale</td></tr>
+    <tr><td><code>US_SCALE</code></td><td>1.5</td><td>Ultrasound display scale</td></tr>
 </table>
 
-<h2>Gamma Defaults</h2>
+<h2>Gamma</h2>
 <table>
-    <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>MRI_GAMMA</code></td><td>2.0</td><td>Default gamma for MRI</td></tr>
-    <tr><td><code>US_GAMMA</code></td><td>2.0</td><td>Default gamma for Ultrasound</td></tr>
-    <tr><td><code>DEFAULT_GAMMA</code></td><td>1.0</td><td>Fallback gamma</td></tr>
-    <tr><td><code>DEFAULT_WINDOW</code></td><td>1.0</td><td>Fallback legacy window</td></tr>
+    <tr><th>Constant</th><th>Value</th></tr>
+    <tr><td><code>MRI_GAMMA</code></td><td>2.0</td></tr>
+    <tr><td><code>US_GAMMA</code></td><td>2.0</td></tr>
+    <tr><td><code>DEFAULT_GAMMA</code></td><td>1.0</td></tr>
+    <tr><td><code>DEFAULT_WINDOW</code></td><td>1.0</td></tr>
 </table>
 
-<h2>UI Constants</h2>
+<h2>Window/Level</h2>
 <table>
     <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>GAMMA_SLIDER_MAX</code></td><td>10.0</td><td>Upper bound for gamma slider</td></tr>
-    <tr><td><code>WINDOW_SLIDER_MAX</code></td><td>2.0</td><td>Upper bound for legacy window slider</td></tr>
-    <tr><td><code>MAX_LOG_MESSAGES</code></td><td>10</td><td>Max visible log entries</td></tr>
-    <tr><td><code>DEFAULT_REFRESH_MS</code></td><td>500.0</td><td>Animation refresh rate (ms)</td></tr>
+    <tr><td><code>WL_CENTER_DEFAULT</code></td><td>2000.0</td><td>Fallback center</td></tr>
+    <tr><td><code>WL_WIDTH_DEFAULT</code></td><td>4000.0</td><td>Fallback width</td></tr>
+    <tr><td><code>WL_CENTER_SLIDER_MIN</code></td><td>-2000.0</td><td>Min center (neg HU)</td></tr>
+    <tr><td><code>WL_CENTER_SLIDER_MAX</code></td><td>20000.0</td><td>Default max center</td></tr>
+    <tr><td><code>WL_WIDTH_SLIDER_MIN</code></td><td>1.0</td><td>Min width</td></tr>
+    <tr><td><code>WL_WIDTH_SLIDER_MAX</code></td><td>40000.0</td><td>Default max width</td></tr>
+    <tr><td><code>WL_SLIDER_STEP</code></td><td>10.0</td><td>Slider step size</td></tr>
+    <tr><td><code>WL_MANUAL_LABEL</code></td><td>"Manual"</td><td>Dropdown label</td></tr>
 </table>
 
-<h2>Window/Level Constants</h2>
+<h2>Color Map</h2>
 <table>
-    <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>WL_CENTER_DEFAULT</code></td><td>2000.0</td>
-        <td>Fallback center when no DICOM presets and no image data</td></tr>
-    <tr><td><code>WL_WIDTH_DEFAULT</code></td><td>4000.0</td>
-        <td>Fallback width when no DICOM presets and no image data</td></tr>
-    <tr><td><code>WL_CENTER_SLIDER_MIN</code></td><td>-2000.0</td>
-        <td>Minimum value for center slider (accommodates negative HU values)</td></tr>
-    <tr><td><code>WL_CENTER_SLIDER_MAX</code></td><td>20000.0</td>
-        <td>Default maximum for center slider (auto-adjusts to image data)</td></tr>
-    <tr><td><code>WL_WIDTH_SLIDER_MIN</code></td><td>1.0</td>
-        <td>Minimum window width (must be &gt; 0)</td></tr>
-    <tr><td><code>WL_WIDTH_SLIDER_MAX</code></td><td>40000.0</td>
-        <td>Default maximum for width slider (auto-adjusts to image data)</td></tr>
-    <tr><td><code>WL_SLIDER_STEP</code></td><td>10.0</td>
-        <td>Step size for W/L sliders</td></tr>
-    <tr><td><code>WL_MANUAL_LABEL</code></td><td>"Manual"</td>
-        <td>Label shown in preset dropdown when using manual sliders</td></tr>
+    <tr><th>Constant</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>COLOR_LUTS</code></td><td>dict</td>
+        <td>Maps 10 color map names to 256-element hex color lists.
+            Keys: Grayscale, Grayscale (Inverted), Inferno, Viridis, Turbo,
+            Cividis, Plasma, Magma, Hot, PET</td></tr>
+    <tr><td><code>DEFAULT_LUT</code></td><td>str</td>
+        <td>"Grayscale" &mdash; initial color map on startup</td></tr>
 </table>
 
-<h2>Analysis Constants</h2>
+<h2>UI and Analysis</h2>
 <table>
     <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>NORMAL_THRESHOLD</code></td><td>0.95</td>
-        <td>Dot-product threshold for imaging axis detection</td></tr>
-    <tr><td><code>ANIMATION_SLICE_RESET</code></td><td>0</td>
-        <td>Slice index to reset to on animation loop</td></tr>
+    <tr><td><code>GAMMA_SLIDER_MAX</code></td><td>10.0</td><td>Gamma upper bound</td></tr>
+    <tr><td><code>WINDOW_SLIDER_MAX</code></td><td>2.0</td><td>Legacy window upper bound</td></tr>
+    <tr><td><code>MAX_LOG_MESSAGES</code></td><td>10</td><td>Visible log entries</td></tr>
+    <tr><td><code>DEFAULT_REFRESH_MS</code></td><td>500.0</td><td>Animation refresh (ms)</td></tr>
+    <tr><td><code>NORMAL_THRESHOLD</code></td><td>0.95</td><td>Axis detection threshold</td></tr>
+    <tr><td><code>ANIMATION_SLICE_RESET</code></td><td>0</td><td>Loop reset index</td></tr>
 </table>
 
 <h2>Modality Strings</h2>
@@ -1038,251 +1000,227 @@ from bokeh.palettes import Greys256</code></pre>
         nav_title="ViewerConfig",
         raw_content="""
 <h2>Overview</h2>
-<p>A <code>@dataclass</code> that holds application configuration loaded from YAML.</p>
 <div class="method-sig">@dataclass<br>class ViewerConfig:</div>
 
 <h2>Fields</h2>
 <table class="attr-table">
     <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td>debug</td><td>bool</td><td>False</td><td>Debug mode flag</td></tr>
-    <tr><td>gamma_def</td><td>float</td><td>1.0</td><td>Default gamma correction</td></tr>
-    <tr><td>window_def</td><td>float</td><td>1.0</td><td>Default legacy window multiplier</td></tr>
+    <tr><td>debug</td><td>bool</td><td>False</td><td>Debug mode</td></tr>
+    <tr><td>gamma_def</td><td>float</td><td>1.0</td><td>Default gamma</td></tr>
+    <tr><td>window_def</td><td>float</td><td>1.0</td><td>Default legacy window</td></tr>
     <tr><td>starter_images</td><td>str</td><td>""</td><td>Initial dataset key</td></tr>
-    <tr><td>data_db</td><td>dict</td><td>{}</td><td>Dataset name &rarr; directory mapping</td></tr>
+    <tr><td>data_db</td><td>dict</td><td>{}</td><td>Dataset mapping</td></tr>
 </table>
 
-<h2>Class Methods</h2>
-<div class="method-sig">@classmethod<br>from_yaml(cls, path: str) &rarr; ViewerConfig</div>
-<p>Load configuration from a YAML file. Applies defaults for missing fields.</p>
+<h2>Methods</h2>
+<div class="method-sig">@classmethod from_yaml(cls, path: str) &rarr; ViewerConfig</div>
 """,
     ))
 
-    # ---- ImageProcessor (UPDATED with extract_wl_presets) ----
+    # ---- ImageProcessor (unchanged from 2.1) ----
     manual.pages.append(Page(
         filename="imageprocessor.html",
         title="Class: ImageProcessor",
         nav_title="ImageProcessor",
         raw_content="""
 <h2>Overview</h2>
-<p>Stateless image processing utilities and DICOM metadata extraction.
-All methods are <code>@staticmethod</code>.</p>
+<p>Stateless utilities. All <code>@staticmethod</code>.</p>
 
-<h2>Image Processing Methods</h2>
+<h2>Image Processing</h2>
+<div class="method-sig">apply_photometric(image, ds) &rarr; ndarray</div>
+<div class="method-sig">apply_rescale(image, ds) &rarr; ndarray</div>
+<div class="method-sig">ensure_2d(image) &rarr; ndarray</div>
+<div class="method-sig">perform_gamma(image, gamma, original_dtype) &rarr; ndarray</div>
 
-<div class="method-sig">apply_photometric(image: ndarray, ds: Dataset) &rarr; ndarray</div>
-<p>Checks <code>PhotometricInterpretation</code>. Inverts for MONOCHROME1, copies for MONOCHROME2.</p>
+<h2>Metadata Extraction</h2>
+<div class="method-sig">extract_wl_presets(ds) &rarr; list[dict]</div>
+<p>Reads (0028,1050), (0028,1051), (0028,1055). Returns list of
+<code>{"center": float, "width": float, "name": str}</code>.</p>
 
-<div class="method-sig">apply_rescale(image: ndarray, ds: Dataset) &rarr; ndarray</div>
-<p>Applies <code>RescaleSlope</code> and <code>RescaleIntercept</code>:
-<code>output = pixel * slope + intercept</code>. Essential for CT Hounsfield units.</p>
-
-<div class="method-sig">ensure_2d(image: ndarray) &rarr; ndarray</div>
-<p>Handles multi-dimensional pixel arrays (RGB averaged to grayscale; multi-frame takes first frame).</p>
-
-<div class="method-sig">perform_gamma(image: ndarray, gamma: float, original_dtype: dtype) &rarr; ndarray</div>
-<p>Gamma correction: normalize &rarr; exponentiate &rarr; rescale to original dtype.</p>
-
-<h2>Metadata Extraction Methods</h2>
-
-<div class="method-sig">extract_wl_presets(ds: Dataset) &rarr; list[dict]</div>
-<p>Extracts Window/Level presets from DICOM metadata. Returns a list of preset dictionaries.</p>
-
-<h3>DICOM Tags Read</h3>
-<table>
-    <tr><th>Tag</th><th>Name</th><th>Purpose</th></tr>
-    <tr><td>(0028,1050)</td><td>Window Center</td><td>Center of display value range</td></tr>
-    <tr><td>(0028,1051)</td><td>Window Width</td><td>Width of display value range</td></tr>
-    <tr><td>(0028,1055)</td><td>Window Center &amp; Width Explanation</td>
-        <td>Human-readable preset name (e.g., "BONE", "SOFT_TISSUE")</td></tr>
-</table>
-
-<h3>Return Format</h3>
-<pre><code>[
-    {"center": 400.0, "width": 1500.0, "name": "BONE"},
-    {"center": 40.0,  "width": 350.0,  "name": "SOFT_TISSUE"},
-]</code></pre>
-
-<h3>Edge Cases Handled</h3>
-<ul>
-    <li><strong>Single value vs. multi-value:</strong> Both <code>400</code> and
-        <code>[400, 40]</code> (pydicom MultiValue) are handled.</li>
-    <li><strong>Missing explanation tag:</strong> Falls back to "Preset 1", "Preset 2", etc.</li>
-    <li><strong>Fewer names than presets:</strong> Remaining presets get auto-generated names.</li>
-    <li><strong>No W/L tags at all:</strong> Returns empty list.</li>
-</ul>
-
-<h2>Geometry Methods</h2>
-
-<div class="method-sig">rotated_rectangle_properties(corners: list) &rarr; tuple</div>
-<p>Calculates rotation angle and bounding box from four corner points.</p>
-<table>
-    <tr><th>Returns</th><th>Description</th></tr>
-    <tr><td>rotation_angle_degrees</td><td>Angle in degrees (-90 to +90)</td></tr>
-    <tr><td>min_x, max_x</td><td>Horizontal bounds</td></tr>
-    <tr><td>min_y, max_y</td><td>Vertical bounds</td></tr>
-    <tr><td>center</td><td>Center point as ndarray</td></tr>
-</table>
+<h2>Geometry</h2>
+<div class="method-sig">rotated_rectangle_properties(corners) &rarr; tuple</div>
 """,
     ))
 
-    # ---- SeriesManager (unchanged) ----
+    # ---- SeriesManager (UPDATED with position sort) ----
     manual.pages.append(Page(
         filename="seriesmanager.html",
         title="Class: SeriesManager",
         nav_title="SeriesManager",
         raw_content="""
 <h2>Overview</h2>
-<p>Manages DICOM series metadata for multi-slice datasets. Reads metadata
-using <code>stop_before_pixels=True</code> for performance.</p>
+<p>Manages DICOM series metadata. Supports both filename and position-based sorting.</p>
 
 <h2>Instance Attributes</h2>
 <table class="attr-table">
     <tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
     <tr><td>series_map</td><td>dict</td>
-        <td><code>{series_num: {filename: [instance, pos, dir, normal]}}</code></td></tr>
+        <td><code>{series: {filename: [instance, pos, dir, normal]}}</code></td></tr>
     <tr><td>series</td><td>list[str]</td><td>Sorted series numbers</td></tr>
     <tr><td>series_extrema</td><td>dict</td><td>Position ranges per series</td></tr>
-    <tr><td>series_pos_index</td><td>int</td><td>Active axis (0=x, 1=y, 2=z)</td></tr>
+    <tr><td>series_pos_index</td><td>int</td><td>Active axis (0/1/2)</td></tr>
+    <tr><td>sort_by_position</td><td>bool</td>
+        <td><strong>New in 2.2.</strong> If True, <code>get_series_images_by_position()</code>
+            is used; otherwise <code>get_series_images()</code> (filename sort).
+            Default: True.</td></tr>
 </table>
 
 <h2>Methods</h2>
 
 <div class="method-sig">categorize(images_list, data_dir, debug=False, log_callback=None)</div>
-<p>Scans all files, extracts series/instance/position/orientation metadata.</p>
+<p>Scans all files with <code>stop_before_pixels=True</code>. Populates series_map.</p>
 
 <div class="method-sig">get_series_images(series_key: str) &rarr; list[str]</div>
-<p>Returns naturally-sorted filenames for a series.</p>
+<p>Returns filenames sorted by natural filename order (alpha prefix + numeric suffix).</p>
+
+<div class="method-sig">get_series_images_by_position(series_key: str, axis: int = 2) &rarr; list[str]</div>
+<p><strong>New in 2.2.</strong> Returns filenames sorted by DICOM spatial position
+along the specified axis.</p>
+<table>
+    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+    <tr><td>series_key</td><td>str</td><td>Series identifier</td></tr>
+    <tr><td>axis</td><td>int</td><td>0=x (sagittal), 1=y (coronal), 2=z (axial)</td></tr>
+</table>
+<p><strong>Fallback:</strong> If no valid position data exists (all positions are sentinel
+value -999.0), falls back to <code>get_series_images()</code>.</p>
 
 <div class="method-sig">determine_axis(series_key, images) &rarr; int</div>
-<p>Returns principal imaging axis (0, 1, or 2) from slice normal vectors.</p>
+<p>Returns principal imaging axis from slice normal vectors.</p>
 """,
     ))
 
-    # ---- DicomViewer (UPDATED with W/L methods) ----
+    # ---- DicomViewer (UPDATED with Phase 1) ----
     manual.pages.append(Page(
         filename="dicomviewer.html",
         title="Class: DicomViewer",
         nav_title="DicomViewer",
         raw_content="""
 <h2>Overview</h2>
-<p>Main application class. Orchestrates UI, state, DICOM loading, and W/L preset management.</p>
+<p>Main application class with color map management, zoom persistence, and position sorting.</p>
 
 <h2>Key Instance Attributes</h2>
 <table class="attr-table">
     <tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
-    <tr><td>config</td><td>ViewerConfig</td><td>Application configuration</td></tr>
-    <tr><td>img_proc</td><td>ImageProcessor</td><td>Image processing utilities</td></tr>
-    <tr><td>series_mgr</td><td>SeriesManager</td><td>Series metadata manager</td></tr>
+    <tr><td>config</td><td>ViewerConfig</td><td>Configuration</td></tr>
+    <tr><td>img_proc</td><td>ImageProcessor</td><td>Processing utilities</td></tr>
+    <tr><td>series_mgr</td><td>SeriesManager</td><td>Series manager</td></tr>
     <tr><td>ds</td><td>pydicom.Dataset</td><td>Current DICOM dataset</td></tr>
-    <tr><td>processed_image</td><td>ndarray</td><td>Final display image (after gamma)</td></tr>
-    <tr><td>original_dtype</td><td>numpy.dtype</td><td>Pixel data type before processing</td></tr>
-    <tr><td>wl_presets</td><td>list[dict]</td>
-        <td>W/L presets extracted from current image's DICOM metadata.
-            Each dict has keys: <code>center</code>, <code>width</code>, <code>name</code></td></tr>
-    <tr><td>image_type</td><td>str</td><td>Current modality string</td></tr>
-    <tr><td>is_series</td><td>bool</td><td>Whether current data is multi-slice</td></tr>
-    <tr><td>current_slice</td><td>int</td><td>Current slice index</td></tr>
-    <tr><td>gamma</td><td>float</td><td>Active gamma value</td></tr>
-    <tr><td>window</td><td>float</td><td>Active legacy window multiplier</td></tr>
-    <tr><td>source</td><td>ColumnDataSource</td><td>Bokeh data source for image</td></tr>
-    <tr><td>color_mapper</td><td>LinearColorMapper</td>
-        <td>Controls displayed value range. <code>low</code> and <code>high</code>
-            are set by W/L controls.</td></tr>
+    <tr><td>processed_image</td><td>ndarray</td><td>Display image</td></tr>
+    <tr><td>wl_presets</td><td>list[dict]</td><td>W/L presets from metadata</td></tr>
+    <tr><td>color_mapper</td><td>LinearColorMapper</td><td>Controls display range and palette</td></tr>
+    <tr><td colspan="3" style="background:#faf5ff;font-weight:bold;">New in v2.2</td></tr>
+    <tr><td>current_lut</td><td>str</td>
+        <td>Name of active color map (key into <code>COLOR_LUTS</code>)</td></tr>
+    <tr><td>is_inverted</td><td>bool</td>
+        <td>Whether the current palette is inverted</td></tr>
+    <tr><td>zoom_locked</td><td>bool</td>
+        <td>Whether zoom/pan persistence is active</td></tr>
+    <tr><td>saved_x_range</td><td>tuple or None</td>
+        <td>Saved (start, end) for x_range when zoom is locked</td></tr>
+    <tr><td>saved_y_range</td><td>tuple or None</td>
+        <td>Saved (start, end) for y_range when zoom is locked</td></tr>
 </table>
 
-<h2>Initialization Methods</h2>
+<h2>Phase 1 Methods (New in v2.2)</h2>
+
+<h3>Color Map Methods</h3>
 <table>
     <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>__init__()</code></td>
-        <td>Parse args, load config, read initial DICOM, extract W/L presets, build UI</td></tr>
-    <tr><td><code>_create_figures()</code></td><td>Create image + scatter plot figures</td></tr>
-    <tr><td><code>_create_widgets()</code></td>
-        <td>Create all widgets including W/L preset dropdown, center/width sliders</td></tr>
-    <tr><td><code>_build_layout()</code></td><td>Assemble layout with W/L controls column</td></tr>
+    <tr><td><code>_invert_cb(active)</code></td>
+        <td>Toggle callback. Sets <code>is_inverted</code>, calls <code>_apply_current_lut()</code>,
+            updates button appearance.</td></tr>
+    <tr><td><code>_lut_cb(attr, old, new)</code></td>
+        <td>Dropdown callback. Sets <code>current_lut</code>, calls <code>_apply_current_lut()</code>.</td></tr>
+    <tr><td><code>_apply_current_lut()</code></td>
+        <td>Core LUT application method. Looks up palette from <code>COLOR_LUTS</code>,
+            applies inversion if <code>is_inverted</code>, sets
+            <code>color_mapper.palette</code>. Makes a copy of the palette list
+            to avoid mutating the original.</td></tr>
 </table>
 
-<h2>Image Processing Methods</h2>
+<h3>Sort Methods</h3>
 <table>
     <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>_prepare_images()</code></td>
-        <td>Full pipeline including W/L preset extraction via
-            <code>ImageProcessor.extract_wl_presets()</code></td></tr>
-    <tr><td><code>_size_figures()</code></td><td>Update figure dimensions</td></tr>
-    <tr><td><code>_set_image_fig_title(name)</code></td><td>Set title from patient metadata</td></tr>
+    <tr><td><code>_sort_toggle_cb(active)</code></td>
+        <td>Toggle callback. Sets <code>series_mgr.sort_by_position</code>,
+            calls <code>_resort_current_series()</code>, updates button label.</td></tr>
+    <tr><td><code>_resort_current_series()</code></td>
+        <td>Re-sorts current series based on sort mode. Updates image dropdown,
+            slice slider, and position plot. Tries to preserve the current image
+            (finds its index in the new sort order).</td></tr>
+</table>
+
+<h3>Zoom Lock Methods</h3>
+<table>
+    <tr><th>Method</th><th>Description</th></tr>
+    <tr><td><code>_zoom_lock_cb(active)</code></td>
+        <td>Toggle callback. When locking: saves current <code>x_range</code> and
+            <code>y_range</code> start/end values. When unlocking: clears saved ranges.
+            Updates button appearance.</td></tr>
+    <tr><td><code>_restore_zoom()</code></td>
+        <td>Restores saved x/y ranges to the figure. Called by <code>_size_figures()</code>,
+            <code>_get_new_image()</code>, and <code>_animate_series()</code> when
+            zoom is locked.</td></tr>
+</table>
+
+<h2>Updated Methods (changed in v2.2)</h2>
+<table>
+    <tr><th>Method</th><th>What Changed</th></tr>
+    <tr><td><code>_size_figures()</code></td>
+        <td>When zoom locked: only updates glyph dw/dh, then calls <code>_restore_zoom()</code>
+            instead of resetting ranges.</td></tr>
     <tr><td><code>_get_new_image()</code></td>
-        <td>Load image at current_slice; preserves current W/L slider positions</td></tr>
+        <td>Calls <code>_restore_zoom()</code> after loading new image data.</td></tr>
+    <tr><td><code>_name_cb()</code></td>
+        <td>Updates <code>current_slice</code> index to match selected image name.</td></tr>
+    <tr><td><code>_db_dropdown_cb()</code></td>
+        <td>Uses sort mode for series ordering. Unlocks zoom on dataset change.
+            Reapplies current LUT after reset.</td></tr>
+    <tr><td><code>_series_cb()</code></td>
+        <td>Uses sort mode for new series.</td></tr>
+    <tr><td><code>_animate_series()</code></td>
+        <td>Applies current W/L and restores zoom on each frame.</td></tr>
+    <tr><td><code>_update_visibility()</code></td>
+        <td>Shows/hides sort toggle based on modality.</td></tr>
+    <tr><td><code>_reset_cb()</code></td>
+        <td>Resets invert, LUT, and zoom lock in addition to gamma/window/W/L.</td></tr>
+    <tr><td><code>_build_layout()</code></td>
+        <td>New <code>visual_controls</code> column with LUT dropdown, Invert toggle,
+            and Zoom Lock toggle. Sort toggle added to series control row.</td></tr>
+    <tr><td><code>_create_widgets()</code></td>
+        <td>Creates 4 new widgets: <code>invert_toggle</code>, <code>lut_dropdown</code>,
+            <code>sort_toggle</code>, <code>zoom_lock_toggle</code>.</td></tr>
 </table>
 
-<h2>Window/Level Methods</h2>
+<h2>All Callbacks</h2>
 <table>
-    <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>_apply_window_level(center, width)</code></td>
-        <td>Sets <code>color_mapper.low</code> and <code>.high</code> from center &amp; width.
-            <code>low = center - width/2</code>, <code>high = center + width/2</code></td></tr>
-    <tr><td><code>_wl_preset_label(preset)</code></td>
-        <td>Static method. Generates display label: <code>"name (C:nnn W:nnn)"</code></td></tr>
-    <tr><td><code>_build_wl_preset_options()</code></td>
-        <td>Builds options list for dropdown: <code>["Manual", "preset1 label", ...]</code></td></tr>
-    <tr><td><code>_refresh_wl_presets()</code></td>
-        <td>Called after every image change. Updates dropdown options, slider ranges,
-            and applies first preset or falls back to image data range.
-            Temporarily removes and re-adds callbacks to prevent cascading triggers.</td></tr>
-</table>
-
-<h2>Window/Level Callbacks</h2>
-<table>
-    <tr><th>Method</th><th>Trigger</th><th>Description</th></tr>
-    <tr><td><code>_wl_preset_cb(a,o,n)</code></td><td>W/L Preset dropdown</td>
-        <td>Applies selected preset. Updates center/width sliders without triggering
-            their callbacks. If "Manual" selected, no action.</td></tr>
-    <tr><td><code>_wl_manual_cb(a,o,n)</code></td><td>Center or Width slider</td>
-        <td>Applies manual center/width values. Switches dropdown to "Manual"
-            to indicate user override.</td></tr>
-</table>
-
-<h2>Other Callbacks</h2>
-<table>
-    <tr><th>Method</th><th>Trigger</th><th>Description</th></tr>
-    <tr><td><code>_name_cb(a,o,n)</code></td><td>Image dropdown</td>
-        <td>Load image + call <code>_refresh_wl_presets()</code></td></tr>
-    <tr><td><code>_db_dropdown_cb(a,o,n)</code></td><td>Dataset dropdown</td>
-        <td>Full reset + call <code>_refresh_wl_presets()</code></td></tr>
-    <tr><td><code>_series_cb(a,o,n)</code></td><td>Series dropdown</td>
-        <td>Switch series + call <code>_refresh_wl_presets()</code></td></tr>
-    <tr><td><code>_gamma_cb(a,o,n)</code></td><td>Gamma slider</td>
-        <td>Reprocess image; updates <code>max_bright</code></td></tr>
-    <tr><td><code>_window_cb(a,o,n)</code></td><td>Legacy window slider</td>
-        <td>Scale color mapper high value</td></tr>
-    <tr><td><code>_refresh_rate_cb(a,o,n)</code></td><td>Refresh TextInput</td>
-        <td>Update animation speed</td></tr>
-    <tr><td><code>_reset_cb()</code></td><td>Reset button</td>
-        <td>Restore gamma, window, and W/L to defaults. Reapplies first preset if available.</td></tr>
-    <tr><td><code>_clip_reset_cb()</code></td><td>Clip button</td><td>Reset clip state</td></tr>
-    <tr><td><code>_increment_cb()</code></td><td>Increment button</td><td>Next slice</td></tr>
-    <tr><td><code>_decrement_cb()</code></td><td>Decrement button</td><td>Previous slice</td></tr>
-    <tr><td><code>_series_slider_slice_cb</code></td><td>Slice slider</td><td>Jump to slice</td></tr>
-    <tr><td><code>_series_toggle_anim_cb</code></td><td>Animation toggle</td><td>Start/stop</td></tr>
-    <tr><td><code>_animate_series()</code></td><td>Periodic timer</td><td>Advance frame</td></tr>
-    <tr><td><code>_tap_callback(event)</code></td><td>Mouse tap</td><td>Clip points</td></tr>
-    <tr><td><code>_stop_server()</code></td><td>Exit button</td><td>Shutdown</td></tr>
-</table>
-
-<h2>Helper Methods</h2>
-<table>
-    <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>_find_images()</code></td><td>Scan directory, exclude hidden files, natural sort</td></tr>
-    <tr><td><code>_sync_slice_slider()</code></td><td>Update slider without triggering callback</td></tr>
-    <tr><td><code>_histogram_positions()</code></td><td>Populate position scatter data</td></tr>
-    <tr><td><code>_series_scatter_pos(name)</code></td><td>Highlight current slice</td></tr>
-    <tr><td><code>_modality_index()</code></td><td>Map modality to button index</td></tr>
-    <tr><td><code>_update_visibility()</code></td><td>Show/hide series widgets</td></tr>
-    <tr><td><code>_reset_adjustments()</code></td><td>Reset gamma/window sliders to defaults</td></tr>
-    <tr><td><code>_log(message)</code></td><td>On-screen + Python logger</td></tr>
+    <tr><th>Method</th><th>Trigger</th><th>Category</th></tr>
+    <tr><td><code>_name_cb</code></td><td>Image dropdown</td><td>Navigation</td></tr>
+    <tr><td><code>_db_dropdown_cb</code></td><td>Dataset dropdown</td><td>Navigation</td></tr>
+    <tr><td><code>_series_cb</code></td><td>Series dropdown</td><td>Navigation</td></tr>
+    <tr><td><code>_increment_cb</code></td><td>Increment button</td><td>Navigation</td></tr>
+    <tr><td><code>_decrement_cb</code></td><td>Decrement button</td><td>Navigation</td></tr>
+    <tr><td><code>_series_slider_slice_cb</code></td><td>Slice slider</td><td>Navigation</td></tr>
+    <tr><td><code>_series_toggle_anim_cb</code></td><td>Animation toggle</td><td>Animation</td></tr>
+    <tr><td><code>_animate_series</code></td><td>Periodic timer</td><td>Animation</td></tr>
+    <tr><td><code>_gamma_cb</code></td><td>Gamma slider</td><td>Image adjust</td></tr>
+    <tr><td><code>_window_cb</code></td><td>Legacy window slider</td><td>Image adjust</td></tr>
+    <tr><td><code>_wl_preset_cb</code></td><td>W/L preset dropdown</td><td>Image adjust</td></tr>
+    <tr><td><code>_wl_manual_cb</code></td><td>Center/Width sliders</td><td>Image adjust</td></tr>
+    <tr><td><code>_lut_cb</code></td><td>Color map dropdown</td><td>Visual (v2.2)</td></tr>
+    <tr><td><code>_invert_cb</code></td><td>Invert toggle</td><td>Visual (v2.2)</td></tr>
+    <tr><td><code>_zoom_lock_cb</code></td><td>Zoom lock toggle</td><td>Visual (v2.2)</td></tr>
+    <tr><td><code>_sort_toggle_cb</code></td><td>Sort toggle</td><td>Navigation (v2.2)</td></tr>
+    <tr><td><code>_refresh_rate_cb</code></td><td>Refresh TextInput</td><td>Animation</td></tr>
+    <tr><td><code>_reset_cb</code></td><td>Reset button</td><td>Control</td></tr>
+    <tr><td><code>_clip_reset_cb</code></td><td>Clip button</td><td>Tool</td></tr>
+    <tr><td><code>_tap_callback</code></td><td>Mouse tap</td><td>Tool</td></tr>
+    <tr><td><code>_stop_server</code></td><td>Exit button</td><td>Control</td></tr>
 </table>
 """,
     ))
 
-    # ---- Data Flow (UPDATED with W/L flow) ----
+    # ---- Data Flow (UPDATED) ----
     manual.pages.append(Page(
         filename="dataflow.html",
         title="Data Flow",
@@ -1290,101 +1228,93 @@ using <code>stop_before_pixels=True</code> for performance.</p>
         raw_content="""
 <h2>Initialization Flow</h2>
 <div class="flow-diagram">
-    YAML Config File<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    ViewerConfig.from_yaml()<br>
+    YAML &rarr; ViewerConfig.from_yaml()<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
     DicomViewer.__init__()<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _find_images() <span class="arrow">&rarr;</span> self.images_list<br>
+    _find_images() &rarr; images_list<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _prepare_images()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; pydicom.dcmread()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.ensure_2d()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.apply_rescale()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.apply_photometric()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; np.flipud()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.perform_gamma()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; <strong>ImageProcessor.extract_wl_presets()</strong> <span class="arrow">&rarr;</span> self.wl_presets<br>
+    _prepare_images() [includes extract_wl_presets]<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Create color_mapper<br>
+    SeriesManager.categorize() [if series]<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; <strong>get_series_images_by_position()</strong> [default sort]<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    <strong>_apply_window_level(first preset)</strong> [if presets available]<br>
+    Create color_mapper with <strong>COLOR_LUTS["Grayscale"]</strong><br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    SeriesManager.categorize() &nbsp;[if is_series]<br>
+    _apply_window_level(first preset) [if available]<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
     _create_figures() + _create_widgets() + _build_layout()<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    curdoc().add_root() <span class="arrow">&rarr;</span> Bokeh server running
+    curdoc().add_root()
 </div>
 
-<h2>Image Change Flow (any image switch)</h2>
+<h2>Slice Navigation with Zoom Lock</h2>
 <div class="flow-diagram">
-    User action (dropdown, slider, button, animation)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Set self.path to new DICOM file<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _prepare_images()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Full processing pipeline<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; <strong>extract_wl_presets()</strong> <span class="arrow">&rarr;</span> self.wl_presets updated<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    self.source.data["image"] = [self.processed_image]<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    <strong>_refresh_wl_presets()</strong><br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Update dropdown options from new wl_presets<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Update slider ranges from image data<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Apply first preset OR auto-calculate from range<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; <strong>_apply_window_level(center, width)</strong><br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x251C; color_mapper.low = center - width/2<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2514; color_mapper.high = center + width/2<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Bokeh syncs to browser
-</div>
-
-<h2>W/L Preset Selection Flow</h2>
-<div class="flow-diagram">
-    User selects preset from dropdown<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _wl_preset_cb(attr, old, new)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Find matching preset in self.wl_presets<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Remove slider callbacks (prevent cascade)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Update wl_center_slider.value and wl_width_slider.value<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Re-add slider callbacks<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _apply_window_level(center, width)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    color_mapper updates <span class="arrow">&rarr;</span> browser re-renders
-</div>
-
-<h2>Manual W/L Adjustment Flow</h2>
-<div class="flow-diagram">
-    User drags Center or Width slider<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _wl_manual_cb(attr, old, new)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Read current values from both sliders<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _apply_window_level(center, width)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Switch dropdown to "Manual" (remove/re-add callback)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    color_mapper updates <span class="arrow">&rarr;</span> browser re-renders
-</div>
-
-<h2>Slice Navigation Flow (preserves W/L)</h2>
-<div class="flow-diagram">
-    User clicks Increment/Decrement or drags slice slider<br>
+    User clicks Increment/Decrement or drags slider<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
     _get_new_image()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; _prepare_images() [new wl_presets extracted but not yet applied]<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Update source.data<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; <strong>_apply_window_level(current slider center, current slider width)</strong><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; _prepare_images()<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; source.data update<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; _apply_window_level(current sliders)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; <strong>if zoom_locked: _restore_zoom()</strong><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x251C; fig.x_range = saved_x_range<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2514; fig.y_range = saved_y_range<br>
     &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    User's W/L settings preserved across slices
+    View preserved &rarr; browser renders same zoom/pan
+</div>
+
+<h2>Color Map Change Flow</h2>
+<div class="flow-diagram">
+    User selects new LUT from dropdown<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    _lut_cb(attr, old, new)<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    self.current_lut = new<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    _apply_current_lut()<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; palette = COLOR_LUTS[current_lut].copy()<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; if is_inverted: palette = reversed(palette)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; color_mapper.palette = palette<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    Bokeh syncs palette to browser
+</div>
+
+<h2>Sort Mode Change Flow</h2>
+<div class="flow-diagram">
+    User toggles Sort by Position / Filename<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    _sort_toggle_cb(active)<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    series_mgr.sort_by_position = active<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    _resort_current_series()<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; if sort_by_position:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x2502;&nbsp;&nbsp;&nbsp;get_series_images_by_position(series, axis)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; else:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x2502;&nbsp;&nbsp;&nbsp;get_series_images(series)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Update name_dropdown options<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Find current image in new order (preserve selection)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Update slice_slider range<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; Refresh position histogram + scatter
+</div>
+
+<h2>Reset Flow</h2>
+<div class="flow-diagram">
+    _reset_cb()<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    Reset gamma, window sliders to config defaults<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    Reprocess image with default gamma<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    _refresh_wl_presets() [reset W/L]<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    Reset is_inverted = False, invert_toggle<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    Reset current_lut = "Grayscale", lut_dropdown<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    _apply_current_lut() [restore grayscale palette]<br>
+    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
+    Unlock zoom: zoom_locked = False, clear saved ranges
 </div>
 """,
     ))
@@ -1396,13 +1326,11 @@ using <code>stop_before_pixels=True</code> for performance.</p>
         nav_title="YAML Schema",
         raw_content="""
 <h2>Complete Schema</h2>
-<pre><code># All fields are required unless marked optional
-
-debug: bool              # Enable verbose logging
-gamma_def: float         # Default gamma (typically 1.0-2.0)
-window_def: float        # Default legacy window scale (typically 1.0)
-starter_images: str      # Key into data_db for initial dataset
-data_db:                 # Dictionary of named datasets
+<pre><code>debug: bool
+gamma_def: float
+window_def: float
+starter_images: str
+data_db:
   name: "/absolute/path/"</code></pre>
 
 <h2>Validation Rules</h2>
@@ -1412,103 +1340,90 @@ data_db:                 # Dictionary of named datasets
         <td>Initial dataset key must match</td></tr>
     <tr><td>All paths must exist</td><td>Directories must be accessible</td></tr>
     <tr><td>Directories must contain DICOM files</td><td>At least one readable file</td></tr>
-    <tr><td><code>gamma_def</code> non-negative</td><td>Zero produces black; typical 0.5-3.0</td></tr>
-    <tr><td><code>window_def</code> non-negative</td><td>Zero clips to black; typical 0.5-1.5</td></tr>
 </table>
 """,
     ))
 
-    # ---- Extending (UPDATED with W/L extension example) ----
+    # ---- Extending (UPDATED with Phase 1 examples) ----
     manual.pages.append(Page(
         filename="extending.html",
         title="Extending the Viewer",
         nav_title="Extending",
         raw_content="""
-<h2>Adding a New Modality</h2>
-<ol>
-    <li>Add constants: <code>MODALITY_PET = "PET"</code>, <code>PET_SCALE = 2.0</code></li>
-    <li>Add detection in <code>_prepare_images()</code></li>
-    <li>Update <code>_modality_index()</code> and <code>RadioButtonGroup</code> labels</li>
-</ol>
+<h2>Adding a Custom Color Map</h2>
+<p>Add a new palette to <code>COLOR_LUTS</code> at module level:</p>
+<pre><code>def _build_rainbow_palette(n=256):
+    palette = []
+    for i in range(n):
+        h = i / n
+        # HSV to RGB conversion
+        r, g, b = colorsys.hsv_to_rgb(h, 1.0, 1.0)
+        palette.append(f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}")
+    return palette
 
-<h2>Adding a New Image Processing Function</h2>
-<pre><code>@staticmethod
-def apply_edge_detection(image: np.ndarray) -> np.ndarray:
-    from skimage import filters
-    return filters.sobel(image)</code></pre>
+COLOR_LUTS["Rainbow"] = _build_rainbow_palette()</code></pre>
+<p>The new color map automatically appears in the dropdown.</p>
+
+<h2>Adding a New Sort Mode</h2>
+<p>Add a new method to <code>SeriesManager</code>:</p>
+<pre><code>def get_series_images_by_instance(self, series_key):
+    entries = self.series_map.get(series_key, {})
+    return sorted(entries.keys(),
+                  key=lambda k: int(entries[k][0]))</code></pre>
+<p>Then add it as an option in the sort toggle or replace the dropdown.</p>
 
 <h2>Adding Custom W/L Presets</h2>
-<p>You can add application-defined presets that supplement the DICOM metadata presets.
-Modify <code>_prepare_images()</code> or <code>_refresh_wl_presets()</code>:</p>
-
-<pre><code># Example: Add standard CT presets if the image is CT
-# Add to end of _prepare_images() or beginning of _refresh_wl_presets()
-if self.image_type == MODALITY_CT and not self.wl_presets:
+<pre><code>if self.image_type == MODALITY_CT and not self.wl_presets:
     self.wl_presets = [
         {"center": 40.0,   "width": 350.0,  "name": "Soft Tissue"},
         {"center": 400.0,  "width": 1500.0, "name": "Bone"},
         {"center": -600.0, "width": 1500.0, "name": "Lung"},
-        {"center": 40.0,   "width": 80.0,   "name": "Brain"},
     ]</code></pre>
 
-<h2>Adding a DICOM Metadata Panel</h2>
-<pre><code># In _create_widgets():
-self.metadata_div = Div(text="", width=400, height=300, visible=False)
-self.metadata_button = Toggle(label="Show Metadata", active=False)
-self.metadata_button.on_click(self._metadata_toggle_cb)
+<h2>Adding a New Modality</h2>
+<ol>
+    <li>Add constants: <code>MODALITY_PET = "PET"</code>, <code>PET_SCALE = 2.0</code></li>
+    <li>Add detection in <code>_prepare_images()</code></li>
+    <li>Update <code>_modality_index()</code> and RadioButtonGroup labels</li>
+</ol>
 
-def _metadata_toggle_cb(self, active):
-    if active:
-        info = []
-        for elem in self.ds:
-            if elem.VR not in ("OW", "OB"):
-                info.append(f"{elem.tag} {elem.name}: {elem.value}")
-        self.metadata_div.text = "&lt;br&gt;".join(info[:50])
-    self.metadata_div.visible = active</code></pre>
+<h2>Adding Zoom-Aware Tools</h2>
+<p>Any new tool that modifies the view should respect zoom lock:</p>
+<pre><code>def _my_tool_cb(self):
+    # ... do work ...
+    if self.zoom_locked:
+        self._restore_zoom()</code></pre>
 
 <h2>Naming Conventions</h2>
 <table>
-    <tr><th>Pattern</th><th>Meaning</th><th>Example</th></tr>
-    <tr><td><code>_method_name</code></td><td>Private method</td><td><code>_prepare_images</code></td></tr>
-    <tr><td><code>_xxx_cb</code></td><td>Bokeh callback</td><td><code>_wl_preset_cb</code></td></tr>
-    <tr><td><code>_async_xxx</code></td><td>Async method</td><td><code>_async_update_log</code></td></tr>
-    <tr><td><code>UPPER_CASE</code></td><td>Module constant</td><td><code>WL_CENTER_DEFAULT</code></td></tr>
+    <tr><th>Pattern</th><th>Meaning</th></tr>
+    <tr><td><code>_method_name</code></td><td>Private method</td></tr>
+    <tr><td><code>_xxx_cb</code></td><td>Bokeh callback</td></tr>
+    <tr><td><code>_async_xxx</code></td><td>Async method</td></tr>
+    <tr><td><code>UPPER_CASE</code></td><td>Module constant</td></tr>
+    <tr><td><code>_build_xxx_palette</code></td><td>Palette generator function</td></tr>
 </table>
 
-<h2>Testing Strategy</h2>
-<div class="card">
-<pre><code>import numpy as np
-import pydicom
-from dicom_viewer import ImageProcessor
+<h2>Testing</h2>
+<pre><code>from dicom_viewer import COLOR_LUTS, _build_hot_palette
 
-def test_gamma_identity():
-    img = np.array([[100, 200], [50, 150]], dtype=np.uint16)
-    result = ImageProcessor.perform_gamma(img, 1.0, np.uint16)
-    assert result.shape == img.shape
+def test_all_luts_have_256_entries():
+    for name, palette in COLOR_LUTS.items():
+        assert len(palette) == 256, f"{name} has {len(palette)} entries"
 
-def test_extract_wl_presets_empty():
-    ds = pydicom.Dataset()
-    presets = ImageProcessor.extract_wl_presets(ds)
-    assert presets == []
+def test_hot_palette_starts_black():
+    p = _build_hot_palette()
+    assert p[0] == "#000000"
 
-def test_extract_wl_presets_single():
-    ds = pydicom.Dataset()
-    ds.add_new(0x00281050, 'DS', '400')
-    ds.add_new(0x00281051, 'DS', '1500')
-    ds.add_new(0x00281055, 'LO', 'BONE')
-    presets = ImageProcessor.extract_wl_presets(ds)
-    assert len(presets) == 1
-    assert presets[0]["center"] == 400.0
-    assert presets[0]["name"] == "BONE"
+def test_hot_palette_ends_white():
+    p = _build_hot_palette()
+    assert p[-1] == "#ffffff"
 
-def test_extract_wl_presets_multi():
-    ds = pydicom.Dataset()
-    ds.add_new(0x00281050, 'DS', ['400', '40'])
-    ds.add_new(0x00281051, 'DS', ['1500', '350'])
-    ds.add_new(0x00281055, 'LO', ['BONE', 'SOFT'])
-    presets = ImageProcessor.extract_wl_presets(ds)
-    assert len(presets) == 2</code></pre>
-</div>
+def test_inversion_reversal():
+    original = list(COLOR_LUTS["Grayscale"])
+    inverted = list(reversed(original))
+    assert original[0] == inverted[-1]
+    assert original[-1] == inverted[0]</code></pre>
 """,
     ))
 
@@ -1520,848 +1435,50 @@ def test_extract_wl_presets_multi():
         raw_content="""
 <h2>Current Limitations</h2>
 <table>
-    <tr><th>#</th><th>Limitation</th><th>Impact</th><th>Status</th></tr>
-    <tr><td>1</td>
-        <td>No DICOMDIR navigation</td>
-        <td>Must point to flat directories</td>
-        <td>Open</td></tr>
-    <tr><td>2</td>
-        <td>W/L presets from metadata only</td>
-        <td>If DICOM lacks tags (0028,1050/1051), no presets are shown.
-            Auto-fallback uses image data range.</td>
-        <td><em>Partially resolved in v2.1</em></td></tr>
-    <tr><td>3</td>
-        <td>Color images converted to grayscale</td>
-        <td>RGB, YBR_FULL images lose color</td>
-        <td>Open</td></tr>
-    <tr><td>4</td>
-        <td>Clip/rotate cannot be undone</td>
-        <td>Must reload image</td>
-        <td>Open</td></tr>
-    <tr><td>5</td>
-        <td>No zoom/pan persistence</td>
-        <td>View resets on image switch</td>
-        <td>Open</td></tr>
-    <tr><td>6</td>
-        <td>Sequential series metadata loading</td>
-        <td>Slow for large datasets</td>
-        <td>Open</td></tr>
-    <tr><td>7</td>
-        <td>No measurement tools</td>
-        <td>Cannot measure distance/area</td>
-        <td>Open</td></tr>
-    <tr><td>8</td>
-        <td>No DICOM metadata panel</td>
-        <td>Cannot view tags in UI</td>
-        <td>Open (see <a href="extending.html">Extending</a>)</td></tr>
-    <tr><td>9</td>
-        <td>No keyboard shortcuts</td>
-        <td>Mouse-only interaction</td>
-        <td>Open</td></tr>
-    <tr><td>10</td>
-        <td>Single-user per session</td>
-        <td>By design (Bokeh)</td>
-        <td>N/A</td></tr>
-    <tr><td>11</td>
-        <td>Animation refresh change requires restart</td>
-        <td>Must stop and restart animation</td>
-        <td>Open</td></tr>
-    <tr><td>12</td>
-        <td>Legacy window slider overlaps with W/L</td>
-        <td>Both affect color_mapper; can produce confusing interaction
-            if used simultaneously</td>
-        <td>Documented; legacy slider may be removed in future version</td></tr>
+    <tr><th>#</th><th>Limitation</th><th>Status</th></tr>
+    <tr><td>1</td><td>No DICOMDIR navigation</td><td>Open</td></tr>
+    <tr><td>2</td><td>W/L presets from metadata only (no custom CT presets built-in)</td>
+        <td><em>Partially resolved v2.1</em></td></tr>
+    <tr><td>3</td><td>Color images converted to grayscale</td><td>Open</td></tr>
+    <tr><td>4</td><td>Clip/rotate cannot be undone</td><td>Open</td></tr>
+    <tr><td>5</td><td>Zoom persistence requires manual lock toggle</td>
+        <td><em>Resolved v2.2</em> (Lock Zoom feature)</td></tr>
+    <tr><td>6</td><td>Sequential series metadata loading</td><td>Open</td></tr>
+    <tr><td>7</td><td>No measurement tools</td><td>Open (Phase 3)</td></tr>
+    <tr><td>8</td><td>No DICOM metadata panel</td><td>Open (Phase 2)</td></tr>
+    <tr><td>9</td><td>No keyboard shortcuts</td><td>Open (Phase 4)</td></tr>
+    <tr><td>10</td><td>Single-user per session</td><td>By design</td></tr>
+    <tr><td>11</td><td>Animation refresh change requires restart</td><td>Open</td></tr>
+    <tr><td>12</td><td>Legacy window slider overlaps with W/L</td><td>Documented</td></tr>
+    <tr><td>13</td><td>Mousewheel slice scrolling</td><td>Open (Phase 2)</td></tr>
+    <tr><td>14</td><td>No ROI statistics</td><td>Open (Phase 3)</td></tr>
+    <tr><td>15</td><td>No multiplanar reconstruction</td><td>Open (Phase 4)</td></tr>
 </table>
 
-<h2>DICOM Compliance Notes</h2>
+<h2>Feature Roadmap</h2>
+<table>
+    <tr><th>Phase</th><th>Features</th><th>Status</th></tr>
+    <tr><td>1</td><td>Color maps, invert, zoom lock, position sort</td>
+        <td><strong>&#x2705; Complete (v2.2)</strong></td></tr>
+    <tr><td>2</td><td>Mousewheel scrolling, metadata panel, histogram</td><td>Planned</td></tr>
+    <tr><td>3</td><td>Measurement tools, ROI stats, annotations</td><td>Planned</td></tr>
+    <tr><td>4</td><td>MPR, multi-panel, cine controls, keyboard shortcuts</td><td>Planned</td></tr>
+    <tr><td>5</td><td>3D rendering, PACS connectivity, fusion</td><td>Future</td></tr>
+</table>
+
+<h2>DICOM Compliance</h2>
 <div class="warning">
-    <p>This viewer is for <strong>research and educational use only</strong>.
-    It is <strong>not</strong> a certified medical device.</p>
+    <p>This viewer is for <strong>research and educational use only</strong>.</p>
 </div>
 <ul>
-    <li>Reads standard W/L tags (0028,1050), (0028,1051), (0028,1055)</li>
-    <li>Reads PhotometricInterpretation for correct grayscale handling</li>
-    <li>Reads RescaleSlope/Intercept for CT Hounsfield units</li>
-    <li>Does not support VOI LUT Sequences (more complex W/L definitions)</li>
-    <li>Overlay and annotation layers are not rendered</li>
-    <li>Structured Reports (SR) are not parsed</li>
-    <li>Patient orientation labels are not displayed</li>
-</ul>
-""",
-    ))
-
-    return manual
-
-# ---------------------------------------------------------------------------
-# Reference Manual content definition
-# ---------------------------------------------------------------------------
-def build_reference_manual(output_dir: str) -> Manual:
-    """Build the complete Developer Reference Manual content structure."""
-
-    manual = Manual(
-        title="DICOM Viewer Reference",
-        subtitle="Developer API &amp; Architecture Guide &mdash; Version 2.1 &mdash; April 2026",
-        output_dir=os.path.join(output_dir, "reference_manual"),
-        accent_color="#7c3aed",
-        icon="&#x1F527;",
-    )
-
-    # ---- Index / Architecture ----
-    manual.pages.append(Page(
-        filename="index.html",
-        title="Architecture Overview",
-        nav_title="Architecture",
-        raw_content="""
-<p class="subtitle">Developer API &amp; Architecture Guide &mdash; Version 2.0</p>
-
-<h2>Module Structure</h2>
-<p>The application follows a modular architecture with four principal components:</p>
-
-<table>
-    <tr><th>Component</th><th>File Role</th><th>Responsibility</th></tr>
-    <tr><td><code>ViewerConfig</code></td><td>Configuration</td>
-        <td>Dataclass for loading and validating YAML configuration</td></tr>
-    <tr><td><code>ImageProcessor</code></td><td>Processing</td>
-        <td>Stateless image processing utilities (all static methods)</td></tr>
-    <tr><td><code>SeriesManager</code></td><td>Data Management</td>
-        <td>DICOM series metadata organization and spatial analysis</td></tr>
-    <tr><td><code>DicomViewer</code></td><td>Application</td>
-        <td>Main UI class: state management, Bokeh widgets, callbacks</td></tr>
-</table>
-
-<h2>Design Principles</h2>
-<ul>
-    <li><strong>Separation of concerns:</strong> Image processing is stateless and testable
-        independently of the UI.</li>
-    <li><strong>Named constants:</strong> All magic numbers are defined as module-level constants.</li>
-    <li><strong>Specific exceptions:</strong> All <code>try/except</code> blocks catch specific
-        exception types.</li>
-    <li><strong>Python logging:</strong> Uses the standard <code>logging</code> module alongside
-        the in-app log panel.</li>
-    <li><strong>Path handling:</strong> Uses <code>os.path.join()</code> and <code>pathlib.Path</code>
-        consistently.</li>
-    <li><strong>Private methods:</strong> Internal methods use the <code>_prefix</code> convention.
-        Callbacks use <code>_name_cb</code> suffix.</li>
-</ul>
-
-<h2>Runtime Model</h2>
-<div class="card">
-    <p>The application runs as a <strong>Bokeh server app</strong>:</p>
-    <ol>
-        <li>Bokeh's Tornado server loads <code>dicom_viewer.py</code> as a module</li>
-        <li>A single <code>DicomViewer</code> instance is created at module scope</li>
-        <li>The constructor builds the UI layout and attaches it to <code>curdoc()</code></li>
-        <li>User interactions trigger registered Python callbacks</li>
-        <li>Callbacks update Bokeh model properties, which sync to the browser via WebSocket</li>
-    </ol>
-</div>
-""",
-    ))
-
-    # ---- Dependencies ----
-    manual.pages.append(Page(
-        filename="dependencies.html",
-        title="Dependencies",
-        nav_title="Dependencies",
-        raw_content="""
-<h2>Required Packages</h2>
-<table>
-    <tr><th>Package</th><th>Min Version</th><th>Purpose</th></tr>
-    <tr><td><code>pydicom</code></td><td>&ge; 2.0</td>
-        <td>DICOM file reading and metadata access</td></tr>
-    <tr><td><code>pylibjpeg[all]</code></td><td>&ge; 1.0</td>
-        <td>JPEG / JPEG2000 compressed DICOM transfer syntax support</td></tr>
-    <tr><td><code>numpy</code></td><td>&ge; 1.20</td>
-        <td>Array operations, image manipulation, linear algebra</td></tr>
-    <tr><td><code>scikit-image</code></td><td>&ge; 0.18</td>
-        <td>Image rotation via <code>skimage.transform.rotate</code></td></tr>
-    <tr><td><code>bokeh</code></td><td>&ge; 3.0</td>
-        <td>Interactive web UI: figures, widgets, server, WebSocket sync</td></tr>
-    <tr><td><code>pyyaml</code></td><td>&ge; 5.0</td>
-        <td>YAML configuration file parsing</td></tr>
-    <tr><td><code>tornado</code></td><td>(via bokeh)</td>
-        <td>Async web server; <code>IOLoop</code> for graceful shutdown</td></tr>
-</table>
-
-<h2>Import Map</h2>
-<pre><code>import os, re, logging, argparse
-import numpy as np
-import pydicom, pylibjpeg
-from tornado.ioloop import IOLoop
-from skimage import transform
-import yaml
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional
-
-from bokeh.plotting import figure, curdoc
-from bokeh.layouts import column, row, layout
-from bokeh.models import (
-    ColumnDataSource, LinearColorMapper, ColorBar,
-    HoverTool, Button, Slider, Div, TapTool,
-    Select, RadioButtonGroup, Toggle, TextInput
-)
-from bokeh.palettes import Greys256</code></pre>
-""",
-    ))
-
-    # ---- Constants ----
-    manual.pages.append(Page(
-        filename="constants.html",
-        title="Module Constants",
-        nav_title="Constants",
-        raw_content="""
-<h2>Display Scale Constants</h2>
-<table>
-    <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>XRAY_SCALE</code></td><td>0.5</td><td>Display scale multiplier for X-Ray images</td></tr>
-    <tr><td><code>CT_SCALE</code></td><td>1.5</td><td>Display scale multiplier for CT images</td></tr>
-    <tr><td><code>MRI_SCALE</code></td><td>4.0</td><td>Display scale multiplier for MRI images</td></tr>
-    <tr><td><code>US_SCALE</code></td><td>1.5</td><td>Display scale multiplier for Ultrasound images</td></tr>
-</table>
-
-<h2>Gamma Defaults</h2>
-<table>
-    <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>MRI_GAMMA</code></td><td>2.0</td><td>Default gamma for MRI modality</td></tr>
-    <tr><td><code>US_GAMMA</code></td><td>2.0</td><td>Default gamma for Ultrasound modality</td></tr>
-    <tr><td><code>DEFAULT_GAMMA</code></td><td>1.0</td><td>Fallback gamma value</td></tr>
-    <tr><td><code>DEFAULT_WINDOW</code></td><td>1.0</td><td>Fallback window value</td></tr>
-</table>
-
-<h2>UI Constants</h2>
-<table>
-    <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>GAMMA_SLIDER_MAX</code></td><td>10.0</td><td>Upper bound for gamma slider</td></tr>
-    <tr><td><code>WINDOW_SLIDER_MAX</code></td><td>2.0</td><td>Upper bound for window slider</td></tr>
-    <tr><td><code>MAX_LOG_MESSAGES</code></td><td>10</td><td>Maximum visible entries in log panel</td></tr>
-    <tr><td><code>DEFAULT_REFRESH_MS</code></td><td>500.0</td><td>Default animation refresh rate (ms)</td></tr>
-</table>
-
-<h2>Analysis Constants</h2>
-<table>
-    <tr><th>Constant</th><th>Value</th><th>Description</th></tr>
-    <tr><td><code>NORMAL_THRESHOLD</code></td><td>0.95</td>
-        <td>Dot-product threshold for determining imaging axis from slice normals</td></tr>
-    <tr><td><code>ANIMATION_SLICE_RESET</code></td><td>0</td>
-        <td>Slice index to reset to when animation loops</td></tr>
-</table>
-
-<h2>Modality Strings</h2>
-<table>
-    <tr><th>Constant</th><th>Value</th><th>Used For</th></tr>
-    <tr><td><code>MODALITY_XRAY</code></td><td>"X-Ray"</td><td>SOP class name matching</td></tr>
-    <tr><td><code>MODALITY_CT</code></td><td>"CT"</td><td>SOP class name matching</td></tr>
-    <tr><td><code>MODALITY_MRI</code></td><td>"MRI"</td><td>SOP class name matching</td></tr>
-    <tr><td><code>MODALITY_US</code></td><td>"US"</td><td>Fallback modality</td></tr>
-</table>
-""",
-    ))
-
-    # ---- ViewerConfig ----
-    manual.pages.append(Page(
-        filename="viewerconfig.html",
-        title="Class: ViewerConfig",
-        nav_title="ViewerConfig",
-        raw_content="""
-<h2>Overview</h2>
-<p>A <code>@dataclass</code> that holds application configuration loaded from YAML.</p>
-<div class="method-sig">@dataclass<br>class ViewerConfig:</div>
-
-<h2>Fields</h2>
-<table class="attr-table">
-    <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
-    <tr><td>debug</td><td>bool</td><td>False</td><td>Debug mode flag</td></tr>
-    <tr><td>gamma_def</td><td>float</td><td>1.0</td><td>Default gamma correction value</td></tr>
-    <tr><td>window_def</td><td>float</td><td>1.0</td><td>Default window multiplier</td></tr>
-    <tr><td>starter_images</td><td>str</td><td>""</td><td>Initial dataset key from data_db</td></tr>
-    <tr><td>data_db</td><td>dict</td><td>{}</td><td>Dataset name &rarr; directory path mapping</td></tr>
-</table>
-
-<h2>Class Methods</h2>
-<div class="method-sig">@classmethod<br>from_yaml(cls, path: str) &rarr; ViewerConfig</div>
-<p>Load configuration from a YAML file and return a new <code>ViewerConfig</code> instance.
-Applies defaults for any missing fields.</p>
-
-<h3>Parameters</h3>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
-    <tr><td>path</td><td>str</td><td>Absolute path to the YAML configuration file</td></tr>
-</table>
-
-<h3>Returns</h3>
-<p>A new <code>ViewerConfig</code> instance populated from the YAML data.</p>
-
-<h3>Raises</h3>
-<table>
-    <tr><th>Exception</th><th>When</th></tr>
-    <tr><td><code>FileNotFoundError</code></td><td>YAML file does not exist</td></tr>
-    <tr><td><code>yaml.YAMLError</code></td><td>YAML file is malformed</td></tr>
-</table>
-""",
-    ))
-
-    # ---- ImageProcessor ----
-    manual.pages.append(Page(
-        filename="imageprocessor.html",
-        title="Class: ImageProcessor",
-        nav_title="ImageProcessor",
-        raw_content="""
-<h2>Overview</h2>
-<p>Stateless image processing utilities for DICOM images.
-All methods are <code>@staticmethod</code> — no instance required.</p>
-
-<h2>Methods</h2>
-
-<div class="method-sig">apply_photometric(image: ndarray, ds: Dataset) &rarr; ndarray</div>
-<p>Checks the DICOM <code>PhotometricInterpretation</code> tag. Inverts grayscale for
-<code>MONOCHROME1</code> images (where high pixel values = dark). Returns a copy for
-<code>MONOCHROME2</code> (high values = bright).</p>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
-    <tr><td>image</td><td>ndarray</td><td>2-D pixel array</td></tr>
-    <tr><td>ds</td><td>pydicom.Dataset</td><td>DICOM dataset with metadata</td></tr>
-</table>
-
-<div class="method-sig">apply_rescale(image: ndarray, ds: Dataset) &rarr; ndarray</div>
-<p>Applies DICOM <code>RescaleSlope</code> and <code>RescaleIntercept</code> if present.
-Essential for CT Hounsfield unit conversion: <code>HU = pixel * slope + intercept</code>.</p>
-
-<div class="method-sig">ensure_2d(image: ndarray) &rarr; ndarray</div>
-<p>Handles multi-dimensional pixel arrays:</p>
-<ul>
-    <li><strong>RGB/RGBA</strong> (shape [H, W, 3] or [H, W, 4]): averaged to grayscale</li>
-    <li><strong>Multi-frame</strong> (shape [N, H, W]): first frame extracted</li>
-    <li><strong>2-D</strong>: returned unchanged</li>
-</ul>
-
-<div class="method-sig">perform_gamma(image: ndarray, gamma: float, original_dtype: dtype) &rarr; ndarray</div>
-<p>Applies gamma correction:</p>
-<ol>
-    <li>Normalizes pixel values to [0, 1]</li>
-    <li>Applies <code>pixel = pixel ** gamma</code></li>
-    <li>Scales back to the original data type range</li>
-</ol>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
-    <tr><td>image</td><td>ndarray</td><td>2-D pixel array</td></tr>
-    <tr><td>gamma</td><td>float</td><td>Gamma exponent (&gt; 1 darkens midtones, &lt; 1 brightens)</td></tr>
-    <tr><td>original_dtype</td><td>numpy.dtype</td><td>Original pixel data type for rescaling</td></tr>
-</table>
-
-<div class="method-sig">apply_window_level(image: ndarray, window_center: float,
-                     window_width: float) &rarr; ndarray</div>
-<p>Standard DICOM window/level transform. Returns values clipped to [0, 1].
-<em>Available for future integration with DICOM metadata presets.</em></p>
-
-<div class="method-sig">rotated_rectangle_properties(corners: list) &rarr; tuple</div>
-<p>Calculates rotation angle and bounding box from four corner points defined
-by user taps on the image.</p>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
-    <tr><td>corners</td><td>list of [x, y]</td><td>Four corner coordinate pairs</td></tr>
-</table>
-<table>
-    <tr><th>Returns (tuple element)</th><th>Type</th><th>Description</th></tr>
-    <tr><td>rotation_angle_degrees</td><td>float</td><td>Angle in degrees (-90 to +90)</td></tr>
-    <tr><td>min_x</td><td>float</td><td>Left bound of rotated bounding box</td></tr>
-    <tr><td>max_x</td><td>float</td><td>Right bound</td></tr>
-    <tr><td>min_y</td><td>float</td><td>Bottom bound</td></tr>
-    <tr><td>max_y</td><td>float</td><td>Top bound</td></tr>
-    <tr><td>center</td><td>ndarray</td><td>Center point [x, y]</td></tr>
-</table>
-
-<h3>Algorithm</h3>
-<ol>
-    <li>Compute centroid of four corners</li>
-    <li>Find the pair of corners with maximum distance (longest side)</li>
-    <li>Compute angle of that side via <code>arctan2</code></li>
-    <li>Construct rotation matrix and rotate all corners around centroid</li>
-    <li>Extract axis-aligned bounding box from rotated corners</li>
-</ol>
-""",
-    ))
-
-    # ---- SeriesManager ----
-    manual.pages.append(Page(
-        filename="seriesmanager.html",
-        title="Class: SeriesManager",
-        nav_title="SeriesManager",
-        raw_content="""
-<h2>Overview</h2>
-<p>Manages DICOM series metadata for multi-slice datasets (CT, MRI, Ultrasound).
-Reads metadata without loading pixel data for performance.</p>
-
-<h2>Instance Attributes</h2>
-<table class="attr-table">
-    <tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
-    <tr><td>series_map</td><td>dict</td>
-        <td>Nested dict: <code>{series_num: {filename: [instance, pos, dir, normal]}}</code></td></tr>
-    <tr><td>series</td><td>list[str]</td><td>Sorted list of series numbers</td></tr>
-    <tr><td>series_extrema</td><td>dict</td>
-        <td>Position ranges per series: <code>{series: [min_x, max_x, ...]}</code></td></tr>
-    <tr><td>series_pos_index</td><td>int</td>
-        <td>Active spatial axis: 0=x, 1=y, 2=z</td></tr>
-</table>
-
-<h2>Methods</h2>
-
-<div class="method-sig">categorize(images_list, data_dir, debug=False, log_callback=None) &rarr; None</div>
-<p>Reads DICOM metadata from all files using <code>stop_before_pixels=True</code> for performance.
-Populates <code>series_map</code>, <code>series</code>, and <code>series_extrema</code>.</p>
-<table>
-    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
-    <tr><td>images_list</td><td>list[str]</td><td>Filenames to scan</td></tr>
-    <tr><td>data_dir</td><td>str</td><td>Directory containing the DICOM files</td></tr>
-    <tr><td>debug</td><td>bool</td><td>Enable debug logging for missing metadata</td></tr>
-    <tr><td>log_callback</td><td>callable</td><td>Function accepting a string message for UI logging</td></tr>
-</table>
-
-<h3>DICOM Tags Read</h3>
-<table>
-    <tr><th>Tag</th><th>Name</th><th>Purpose</th></tr>
-    <tr><td>(0020,0011)</td><td>Series Number</td><td>Group images into series</td></tr>
-    <tr><td>(0020,0013)</td><td>Instance Number</td><td>Order within series</td></tr>
-    <tr><td>(0020,0032)</td><td>Image Position (Patient)</td><td>3D spatial position [x,y,z]</td></tr>
-    <tr><td>(0020,0037)</td><td>Image Orientation (Patient)</td><td>Row/column direction cosines</td></tr>
-</table>
-
-<div class="method-sig">get_series_images(series_key: str) &rarr; list[str]</div>
-<p>Returns a naturally-sorted list of filenames belonging to the specified series.</p>
-
-<div class="method-sig">determine_axis(series_key: str, images: list) &rarr; int</div>
-<p>Determines the principal imaging axis by computing the slice normal vector
-(cross product of row and column directions) and comparing against unit vectors
-using a dot-product threshold of <code>NORMAL_THRESHOLD</code> (0.95).</p>
-<table>
-    <tr><th>Return Value</th><th>Meaning</th></tr>
-    <tr><td>0</td><td>Sagittal (x-axis)</td></tr>
-    <tr><td>1</td><td>Coronal (y-axis)</td></tr>
-    <tr><td>2</td><td>Axial (z-axis) — default</td></tr>
-</table>
-
-<h2>Private Methods</h2>
-<div class="method-sig">_get_position_range(series: str) &rarr; list</div>
-<p>Returns <code>[min_x, max_x, min_y, max_y, min_z, max_z]</code> for all slices in a series.</p>
-
-<div class="method-sig">@staticmethod<br>_key_func(filename: str) &rarr; tuple</div>
-<p>Natural sort key: splits filename into <code>(alpha_prefix, numeric_suffix)</code>.
-Enables sorting like <code>img2</code> before <code>img10</code>.</p>
-""",
-    ))
-
-    # ---- DicomViewer ----
-    manual.pages.append(Page(
-        filename="dicomviewer.html",
-        title="Class: DicomViewer",
-        nav_title="DicomViewer",
-        raw_content="""
-<h2>Overview</h2>
-<p>Main application class. Orchestrates the UI, application state, DICOM loading,
-and Bokeh integration. A single instance is created at module scope.</p>
-
-<h2>Key Instance Attributes</h2>
-<table class="attr-table">
-    <tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
-    <tr><td>config</td><td>ViewerConfig</td><td>Application configuration</td></tr>
-    <tr><td>img_proc</td><td>ImageProcessor</td><td>Image processing utilities</td></tr>
-    <tr><td>series_mgr</td><td>SeriesManager</td><td>Series metadata manager</td></tr>
-    <tr><td>ds</td><td>pydicom.Dataset</td><td>Current DICOM dataset</td></tr>
-    <tr><td>dicom_image</td><td>ndarray</td><td>Raw pixel array from DICOM</td></tr>
-    <tr><td>clipped_image</td><td>ndarray</td><td>After photometric + flip</td></tr>
-    <tr><td>processed_image</td><td>ndarray</td><td>Final display image (after gamma)</td></tr>
-    <tr><td>original_dtype</td><td>numpy.dtype</td><td>Pixel data type before processing</td></tr>
-    <tr><td>image_type</td><td>str</td><td>Current modality string</td></tr>
-    <tr><td>is_series</td><td>bool</td><td>Whether current data has multiple slices</td></tr>
-    <tr><td>current_slice</td><td>int</td><td>Index of current slice</td></tr>
-    <tr><td>current_series</td><td>list[str]</td><td>Filenames in selected series</td></tr>
-    <tr><td>selected_series</td><td>str</td><td>Currently selected series key</td></tr>
-    <tr><td>gamma</td><td>float</td><td>Active gamma correction value</td></tr>
-    <tr><td>window</td><td>float</td><td>Active window multiplier</td></tr>
-    <tr><td>source</td><td>ColumnDataSource</td><td>Bokeh data source for image display</td></tr>
-    <tr><td>fig_image</td><td>Figure</td><td>Main image figure</td></tr>
-    <tr><td>clip_points</td><td>list</td><td>Accumulated tap points for clipping (max 4)</td></tr>
-</table>
-
-<h2>Initialization Methods</h2>
-<table>
-    <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>__init__()</code></td><td>Parse CLI args, load config, read initial DICOM, build complete UI</td></tr>
-    <tr><td><code>_create_figures()</code></td><td>Create Bokeh figure objects (image display + scatter plot)</td></tr>
-    <tr><td><code>_create_widgets()</code></td><td>Create all widgets and register their callbacks</td></tr>
-    <tr><td><code>_build_layout()</code></td><td>Assemble widget layout and attach to <code>curdoc()</code></td></tr>
-</table>
-
-<h2>Image Processing Methods</h2>
-<table>
-    <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>_prepare_images()</code></td>
-        <td>Full pipeline: read DICOM &rarr; ensure_2d &rarr; rescale &rarr;
-            photometric &rarr; flip &rarr; detect modality &rarr; gamma</td></tr>
-    <tr><td><code>_size_figures()</code></td>
-        <td>Update figure/glyph dimensions to match current image scale</td></tr>
-    <tr><td><code>_set_image_fig_title(name)</code></td>
-        <td>Set figure title from patient metadata (name, date, protocol)</td></tr>
-    <tr><td><code>_get_new_image()</code></td>
-        <td>Convenience: load and display the image at <code>current_slice</code></td></tr>
-</table>
-
-<h2>Callback Methods</h2>
-<table>
-    <tr><th>Method</th><th>Trigger</th><th>Description</th></tr>
-    <tr><td><code>_name_cb(a,o,n)</code></td><td>Image dropdown</td><td>Load selected image</td></tr>
-    <tr><td><code>_db_dropdown_cb(a,o,n)</code></td><td>Dataset dropdown</td>
-        <td>Full dataset switch with complete state reset</td></tr>
-    <tr><td><code>_series_cb(a,o,n)</code></td><td>Series dropdown</td><td>Switch to selected series</td></tr>
-    <tr><td><code>_gamma_cb(a,o,n)</code></td><td>Gamma slider</td><td>Reprocess image with new gamma</td></tr>
-    <tr><td><code>_window_cb(a,o,n)</code></td><td>Window slider</td><td>Adjust color mapper high bound</td></tr>
-    <tr><td><code>_refresh_rate_cb(a,o,n)</code></td><td>Refresh TextInput</td>
-        <td>Update animation speed (validates input)</td></tr>
-    <tr><td><code>_reset_cb()</code></td><td>Reset button</td>
-        <td>Restore gamma/window to config defaults</td></tr>
-    <tr><td><code>_clip_reset_cb()</code></td><td>Clip button</td><td>Reset clip state for new selection</td></tr>
-    <tr><td><code>_increment_cb()</code></td><td>Increment button</td><td>Advance one slice (bounds-checked)</td></tr>
-    <tr><td><code>_decrement_cb()</code></td><td>Decrement button</td><td>Go back one slice (bounds-checked)</td></tr>
-    <tr><td><code>_series_slider_slice_cb(a,o,n)</code></td><td>Slice slider</td><td>Jump to selected slice</td></tr>
-    <tr><td><code>_series_toggle_anim_cb(active)</code></td><td>Animation toggle</td>
-        <td>Start/stop periodic callback, update button label/color</td></tr>
-    <tr><td><code>_animate_series()</code></td><td>Periodic timer</td>
-        <td>Advance one animation frame, loop at end</td></tr>
-    <tr><td><code>_tap_callback(event)</code></td><td>Mouse tap on image</td>
-        <td>Collect clip points; execute clip/rotate on 4th point</td></tr>
-    <tr><td><code>_stop_server()</code></td><td>Exit button</td><td>Async graceful shutdown sequence</td></tr>
-</table>
-
-<h2>Helper Methods</h2>
-<table>
-    <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>_find_images()</code></td>
-        <td>Scan data directory for files, exclude hidden files, natural sort</td></tr>
-    <tr><td><code>_sync_slice_slider()</code></td>
-        <td>Update slider value without triggering its callback (removes/re-adds listener)</td></tr>
-    <tr><td><code>_histogram_positions()</code></td>
-        <td>Populate series position scatter plot data from SeriesManager</td></tr>
-    <tr><td><code>_series_scatter_pos(name)</code></td>
-        <td>Highlight current slice position on the scatter plot</td></tr>
-    <tr><td><code>_modality_index()</code></td>
-        <td>Map modality string to RadioButtonGroup index (0-3)</td></tr>
-    <tr><td><code>_update_visibility()</code></td>
-        <td>Show/hide series-related widgets based on current modality</td></tr>
-    <tr><td><code>_reset_adjustments()</code></td>
-        <td>Reset gamma/window sliders to config defaults without triggering callbacks</td></tr>
-    <tr><td><code>_log(message)</code></td>
-        <td>Add message to on-screen log (max 10) and Python logger</td></tr>
-</table>
-
-<h2>Async Methods</h2>
-<table>
-    <tr><th>Method</th><th>Description</th></tr>
-    <tr><td><code>_async_update_log(message)</code></td>
-        <td>Async log update used during shutdown sequence</td></tr>
-    <tr><td><code>_exit_server()</code></td>
-        <td>Stops the Tornado IOLoop</td></tr>
-    <tr><td><code>_async_change_button(button, color)</code></td>
-        <td>Async button color change</td></tr>
-</table>
-""",
-    ))
-
-    # ---- Data Flow ----
-    manual.pages.append(Page(
-        filename="dataflow.html",
-        title="Data Flow",
-        nav_title="Data Flow",
-        raw_content="""
-<h2>Initialization Flow</h2>
-<div class="flow-diagram">
-    YAML Config File<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    ViewerConfig.from_yaml()<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    DicomViewer.__init__()<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _find_images() <span class="arrow">&rarr;</span> self.images_list<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _prepare_images()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; pydicom.dcmread() <span class="arrow">&rarr;</span> self.ds<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.ensure_2d()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.apply_rescale()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; ImageProcessor.apply_photometric()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; np.flipud()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; ImageProcessor.perform_gamma() <span class="arrow">&rarr;</span> self.processed_image<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    SeriesManager.categorize() &nbsp;[if is_series]<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; dcmread(stop_before_pixels=True) for each file<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; Populates series_map, series, series_extrema<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _create_figures() <span class="arrow">&rarr;</span> fig_image, fig_series_positions<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _create_widgets() <span class="arrow">&rarr;</span> all widgets + callbacks registered<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _build_layout() <span class="arrow">&rarr;</span> curdoc().add_root()<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Bokeh server running, awaiting user interaction
-</div>
-
-<h2>Image Update Flow (any callback that changes the displayed image)</h2>
-<div class="flow-diagram">
-    User interaction (dropdown, slider, button, animation timer)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Callback sets self.path to new DICOM file<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _prepare_images()<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Read DICOM <span class="arrow">&rarr;</span> detect modality<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x251C; Process pixel data pipeline<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;&#x2514; Compute display dimensions<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    self.source.data["image"] = [self.processed_image]<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Bokeh syncs to browser via WebSocket<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Browser re-renders image
-</div>
-
-<h2>Dataset Switch Flow</h2>
-<div class="flow-diagram">
-    _db_dropdown_cb(attr, old, new)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Update self.data_dir from data_db[new]<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _find_images() <span class="arrow">&rarr;</span> new images_list<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _prepare_images() on first image<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    [if is_series] SeriesManager.categorize()<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Reset all widgets (temporarily remove callbacks to avoid cascading triggers)<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _update_visibility() &mdash; show/hide series controls<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    _reset_adjustments() &mdash; gamma/window to defaults<br>
-    &nbsp;&nbsp;<span class="arrow">&darr;</span><br>
-    Update source, title, figures
-</div>
-""",
-    ))
-
-    # ---- YAML Schema ----
-    manual.pages.append(Page(
-        filename="yaml_schema.html",
-        title="YAML Configuration Schema",
-        nav_title="YAML Schema",
-        raw_content="""
-<h2>Complete Schema</h2>
-<pre><code># All fields are required unless marked optional
-
-# [Required] Enable verbose logging to terminal
-debug: bool
-
-# [Required] Default gamma correction value
-# Range: 0.0 - 10.0, typical: 1.0 - 2.0
-gamma_def: float
-
-# [Required] Default window/brightness multiplier
-# Range: 0.0 - 2.0, typical: 1.0
-window_def: float
-
-# [Required] Key into data_db for the initial dataset to load
-starter_images: str
-
-# [Required] Dictionary of named datasets
-# Each key is a human-readable label
-# Each value is an absolute path to a directory of DICOM files
-data_db:
-  dataset_name_1: "/absolute/path/to/dicom/dir1/"
-  dataset_name_2: "/absolute/path/to/dicom/dir2/"</code></pre>
-
-<h2>Validation Rules</h2>
-<table>
-    <tr><th>Rule</th><th>Description</th></tr>
-    <tr><td><code>starter_images</code> must exist in <code>data_db</code></td>
-        <td>The initial dataset key must match one of the data_db entries</td></tr>
-    <tr><td>All paths must exist</td>
-        <td>Directory paths must be valid and accessible</td></tr>
-    <tr><td>Directories must contain DICOM files</td>
-        <td>At least one readable DICOM file must be present</td></tr>
-    <tr><td><code>gamma_def</code> must be non-negative</td>
-        <td>Zero is allowed (produces black image); typical range 0.5-3.0</td></tr>
-    <tr><td><code>window_def</code> must be non-negative</td>
-        <td>Zero clips everything to black; typical range 0.5-1.5</td></tr>
-</table>
-
-<h2>Type Mapping (YAML &rarr; Python)</h2>
-<table>
-    <tr><th>YAML Type</th><th>Python Type</th><th>Example</th></tr>
-    <tr><td>boolean</td><td>bool</td><td><code>true</code> / <code>false</code></td></tr>
-    <tr><td>number (decimal)</td><td>float</td><td><code>1.5</code></td></tr>
-    <tr><td>string</td><td>str</td><td><code>"my_dataset"</code></td></tr>
-    <tr><td>mapping</td><td>dict</td><td><code>key: value</code></td></tr>
-</table>
-""",
-    ))
-
-    # ---- Extending ----
-    manual.pages.append(Page(
-        filename="extending.html",
-        title="Extending the Viewer",
-        nav_title="Extending",
-        raw_content="""
-<h2>Adding a New Modality</h2>
-<ol>
-    <li>Add a new constant: <code>MODALITY_PET = "PET"</code></li>
-    <li>Add a scale constant: <code>PET_SCALE = 2.0</code></li>
-    <li>Add detection logic in <code>DicomViewer._prepare_images()</code>:
-<pre><code>elif "PET" in self.sop_class_name:
-    self.image_scale = PET_SCALE
-    self.image_type = MODALITY_PET</code></pre>
-    </li>
-    <li>Update <code>_modality_index()</code> to map the new modality to a button index</li>
-    <li>Add the label to the <code>RadioButtonGroup</code> in <code>_create_widgets()</code></li>
-</ol>
-
-<h2>Adding a New Image Processing Function</h2>
-<ol>
-    <li>Add a new <code>@staticmethod</code> to <code>ImageProcessor</code>:
-<pre><code>@staticmethod
-def apply_edge_detection(image: np.ndarray) -> np.ndarray:
-    from skimage import filters
-    return filters.sobel(image)</code></pre>
-    </li>
-    <li>Call it from <code>_prepare_images()</code> or a new callback</li>
-    <li>The method is independently testable without any UI dependency</li>
-</ol>
-
-<h2>Adding a New Widget</h2>
-<ol>
-    <li>Create the widget in <code>_create_widgets()</code>:
-<pre><code>self.my_button = Button(label="My Feature", button_type="primary")
-self.my_button.on_click(self._my_feature_cb)</code></pre>
-    </li>
-    <li>Add it to the layout in <code>_build_layout()</code></li>
-    <li>Implement the callback:
-<pre><code>def _my_feature_cb(self):
-    # Your logic here
-    self._log("My feature activated")</code></pre>
-    </li>
-</ol>
-
-<h2>Adding DICOM Metadata Display</h2>
-<pre><code># In _create_widgets():
-self.metadata_div = Div(text="", width=400, height=300, visible=False)
-self.metadata_button = Toggle(label="Show Metadata", active=False)
-self.metadata_button.on_click(self._metadata_toggle_cb)
-
-# New callback:
-def _metadata_toggle_cb(self, active):
-    if active:
-        info = []
-        for elem in self.ds:
-            if elem.VR != "OW" and elem.VR != "OB":  # Skip pixel data
-                info.append(f"{elem.tag} {elem.name}: {elem.value}")
-        self.metadata_div.text = "&lt;br&gt;".join(info[:50])
-    self.metadata_div.visible = active</code></pre>
-
-<h2>Naming Conventions</h2>
-<table>
-    <tr><th>Pattern</th><th>Meaning</th><th>Example</th></tr>
-    <tr><td><code>_method_name</code></td><td>Private method</td><td><code>_prepare_images</code></td></tr>
-    <tr><td><code>_xxx_cb</code></td><td>Bokeh callback</td><td><code>_gamma_cb</code></td></tr>
-    <tr><td><code>_async_xxx</code></td><td>Async for next_tick_callback</td><td><code>_async_update_log</code></td></tr>
-    <tr><td><code>UPPER_CASE</code></td><td>Module constant</td><td><code>MRI_SCALE</code></td></tr>
-    <tr><td><code>ClassName</code></td><td>Class (PascalCase)</td><td><code>DicomViewer</code></td></tr>
-</table>
-
-<h2>Testing Strategy</h2>
-<div class="card">
-    <p><code>ImageProcessor</code> methods can be unit-tested directly:</p>
-<pre><code>import numpy as np
-from dicom_viewer import ImageProcessor
-
-def test_gamma_identity():
-    img = np.array([[100, 200], [50, 150]], dtype=np.uint16)
-    result = ImageProcessor.perform_gamma(img, 1.0, np.uint16)
-    assert result.shape == img.shape
-    assert result.dtype == np.uint16
-
-def test_ensure_2d_rgb():
-    rgb = np.zeros((100, 100, 3), dtype=np.uint8)
-    result = ImageProcessor.ensure_2d(rgb)
-    assert result.ndim == 2</code></pre>
-</div>
-""",
-    ))
-
-    # ---- Limitations ----
-    manual.pages.append(Page(
-        filename="limitations.html",
-        title="Known Limitations",
-        nav_title="Limitations",
-        raw_content="""
-<h2>Current Limitations</h2>
-<table>
-    <tr><th>#</th><th>Limitation</th><th>Impact</th><th>Possible Enhancement</th></tr>
-    <tr><td>1</td>
-        <td>No DICOMDIR navigation</td>
-        <td>Must point to flat directories of DICOM files</td>
-        <td>Parse DICOMDIR to build file tree</td></tr>
-    <tr><td>2</td>
-        <td>No DICOM Window Center/Width presets</td>
-        <td>Uses a simple brightness multiplier instead of clinical presets</td>
-        <td>Read (0028,1050)/(0028,1051) and apply <code>apply_window_level()</code></td></tr>
-    <tr><td>3</td>
-        <td>Color images converted to grayscale</td>
-        <td>RGB, YBR_FULL images lose color information</td>
-        <td>Support color display for applicable modalities</td></tr>
-    <tr><td>4</td>
-        <td>Clip/rotate cannot be undone</td>
-        <td>Must reload image to restore original view</td>
-        <td>Store original image state for undo</td></tr>
-    <tr><td>5</td>
-        <td>No zoom/pan persistence</td>
-        <td>View resets when switching images</td>
-        <td>Save and restore Range1d state</td></tr>
-    <tr><td>6</td>
-        <td>Sequential series metadata loading</td>
-        <td>Slow for datasets with thousands of files</td>
-        <td>Parallel loading with ThreadPoolExecutor</td></tr>
-    <tr><td>7</td>
-        <td>No measurement tools</td>
-        <td>Cannot measure distance, angle, or area</td>
-        <td>Add Bokeh PolyDrawTool with distance calculation</td></tr>
-    <tr><td>8</td>
-        <td>No DICOM metadata inspection panel</td>
-        <td>Cannot view tags without external tools</td>
-        <td>Add metadata Div (see <a href="extending.html">Extending</a>)</td></tr>
-    <tr><td>9</td>
-        <td>No keyboard shortcuts</td>
-        <td>All interaction requires mouse clicks</td>
-        <td>Add Bokeh CustomJS for keypress events</td></tr>
-    <tr><td>10</td>
-        <td>Single-user per session</td>
-        <td>Bokeh server creates separate state per browser tab</td>
-        <td>By design; each tab is independent</td></tr>
-    <tr><td>11</td>
-        <td>Animation refresh rate requires restart</td>
-        <td>Changing speed while animating requires stop/start</td>
-        <td>Dynamically remove and re-add periodic callback</td></tr>
-    <tr><td>12</td>
-        <td>No JPEG-LS support</td>
-        <td>Some DICOM files with JPEG-LS transfer syntax may not load</td>
-        <td>Install additional pylibjpeg plugins</td></tr>
-</table>
-
-<h2>DICOM Compliance Notes</h2>
-<div class="warning">
-    <p>This viewer is intended for <strong>research and educational use only</strong>.
-    It is <strong>not</strong> a certified medical device and should not be used for
-    clinical diagnosis.</p>
-</div>
-<ul>
-    <li>The viewer does not validate DICOM conformance</li>
-    <li>Not all DICOM transfer syntaxes are supported</li>
-    <li>Overlay and annotation layers are not rendered</li>
-    <li>Structured Reports (SR) are not parsed</li>
-    <li>Patient orientation labels are not displayed</li>
+    <li>Reads W/L tags (0028,1050/1051/1055)</li>
+    <li>Reads PhotometricInterpretation</li>
+    <li>Reads RescaleSlope/Intercept</li>
+    <li>Reads ImagePositionPatient for position sorting</li>
+    <li>Reads ImageOrientationPatient for axis detection</li>
+    <li>Does not support VOI LUT Sequences</li>
+    <li>Overlays and annotations not rendered</li>
+    <li>Patient orientation labels not displayed</li>
 </ul>
 """,
     ))

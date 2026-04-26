@@ -35,7 +35,10 @@ from bokeh.models import (
     Button, Slider, Div, TapTool, Select, RadioButtonGroup,
     Toggle, TextInput, Range1d
 )
-from bokeh.palettes import Greys256
+from bokeh.palettes import (
+    Greys256, Inferno256, Viridis256, Turbo256,
+    Cividis256, Plasma256, Magma256
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -72,6 +75,69 @@ MODALITY_MRI = "MRI"
 MODALITY_US = "US"
 
 WL_MANUAL_LABEL = "Manual"
+
+# Color LUT options
+COLOR_LUTS = {
+    "Grayscale": list(Greys256),
+    "Grayscale (Inverted)": list(reversed(Greys256)),
+    "Inferno": list(Inferno256),
+    "Viridis": list(Viridis256),
+    "Turbo": list(Turbo256),
+    "Cividis": list(Cividis256),
+    "Plasma": list(Plasma256),
+    "Magma": list(Magma256),
+    "Hot": None,  # Built below
+    "PET": None,  # Built below
+}
+
+def _build_hot_palette(n=256):
+    """Build a black-red-yellow-white 'hot' colormap."""
+    palette = []
+    for i in range(n):
+        t = i / (n - 1)
+        if t < 1 / 3:
+            r = int(255 * (t * 3))
+            g = 0
+            b = 0
+        elif t < 2 / 3:
+            r = 255
+            g = int(255 * ((t - 1 / 3) * 3))
+            b = 0
+        else:
+            r = 255
+            g = 255
+            b = int(255 * ((t - 2 / 3) * 3))
+        palette.append(f"#{r:02x}{g:02x}{b:02x}")
+    return palette
+
+
+def _build_pet_palette(n=256):
+    """Build a PET-style black-blue-green-yellow-red-white colormap."""
+    palette = []
+    for i in range(n):
+        t = i / (n - 1)
+        if t < 0.2:
+            s = t / 0.2
+            r, g, b = 0, 0, int(128 * s)
+        elif t < 0.4:
+            s = (t - 0.2) / 0.2
+            r, g, b = 0, int(255 * s), int(128 + 127 * (1 - s))
+        elif t < 0.6:
+            s = (t - 0.4) / 0.2
+            r, g, b = int(255 * s), 255, 0
+        elif t < 0.8:
+            s = (t - 0.6) / 0.2
+            r, g, b = 255, int(255 * (1 - s)), 0
+        else:
+            s = (t - 0.8) / 0.2
+            r, g, b = 255, int(255 * s), int(255 * s)
+        palette.append(f"#{r:02x}{g:02x}{b:02x}")
+    return palette
+
+
+COLOR_LUTS["Hot"] = _build_hot_palette()
+COLOR_LUTS["PET"] = _build_pet_palette()
+DEFAULT_LUT = "Grayscale"
 
 logger = logging.getLogger("dicom_viewer")
 logging.basicConfig(level=logging.INFO)
@@ -364,6 +430,46 @@ class SeriesManager:
                 return (str(filename), 0)
         return (match.group(1), int(match.group(2)))
 
+    def get_series_images_by_position(self, series_key: str,
+                                      axis: int = 2) -> list:
+        """
+        Return filenames sorted by spatial position along the given axis.
+
+        Parameters
+        ----------
+        series_key : str
+            Series identifier.
+        axis : int
+            Spatial axis to sort by (0=x, 1=y, 2=z).
+
+        Returns
+        -------
+        list of str
+            Filenames sorted by position.
+        """
+        entries = self.series_map.get(series_key, {})
+        if not entries:
+            return []
+
+        # Filter out entries with sentinel position values
+        valid = {
+            k: v for k, v in entries.items()
+            if v[1][axis] != -999.0
+        }
+
+        if not valid:
+            # Fall back to natural sort if no valid positions
+            return self.get_series_images(series_key)
+
+        return sorted(valid.keys(), key=lambda k: valid[k][1][axis])
+
+    # Also add a sort_mode attribute to __init__:
+    def __init__(self):
+        self.series_map: dict = {}
+        self.series: list = []
+        self.series_extrema: dict = {}
+        self.series_pos_index: int = 2
+        self.sort_by_position: bool = True  # NEW: default to position sort
 
 # ---------------------------------------------------------------------------
 # Main viewer class
@@ -514,6 +620,9 @@ class DicomViewer:
     # ------------------------------------------------------------------
     # Widget creation
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Widget creation (UPDATED — add new widgets)
+    # ------------------------------------------------------------------
     def _create_widgets(self):
         """Create all Bokeh widgets and register callbacks."""
 
@@ -596,7 +705,7 @@ class DicomViewer:
         )
         self.gamma_slider.on_change("value_throttled", self._gamma_cb)
 
-        # Legacy window slider (simple brightness multiplier)
+        # Legacy window slider
         self.window_slider = Slider(
             start=0, end=WINDOW_SLIDER_MAX,
             value=self.window, step=0.05, title="Window (legacy)",
@@ -610,7 +719,6 @@ class DicomViewer:
         )
         self.wl_preset_dropdown.on_change("value", self._wl_preset_cb)
 
-        # Determine initial W/L slider values
         if self.wl_presets:
             init_center = self.wl_presets[0]["center"]
             init_width = self.wl_presets[0]["width"]
@@ -618,7 +726,6 @@ class DicomViewer:
             init_center = self.max_bright / 2.0 if self.max_bright > 0 else WL_CENTER_DEFAULT
             init_width = self.max_bright if self.max_bright > 0 else WL_WIDTH_DEFAULT
 
-        # Compute slider ranges from image data
         wl_center_max = max(WL_CENTER_SLIDER_MAX, self.max_bright)
         wl_width_max = max(WL_WIDTH_SLIDER_MAX, self.max_bright * 2)
 
@@ -635,6 +742,48 @@ class DicomViewer:
             title="Window Width",
         )
         self.wl_width_slider.on_change("value_throttled", self._wl_manual_cb)
+
+        # ============================================================
+        # NEW Phase 1 widgets
+        # ============================================================
+
+        # --- Invert toggle ---
+        self.invert_toggle = Toggle(
+            label="Invert", button_type="default", active=False,
+        )
+        self.invert_toggle.on_click(self._invert_cb)
+        self.is_inverted = False
+
+        # --- Color LUT dropdown ---
+        self.lut_dropdown = Select(
+            title="Color Map",
+            value=DEFAULT_LUT,
+            options=list(COLOR_LUTS.keys()),
+        )
+        self.lut_dropdown.on_change("value", self._lut_cb)
+        self.current_lut = DEFAULT_LUT
+
+        # --- Slice sort toggle ---
+        self.sort_toggle = Toggle(
+            label="Sort by Position",
+            button_type="success",
+            active=self.series_mgr.sort_by_position,
+            visible=self.is_series,
+        )
+        self.sort_toggle.on_click(self._sort_toggle_cb)
+
+        # --- Zoom lock toggle ---
+        self.zoom_lock_toggle = Toggle(
+            label="Lock Zoom",
+            button_type="default",
+            active=False,
+        )
+        self.zoom_lock_toggle.on_click(self._zoom_lock_cb)
+        self.zoom_locked = False
+        self.saved_x_range = None
+        self.saved_y_range = None
+
+        # ============================================================
 
         # Reset button
         self.reset_button = Button(label="Reset", button_type="warning")
@@ -663,6 +812,7 @@ class DicomViewer:
             self.series_slider_slice,
             self.increment_button,
             self.decrement_button,
+            self.sort_toggle,
         )
 
         wl_controls = column(
@@ -676,6 +826,13 @@ class DicomViewer:
             self.window_slider,
         )
 
+        # New: visual controls column
+        visual_controls = column(
+            self.lut_dropdown,
+            self.invert_toggle,
+            self.zoom_lock_toggle,
+        )
+
         control_widgets = row(
             column(
                 row(
@@ -686,6 +843,7 @@ class DicomViewer:
                     self.clip_button,
                     adjustment_controls,
                     wl_controls,
+                    visual_controls,
                     self.name_dropdown,
                 ),
                 self.series_pulldown,
@@ -966,6 +1124,136 @@ class DicomViewer:
         self._get_new_image()
         self._log(f"Slider set to {self.current_slice}")
 
+    # ------------------------------------------------------------------
+    # Phase 1 callbacks: Invert, Color LUT, Sort, Zoom Lock
+    # ------------------------------------------------------------------
+
+    def _invert_cb(self, active):
+        """Toggle image inversion (positive/negative)."""
+        self.is_inverted = active
+        self._apply_current_lut()
+
+        if active:
+            self.invert_toggle.button_type = "warning"
+            self.invert_toggle.label = "Inverted"
+            self._log("Image inverted")
+        else:
+            self.invert_toggle.button_type = "default"
+            self.invert_toggle.label = "Invert"
+            self._log("Image normal (not inverted)")
+
+    def _lut_cb(self, attr, old, new):
+        """Handle color LUT dropdown change."""
+        self.current_lut = new
+        self._apply_current_lut()
+        self._log(f"Color map: {new}")
+
+    def _apply_current_lut(self):
+        """Apply the current LUT with optional inversion."""
+        palette = COLOR_LUTS.get(self.current_lut, list(Greys256))
+        if palette is None:
+            palette = list(Greys256)
+
+        # Make a copy so we don't modify the original
+        palette = list(palette)
+
+        if self.is_inverted:
+            palette = list(reversed(palette))
+
+        self.color_mapper.palette = palette
+
+    def _sort_toggle_cb(self, active):
+        """Toggle between position-sorted and filename-sorted slices."""
+        self.series_mgr.sort_by_position = active
+
+        if active:
+            self.sort_toggle.button_type = "success"
+            self.sort_toggle.label = "Sort by Position"
+            self._log("Slices sorted by spatial position")
+        else:
+            self.sort_toggle.button_type = "default"
+            self.sort_toggle.label = "Sort by Filename"
+            self._log("Slices sorted by filename")
+
+        # Re-sort the current series
+        if self.is_series and self.selected_series:
+            self._resort_current_series()
+
+    def _resort_current_series(self):
+        """Re-sort the current series based on sort mode and refresh UI."""
+        if self.series_mgr.sort_by_position:
+            axis = self.series_mgr.determine_axis(
+                self.selected_series, self.current_series
+            )
+            self.current_series = self.series_mgr.get_series_images_by_position(
+                self.selected_series, axis
+            )
+        else:
+            self.current_series = self.series_mgr.get_series_images(
+                self.selected_series
+            )
+
+        # Update the image dropdown
+        self.name_dropdown.remove_on_change("value", self._name_cb)
+        self.name_dropdown.options = self.current_series
+        if self.current_series:
+            # Try to stay on the same image
+            if self.image_name in self.current_series:
+                self.current_slice = self.current_series.index(self.image_name)
+            else:
+                self.current_slice = 0
+            self.name_dropdown.value = self.current_series[self.current_slice]
+        self.name_dropdown.on_change("value", self._name_cb)
+
+        # Update slice slider
+        self.series_slider_slice.remove_on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+        self.series_slider_slice.end = max(len(self.current_series), 1)
+        self.series_slider_slice.value = self.current_slice
+        self.series_slider_slice.on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+
+        # Refresh position plot
+        self._histogram_positions()
+        if self.current_series:
+            self._series_scatter_pos(
+                self.current_series[self.current_slice]
+            )
+
+    def _zoom_lock_cb(self, active):
+        """Toggle zoom/pan lock for slice navigation."""
+        self.zoom_locked = active
+
+        if active:
+            # Save current view ranges
+            self.saved_x_range = (
+                self.fig_image.x_range.start,
+                self.fig_image.x_range.end,
+            )
+            self.saved_y_range = (
+                self.fig_image.y_range.start,
+                self.fig_image.y_range.end,
+            )
+            self.zoom_lock_toggle.button_type = "success"
+            self.zoom_lock_toggle.label = "Zoom Locked"
+            self._log("Zoom/pan locked")
+        else:
+            self.saved_x_range = None
+            self.saved_y_range = None
+            self.zoom_lock_toggle.button_type = "default"
+            self.zoom_lock_toggle.label = "Lock Zoom"
+            self._log("Zoom/pan unlocked")
+
+    def _restore_zoom(self):
+        """Restore saved zoom/pan if locked."""
+        if self.zoom_locked and self.saved_x_range and self.saved_y_range:
+            self.fig_image.x_range.start = self.saved_x_range[0]
+            self.fig_image.x_range.end = self.saved_x_range[1]
+            self.fig_image.y_range.start = self.saved_y_range[0]
+            self.fig_image.y_range.end = self.saved_y_range[1]
+
     def _animate_series(self):
         """Periodic callback to advance animation one frame."""
         if not self.series_toggle_anim.active:
@@ -1148,14 +1436,322 @@ class DicomViewer:
         # Extract W/L presets from this image's metadata
         self.wl_presets = ImageProcessor.extract_wl_presets(self.ds)
 
+    # ------------------------------------------------------------------
+    # Updated _size_figures — respects zoom lock
+    # ------------------------------------------------------------------
     def _size_figures(self):
         """Update figure dimensions to match current image."""
-        self.fig_image.x_range.end = self.width_scl
-        self.fig_image.y_range.end = self.height_scl
-        self.fig_image.width = self.width_scl
-        self.fig_image.height = self.height_scl
-        self.f_img.glyph.dw = self.width_scl
-        self.f_img.glyph.dh = self.height_scl
+        if self.zoom_locked and self.saved_x_range and self.saved_y_range:
+            # Only update the glyph size, not the view range
+            self.f_img.glyph.dw = self.width_scl
+            self.f_img.glyph.dh = self.height_scl
+            # Restore the locked view
+            self._restore_zoom()
+        else:
+            self.fig_image.x_range.start = 0
+            self.fig_image.x_range.end = self.width_scl
+            self.fig_image.y_range.start = 0
+            self.fig_image.y_range.end = self.height_scl
+            self.fig_image.width = self.width_scl
+            self.fig_image.height = self.height_scl
+            self.f_img.glyph.dw = self.width_scl
+            self.f_img.glyph.dh = self.height_scl
+
+    # ------------------------------------------------------------------
+    # Updated _get_new_image — respects zoom lock
+    # ------------------------------------------------------------------
+    def _get_new_image(self):
+        """Load and display the image at current_slice."""
+        images = self.current_series if self.is_series else self.images_list
+        if not images or self.current_slice >= len(images):
+            return
+        image_name = images[self.current_slice]
+        self.path = os.path.join(self.data_dir, image_name)
+        self._prepare_images()
+        self._set_image_fig_title(image_name)
+        self.source.data["image"] = [self.processed_image]
+
+        # Apply current W/L settings to new image
+        center = self.wl_center_slider.value
+        width = self.wl_width_slider.value
+        self._apply_window_level(center, width)
+
+        # Restore zoom if locked
+        if self.zoom_locked:
+            self._restore_zoom()
+
+    # ------------------------------------------------------------------
+    # Updated _name_cb — respects zoom lock
+    # ------------------------------------------------------------------
+    def _name_cb(self, attr, old, new):
+        """Handle image selection change."""
+        self.image_name = new
+        self._log(f"Get new file {self.image_name}")
+        self.path = os.path.join(self.data_dir, self.image_name)
+        self._prepare_images()
+        self.source.data["image"] = [self.processed_image]
+        self._size_figures()
+        self._set_image_fig_title(new)
+        self._refresh_wl_presets()
+
+        # Update current_slice index to match
+        images = self.current_series if self.is_series else self.images_list
+        if new in images:
+            self.current_slice = images.index(new)
+            self._sync_slice_slider()
+
+    # ------------------------------------------------------------------
+    # Updated _db_dropdown_cb — integrate sort mode and new widgets
+    # ------------------------------------------------------------------
+    def _db_dropdown_cb(self, attr, old, new):
+        """Handle dataset change — full reset."""
+        self.data_dir = self.data_db[new]
+        self._find_images()
+        self.image_name = self.images_list[0]
+        self.path = os.path.join(self.data_dir, self.image_name)
+
+        self.name_dropdown.remove_on_change("value", self._name_cb)
+        self.name_dropdown.options = self.images_list
+        self.name_dropdown.value = self.image_name
+        self.name_dropdown.on_change("value", self._name_cb)
+
+        self._prepare_images()
+
+        if self.is_series:
+            self.series_mgr.categorize(
+                self.images_list, self.data_dir, self.debug, self._log,
+            )
+            self.selected_series = self.series_mgr.series[0]
+
+            # Use position-sorted or filename-sorted based on toggle
+            if self.series_mgr.sort_by_position:
+                axis = self.series_mgr.determine_axis(
+                    self.selected_series,
+                    self.series_mgr.get_series_images(self.selected_series),
+                )
+                self.current_series = (
+                    self.series_mgr.get_series_images_by_position(
+                        self.selected_series, axis
+                    )
+                )
+            else:
+                self.current_series = self.series_mgr.get_series_images(
+                    self.selected_series
+                )
+
+            self.series_pulldown.options = self.series_mgr.series
+            self.current_slice = 0
+
+            self._histogram_positions()
+            if self.current_series:
+                self._series_scatter_pos(self.current_series[0])
+
+            self.series_slider_slice.remove_on_change(
+                "value_throttled", self._series_slider_slice_cb
+            )
+            self.series_slider_slice.value = self.current_slice
+            self.series_slider_slice.end = len(self.current_series)
+            self.series_slider_slice.on_change(
+                "value_throttled", self._series_slider_slice_cb
+            )
+
+            self.series_pulldown.remove_on_change("value", self._series_cb)
+            self.series_pulldown.value = self.selected_series
+            self.series_pulldown.on_change("value", self._series_cb)
+
+            self.name_dropdown.remove_on_change("value", self._name_cb)
+            self.name_dropdown.options = self.current_series
+            if self.current_series:
+                self.name_dropdown.value = self.current_series[0]
+            self.name_dropdown.on_change("value", self._name_cb)
+
+        # Unlock zoom on dataset change
+        self.zoom_locked = False
+        self.saved_x_range = None
+        self.saved_y_range = None
+        self.zoom_lock_toggle.active = False
+        self.zoom_lock_toggle.button_type = "default"
+        self.zoom_lock_toggle.label = "Lock Zoom"
+
+        self._size_figures()
+        self._update_visibility()
+        self._reset_adjustments()
+
+        self.mode.active = self._modality_index()
+        self._set_image_fig_title(self.image_name)
+        self.source.data["image"] = [self.processed_image]
+        self._refresh_wl_presets()
+
+        # Reapply current LUT
+        self._apply_current_lut()
+
+        self._log(f"Get new imaging {new}")
+
+    # ------------------------------------------------------------------
+    # Updated _series_cb — use sort mode
+    # ------------------------------------------------------------------
+    def _series_cb(self, attr, old, new):
+        """Handle series selection change."""
+        self.selected_series = new
+        self._log(f"Get new series {self.selected_series}")
+
+        # Sort based on current mode
+        if self.series_mgr.sort_by_position:
+            axis = self.series_mgr.determine_axis(
+                self.selected_series,
+                self.series_mgr.get_series_images(self.selected_series),
+            )
+            self.current_series = (
+                self.series_mgr.get_series_images_by_position(
+                    self.selected_series, axis
+                )
+            )
+        else:
+            self.current_series = self.series_mgr.get_series_images(
+                self.selected_series
+            )
+
+        self.name_dropdown.remove_on_change("value", self._name_cb)
+        self.name_dropdown.options = self.current_series
+        if self.current_series:
+            self.name_dropdown.value = self.current_series[0]
+        self.name_dropdown.on_change("value", self._name_cb)
+
+        if self.current_series:
+            self.path = os.path.join(self.data_dir, self.current_series[0])
+
+        self._histogram_positions()
+        if self.current_series:
+            self._series_scatter_pos(self.current_series[0])
+
+        self.fig_series_positions.title.text = (
+            self.fig_series_positions_titles[self.series_mgr.series_pos_index]
+        )
+
+        self.series_toggle_anim.button_type = "success"
+        self.series_toggle_anim.label = "Start Animation"
+        self._prepare_images()
+        if self.current_series:
+            self._set_image_fig_title(self.current_series[0])
+        self.current_slice = 0
+        self._size_figures()
+        self.source.data["image"] = [self.processed_image]
+
+        self.series_slider_slice.remove_on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+        self.series_slider_slice.value = self.current_slice
+        self.series_slider_slice.end = max(len(self.current_series), 1)
+        self.series_slider_slice.on_change(
+            "value_throttled", self._series_slider_slice_cb
+        )
+
+        self._refresh_wl_presets()
+        self._log(f"Selected new series {new}")
+
+    # ------------------------------------------------------------------
+    # Updated _update_visibility — include sort toggle
+    # ------------------------------------------------------------------
+    def _update_visibility(self):
+        """Update widget visibility based on current modality."""
+        is_s = self.is_series
+        self.series_pulldown.visible = is_s
+        self.series_toggle_anim.visible = is_s
+        self.series_slider_slice.visible = is_s
+        self.CT_text_refresh.visible = is_s
+        self.fig_series_positions.visible = is_s
+        self.increment_button.visible = is_s
+        self.decrement_button.visible = is_s
+        self.sort_toggle.visible = is_s
+
+    # ------------------------------------------------------------------
+    # Updated _reset_cb — reset Phase 1 features too
+    # ------------------------------------------------------------------
+    def _reset_cb(self):
+        """Reset all adjustments to defaults."""
+        # Reset gamma
+        self.gamma = self.config.gamma_def
+        self.window = self.config.window_def
+
+        self.gamma_slider.remove_on_change("value_throttled", self._gamma_cb)
+        self.gamma_slider.value = self.gamma
+        self.gamma_slider.on_change("value_throttled", self._gamma_cb)
+
+        self.window_slider.remove_on_change("value_throttled", self._window_cb)
+        self.window_slider.value = self.window
+        self.window_slider.on_change("value_throttled", self._window_cb)
+
+        # Reprocess image with default gamma
+        self.processed_image = ImageProcessor.perform_gamma(
+            self.clipped_image, self.gamma, self.original_dtype
+        )
+        self.max_bright = float(np.max(self.processed_image))
+        self.source.data["image"] = [self.processed_image]
+
+        # Reset W/L
+        self._refresh_wl_presets()
+
+        # Reset invert
+        self.is_inverted = False
+        self.invert_toggle.active = False
+        self.invert_toggle.button_type = "default"
+        self.invert_toggle.label = "Invert"
+
+        # Reset LUT to grayscale
+        self.current_lut = DEFAULT_LUT
+        self.lut_dropdown.remove_on_change("value", self._lut_cb)
+        self.lut_dropdown.value = DEFAULT_LUT
+        self.lut_dropdown.on_change("value", self._lut_cb)
+        self._apply_current_lut()
+
+        # Unlock zoom
+        self.zoom_locked = False
+        self.saved_x_range = None
+        self.saved_y_range = None
+        self.zoom_lock_toggle.active = False
+        self.zoom_lock_toggle.button_type = "default"
+        self.zoom_lock_toggle.label = "Lock Zoom"
+
+        self._log("Reset all adjustments to defaults")
+
+    # ------------------------------------------------------------------
+    # Updated _animate_series — respects zoom lock
+    # ------------------------------------------------------------------
+    def _animate_series(self):
+        """Periodic callback to advance animation one frame."""
+        if not self.series_toggle_anim.active:
+            return
+        images = self.current_series if self.is_series else self.images_list
+        if not images:
+            return
+
+        image_name = images[self.current_slice]
+        self.path = os.path.join(self.data_dir, image_name)
+        self._prepare_images()
+
+        if self.is_series:
+            self._series_scatter_pos(image_name)
+
+        self.fig_image.title.text = image_name + self.title_postfix
+        self.source.data["image"] = [self.processed_image]
+
+        # Apply current W/L
+        center = self.wl_center_slider.value
+        width = self.wl_width_slider.value
+        self._apply_window_level(center, width)
+
+        # Restore zoom if locked
+        if self.zoom_locked:
+            self._restore_zoom()
+
+        self.current_slice += 1
+        if self.current_slice >= len(images):
+            self.current_slice = ANIMATION_SLICE_RESET
+
+        self._sync_slice_slider()
+
+        if self.debug:
+            self._log(f"Animation image {image_name}")
 
     def _set_image_fig_title(self, image_name: str):
         """Set figure title with patient metadata."""
