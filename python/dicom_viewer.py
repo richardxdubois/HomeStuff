@@ -39,6 +39,8 @@ from bokeh.palettes import (
     Greys256, Inferno256, Viridis256, Turbo256,
     Cividis256, Plasma256, Magma256
 )
+from bokeh.models import CustomJS, PreText
+from bokeh.events import MouseWheel
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -89,6 +91,20 @@ COLOR_LUTS = {
     "Hot": None,  # Built below
     "PET": None,  # Built below
 }
+
+# Histogram
+HISTOGRAM_BINS = 256
+HISTOGRAM_HEIGHT = 300
+HISTOGRAM_WIDTH = 500
+
+# Metadata panel
+METADATA_MAX_LINES = 80
+METADATA_WIDTH = 500
+METADATA_HEIGHT = 400
+
+# Tags to skip in metadata display (binary/pixel data)
+METADATA_SKIP_VR = {"OB", "OW", "OF", "SQ", "UN", "UC", "UR"}
+
 
 def _build_hot_palette(n=256):
     """Build a black-red-yellow-white 'hot' colormap."""
@@ -784,6 +800,115 @@ class DicomViewer:
         self.saved_y_range = None
 
         # ============================================================
+        # Phase 2 widgets
+        # ============================================================
+
+        # --- Metadata panel ---
+        self.metadata_toggle = Toggle(
+            label="Show Metadata",
+            button_type="default",
+            active=False,
+        )
+        self.metadata_toggle.on_click(self._metadata_toggle_cb)
+
+        self.metadata_pre = PreText(
+            text="",
+            width=METADATA_WIDTH,
+            height=METADATA_HEIGHT,
+            visible=False,
+        )
+        self.metadata_pre.styles = {
+            "overflow-y": "scroll",
+            "font-size": "11px",
+            "background": "#f8fafc",
+            "border": "1px solid #e2e8f0",
+            "border-radius": "6px",
+            "padding": "8px",
+        }
+
+        # --- Histogram figure ---
+        self.histogram_toggle = Toggle(
+            label="Show Histogram",
+            button_type="default",
+            active=False,
+        )
+        self.histogram_toggle.on_click(self._histogram_toggle_cb)
+
+        self.fig_histogram = figure(
+            title="Pixel Intensity Distribution",
+            height=HISTOGRAM_HEIGHT,
+            width=HISTOGRAM_WIDTH,
+            x_axis_label="Pixel Value",
+            y_axis_label="Count",
+            visible=False,
+        )
+        self.fig_histogram.toolbar_location = "above"
+        self.fig_histogram.y_axis_type = "linear"
+
+        self.histogram_source = ColumnDataSource(
+            data={"top": [], "left": [], "right": []}
+        )
+        self.fig_histogram.quad(
+            top="top", bottom=0, left="left", right="right",
+            source=self.histogram_source,
+            fill_color="#2563eb", line_color="#1e40af",
+            fill_alpha=0.7,
+        )
+
+        # Add W/L range indicator lines to histogram
+        self.histogram_wl_source = ColumnDataSource(
+            data={"x": [], "y": []}
+        )
+        self.fig_histogram.line(
+            x="x", y="y", source=self.histogram_wl_source,
+            line_color="red", line_width=2, line_dash="dashed",
+            legend_label="W/L Range",
+        )
+        self.fig_histogram.legend.click_policy = "hide"
+        self.fig_histogram.legend.location = "top_right"
+        self.fig_histogram.legend.label_text_font_size = "10px"
+
+        # Initial histogram computation
+        self._update_histogram()
+
+        # --- Mousewheel scrolling ---
+        # Bokeh doesn't have a native Python mousewheel callback on figures,
+        # so we use a CustomJS that writes to a hidden text input,
+        # which triggers a Python callback.
+        self.scroll_input = TextInput(
+            value="0", visible=False,
+        )
+        self.scroll_input.on_change("value", self._scroll_cb)
+
+        self.scroll_enabled = Toggle(
+            label="Scroll Slices",
+            button_type="default",
+            active=False,
+            visible=self.is_series,
+        )
+        self.scroll_enabled.on_click(self._scroll_toggle_cb)
+
+        # CustomJS that captures mousewheel on the image figure
+        self.scroll_js = CustomJS(
+            args=dict(scroll_input=self.scroll_input),
+            code="""
+            // Increment or decrement based on scroll direction
+            const delta = cb_obj.delta;
+            const current = parseInt(scroll_input.value) || 0;
+            if (delta > 0) {
+                scroll_input.value = String(current + 1);
+            } else if (delta < 0) {
+                scroll_input.value = String(current - 1);
+            }
+            // Prevent the default scroll behavior on the page
+            if (typeof cb_obj.event !== 'undefined') {
+                cb_obj.event.preventDefault();
+            }
+            """,
+        )
+        # Don't attach yet — only when scroll is enabled
+
+        # ============================================================
 
         # Reset button
         self.reset_button = Button(label="Reset", button_type="warning")
@@ -802,6 +927,196 @@ class DicomViewer:
         self.fig_image.on_event("tap", self._tap_callback)
 
     # ------------------------------------------------------------------
+    # Phase 2: Metadata panel
+    # ------------------------------------------------------------------
+    def _metadata_toggle_cb(self, active):
+        """Toggle the DICOM metadata panel."""
+        self.metadata_pre.visible = active
+
+        if active:
+            self._update_metadata()
+            self.metadata_toggle.button_type = "success"
+            self.metadata_toggle.label = "Hide Metadata"
+            self._log("Metadata panel shown")
+        else:
+            self.metadata_toggle.button_type = "default"
+            self.metadata_toggle.label = "Show Metadata"
+            self._log("Metadata panel hidden")
+
+    def _update_metadata(self):
+        """Populate the metadata panel with current DICOM tags."""
+        if not hasattr(self, 'ds') or self.ds is None:
+            self.metadata_pre.text = "No DICOM data loaded."
+            return
+
+        lines = []
+        lines.append(f"File: {self.image_name}")
+        lines.append(f"SOP Class: {self.sop_class_name}")
+        lines.append("-" * 60)
+
+        count = 0
+        for elem in self.ds:
+            if count >= METADATA_MAX_LINES:
+                lines.append(f"... ({len(self.ds)} total elements, "
+                             f"showing first {METADATA_MAX_LINES})")
+                break
+
+            # Skip binary/pixel data
+            if elem.VR in METADATA_SKIP_VR:
+                lines.append(
+                    f"{elem.tag} {elem.keyword or elem.name}: "
+                    f"[{elem.VR} data, {len(elem.value) if hasattr(elem.value, '__len__') else '?'} bytes]"
+                )
+                count += 1
+                continue
+
+            # Format the value, truncating if very long
+            try:
+                val_str = str(elem.value)
+                if len(val_str) > 80:
+                    val_str = val_str[:77] + "..."
+            except Exception:
+                val_str = "<cannot display>"
+
+            tag_name = elem.keyword if elem.keyword else elem.name
+            lines.append(f"{elem.tag} {tag_name}: {val_str}")
+            count += 1
+
+        self.metadata_pre.text = "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Phase 2: Histogram
+    # ------------------------------------------------------------------
+    def _histogram_toggle_cb(self, active):
+        """Toggle the pixel histogram panel."""
+        self.fig_histogram.visible = active
+
+        if active:
+            self._update_histogram()
+            self.histogram_toggle.button_type = "success"
+            self.histogram_toggle.label = "Hide Histogram"
+            self._log("Histogram shown")
+        else:
+            self.histogram_toggle.button_type = "default"
+            self.histogram_toggle.label = "Show Histogram"
+            self._log("Histogram hidden")
+
+    def _update_histogram(self):
+        """Compute and update the pixel intensity histogram."""
+        if not hasattr(self, 'processed_image') or self.processed_image is None:
+            return
+
+        # Flatten and remove any NaN/inf values
+        flat = self.processed_image.flatten()
+        flat = flat[np.isfinite(flat)]
+
+        if len(flat) == 0:
+            return
+
+        # Compute histogram
+        hist_values, bin_edges = np.histogram(flat, bins=HISTOGRAM_BINS)
+
+        self.histogram_source.data = {
+            "top": hist_values.tolist(),
+            "left": bin_edges[:-1].tolist(),
+            "right": bin_edges[1:].tolist(),
+        }
+
+        # Update W/L range indicator
+        self._update_histogram_wl_lines()
+
+        # Update title with stats
+        img_min = float(np.min(flat))
+        img_max = float(np.max(flat))
+        img_mean = float(np.mean(flat))
+        img_std = float(np.std(flat))
+        self.fig_histogram.title.text = (
+            f"Pixel Distribution  "
+            f"min:{img_min:.0f}  max:{img_max:.0f}  "
+            f"mean:{img_mean:.0f}  std:{img_std:.0f}"
+        )
+
+    def _update_histogram_wl_lines(self):
+        """Update the W/L range indicator lines on the histogram."""
+        if not hasattr(self, 'color_mapper'):
+            return
+
+        low = self.color_mapper.low
+        high = self.color_mapper.high
+
+        # Get the max histogram count for scaling the lines
+        hist_top = self.histogram_source.data.get("top", [])
+        if hist_top:
+            max_count = max(hist_top) if len(hist_top) > 0 else 1
+        else:
+            max_count = 1
+
+        # Draw two vertical lines at low and high
+        self.histogram_wl_source.data = {
+            "x": [low, low, float('nan'), high, high],
+            "y": [0, max_count, float('nan'), 0, max_count],
+        }
+
+    # ------------------------------------------------------------------
+    # Phase 2: Mousewheel scrolling
+    # ------------------------------------------------------------------
+    def _scroll_toggle_cb(self, active):
+        """Enable/disable mousewheel slice scrolling."""
+        if active:
+            self.fig_image.js_on_event(MouseWheel, self.scroll_js)
+            self.scroll_enabled.button_type = "success"
+            self.scroll_enabled.label = "Scroll Active"
+            self._log("Mousewheel slice scrolling enabled")
+        else:
+            # Remove the JS callback
+            # Bokeh doesn't have a clean remove for js_on_event,
+            # so we replace with a no-op
+            noop_js = CustomJS(code="")
+            self.fig_image.js_on_event(MouseWheel, noop_js)
+            self.scroll_enabled.button_type = "default"
+            self.scroll_enabled.label = "Scroll Slices"
+            self._log("Mousewheel slice scrolling disabled")
+
+    def _scroll_cb(self, attr, old, new):
+        """Handle mousewheel scroll events for slice navigation."""
+        if not self.scroll_enabled.active:
+            return
+
+        try:
+            new_val = int(new)
+            old_val = int(old) if old else 0
+        except ValueError:
+            return
+
+        delta = new_val - old_val
+
+        images = self.current_series if self.is_series else self.images_list
+        if not images:
+            return
+
+        if delta > 0 and self.current_slice < len(images) - 1:
+            self.current_slice += 1
+            self._sync_slice_slider()
+            self._get_new_image()
+            self._update_panels()
+        elif delta < 0 and self.current_slice > 0:
+            self.current_slice -= 1
+            self._sync_slice_slider()
+            self._get_new_image()
+            self._update_panels()
+
+    # ------------------------------------------------------------------
+    # Phase 2: Panel update helper
+    # ------------------------------------------------------------------
+    def _update_panels(self):
+        """Update metadata and histogram panels if they are visible."""
+        if self.metadata_pre.visible:
+            self._update_metadata()
+        if self.fig_histogram.visible:
+            self._update_histogram()
+
+
+    # ------------------------------------------------------------------
     # Layout
     # ------------------------------------------------------------------
     def _build_layout(self):
@@ -813,6 +1128,7 @@ class DicomViewer:
             self.increment_button,
             self.decrement_button,
             self.sort_toggle,
+            self.scroll_enabled,
         )
 
         wl_controls = column(
@@ -826,11 +1142,15 @@ class DicomViewer:
             self.window_slider,
         )
 
-        # New: visual controls column
         visual_controls = column(
             self.lut_dropdown,
             self.invert_toggle,
             self.zoom_lock_toggle,
+        )
+
+        panel_toggles = column(
+            self.metadata_toggle,
+            self.histogram_toggle,
         )
 
         control_widgets = row(
@@ -844,6 +1164,7 @@ class DicomViewer:
                     adjustment_controls,
                     wl_controls,
                     visual_controls,
+                    panel_toggles,
                     self.name_dropdown,
                 ),
                 self.series_pulldown,
@@ -851,11 +1172,25 @@ class DicomViewer:
             ),
             self.log_div,
         )
+
+        # Right side panels: series positions, histogram, metadata
+        right_panels = column(
+            self.fig_series_positions,
+            self.fig_histogram,
+            self.metadata_pre,
+        )
+
         image_glyph = row(
             self.fig_image,
-            column(self.fig_series_positions),
+            right_panels,
         )
-        canvas_layout = layout(column(control_widgets, image_glyph))
+
+        # Hidden scroll input (must be in layout to function)
+        canvas_layout = layout(column(
+            control_widgets,
+            image_glyph,
+            self.scroll_input,
+        ))
 
         curdoc().clear()
         curdoc().add_root(canvas_layout)
@@ -1483,6 +1818,9 @@ class DicomViewer:
     # ------------------------------------------------------------------
     # Updated _name_cb — respects zoom lock
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Updated _name_cb — update panels
+    # ------------------------------------------------------------------
     def _name_cb(self, attr, old, new):
         """Handle image selection change."""
         self.image_name = new
@@ -1493,6 +1831,7 @@ class DicomViewer:
         self._size_figures()
         self._set_image_fig_title(new)
         self._refresh_wl_presets()
+        self._update_panels()
 
         # Update current_slice index to match
         images = self.current_series if self.is_series else self.images_list
@@ -1501,7 +1840,7 @@ class DicomViewer:
             self._sync_slice_slider()
 
     # ------------------------------------------------------------------
-    # Updated _db_dropdown_cb — integrate sort mode and new widgets
+    # Updated _db_dropdown_cb — update panels and scroll visibility
     # ------------------------------------------------------------------
     def _db_dropdown_cb(self, attr, old, new):
         """Handle dataset change — full reset."""
@@ -1523,7 +1862,6 @@ class DicomViewer:
             )
             self.selected_series = self.series_mgr.series[0]
 
-            # Use position-sorted or filename-sorted based on toggle
             if self.series_mgr.sort_by_position:
                 axis = self.series_mgr.determine_axis(
                     self.selected_series,
@@ -1581,21 +1919,18 @@ class DicomViewer:
         self._set_image_fig_title(self.image_name)
         self.source.data["image"] = [self.processed_image]
         self._refresh_wl_presets()
-
-        # Reapply current LUT
         self._apply_current_lut()
-
+        self._update_panels()
         self._log(f"Get new imaging {new}")
 
     # ------------------------------------------------------------------
-    # Updated _series_cb — use sort mode
+    # Updated _series_cb — update panels
     # ------------------------------------------------------------------
     def _series_cb(self, attr, old, new):
         """Handle series selection change."""
         self.selected_series = new
         self._log(f"Get new series {self.selected_series}")
 
-        # Sort based on current mode
         if self.series_mgr.sort_by_position:
             axis = self.series_mgr.determine_axis(
                 self.selected_series,
@@ -1647,10 +1982,120 @@ class DicomViewer:
         )
 
         self._refresh_wl_presets()
+        self._update_panels()
         self._log(f"Selected new series {new}")
 
     # ------------------------------------------------------------------
-    # Updated _update_visibility — include sort toggle
+    # Updated _gamma_cb — update histogram
+    # ------------------------------------------------------------------
+    def _gamma_cb(self, attr, old, new):
+        """Handle gamma slider change."""
+        self.gamma = new
+        self.processed_image = ImageProcessor.perform_gamma(
+            self.clipped_image, self.gamma, self.original_dtype
+        )
+        self.source.data["image"] = [self.processed_image]
+        self.max_bright = float(np.max(self.processed_image))
+        self._refresh_wl_presets()
+        if self.fig_histogram.visible:
+            self._update_histogram()
+        self._log(f"Set gamma to {self.gamma:.1f}")
+
+    # ------------------------------------------------------------------
+    # Updated _wl_preset_cb — update histogram W/L lines
+    # ------------------------------------------------------------------
+    def _wl_preset_cb(self, attr, old, new):
+        """Handle window/level preset dropdown selection."""
+        if new == WL_MANUAL_LABEL:
+            self._log("Switched to manual window/level")
+            return
+
+        for p in self.wl_presets:
+            label = self._wl_preset_label(p)
+            if label == new:
+                self.wl_center_slider.remove_on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+                self.wl_width_slider.remove_on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+
+                self.wl_center_slider.value = p["center"]
+                self.wl_width_slider.value = p["width"]
+
+                self.wl_center_slider.on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+                self.wl_width_slider.on_change(
+                    "value_throttled", self._wl_manual_cb
+                )
+
+                self._apply_window_level(p["center"], p["width"])
+                if self.fig_histogram.visible:
+                    self._update_histogram_wl_lines()
+                self._log(f"W/L preset: {p['name']} "
+                          f"(C:{p['center']:.0f} W:{p['width']:.0f})")
+                break
+
+    # ------------------------------------------------------------------
+    # Updated _wl_manual_cb — update histogram W/L lines
+    # ------------------------------------------------------------------
+    def _wl_manual_cb(self, attr, old, new):
+        """Handle manual window center/width slider changes."""
+        center = self.wl_center_slider.value
+        width = self.wl_width_slider.value
+        self._apply_window_level(center, width)
+
+        self.wl_preset_dropdown.remove_on_change("value", self._wl_preset_cb)
+        self.wl_preset_dropdown.value = WL_MANUAL_LABEL
+        self.wl_preset_dropdown.on_change("value", self._wl_preset_cb)
+
+        if self.fig_histogram.visible:
+            self._update_histogram_wl_lines()
+
+        self._log(f"Manual W/L: center={center:.0f}, width={width:.0f}")
+
+    # ------------------------------------------------------------------
+    # Updated _increment_cb — update panels
+    # ------------------------------------------------------------------
+    def _increment_cb(self):
+        """Advance one slice forward."""
+        images = self.current_series if self.is_series else self.images_list
+        if self.current_slice < len(images) - 1:
+            self.current_slice += 1
+            self._sync_slice_slider()
+            self._get_new_image()
+            self._update_panels()
+            self._log(f"Increment image to {self.current_slice}")
+        else:
+            self._log(f"At max image {self.current_slice}")
+
+    # ------------------------------------------------------------------
+    # Updated _decrement_cb — update panels
+    # ------------------------------------------------------------------
+    def _decrement_cb(self):
+        """Go back one slice."""
+        if self.current_slice > 0:
+            self.current_slice -= 1
+            self._sync_slice_slider()
+            self._get_new_image()
+            self._update_panels()
+            self._log(f"Decrement image to {self.current_slice}")
+        else:
+            self._log(f"At min image {self.current_slice}")
+
+    # ------------------------------------------------------------------
+    # Updated _series_slider_slice_cb — update panels
+    # ------------------------------------------------------------------
+    def _series_slider_slice_cb(self, attr, old, new):
+        """Handle slice slider change."""
+        self.current_slice = int(new)
+        self._get_new_image()
+        self._update_panels()
+        self._log(f"Slider set to {self.current_slice}")
+
+    # ------------------------------------------------------------------
+    # Updated _update_visibility — include scroll toggle
     # ------------------------------------------------------------------
     def _update_visibility(self):
         """Update widget visibility based on current modality."""
@@ -1663,9 +2108,10 @@ class DicomViewer:
         self.increment_button.visible = is_s
         self.decrement_button.visible = is_s
         self.sort_toggle.visible = is_s
+        self.scroll_enabled.visible = is_s
 
     # ------------------------------------------------------------------
-    # Updated _reset_cb — reset Phase 1 features too
+    # Updated _reset_cb — reset Phase 2 features too
     # ------------------------------------------------------------------
     def _reset_cb(self):
         """Reset all adjustments to defaults."""
@@ -1681,7 +2127,7 @@ class DicomViewer:
         self.window_slider.value = self.window
         self.window_slider.on_change("value_throttled", self._window_cb)
 
-        # Reprocess image with default gamma
+        # Reprocess image
         self.processed_image = ImageProcessor.perform_gamma(
             self.clipped_image, self.gamma, self.original_dtype
         )
@@ -1697,7 +2143,7 @@ class DicomViewer:
         self.invert_toggle.button_type = "default"
         self.invert_toggle.label = "Invert"
 
-        # Reset LUT to grayscale
+        # Reset LUT
         self.current_lut = DEFAULT_LUT
         self.lut_dropdown.remove_on_change("value", self._lut_cb)
         self.lut_dropdown.value = DEFAULT_LUT
@@ -1711,6 +2157,22 @@ class DicomViewer:
         self.zoom_lock_toggle.active = False
         self.zoom_lock_toggle.button_type = "default"
         self.zoom_lock_toggle.label = "Lock Zoom"
+
+        # Close panels
+        self.metadata_pre.visible = False
+        self.metadata_toggle.active = False
+        self.metadata_toggle.button_type = "default"
+        self.metadata_toggle.label = "Show Metadata"
+
+        self.fig_histogram.visible = False
+        self.histogram_toggle.active = False
+        self.histogram_toggle.button_type = "default"
+        self.histogram_toggle.label = "Show Histogram"
+
+        # Disable scroll
+        self.scroll_enabled.active = False
+        self.scroll_enabled.button_type = "default"
+        self.scroll_enabled.label = "Scroll Slices"
 
         self._log("Reset all adjustments to defaults")
 
