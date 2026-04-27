@@ -102,6 +102,10 @@ METADATA_MAX_LINES = 80
 METADATA_WIDTH = 500
 METADATA_HEIGHT = 400
 
+TARGET_DISPLAY_SIZE = 768  # Target display dimension in pixels
+MIN_DISPLAY_SIZE = 400
+MAX_DISPLAY_SIZE = 1200
+
 # Tags to skip in metadata display (binary/pixel data)
 METADATA_SKIP_VR = {"OB", "OW", "OF", "SQ", "UN", "UC", "UR"}
 
@@ -1730,34 +1734,50 @@ class DicomViewer:
         self.dicom_image = ImageProcessor.ensure_2d(self.dicom_image)
 
         # Apply rescale slope/intercept
-        self.dicom_image = ImageProcessor.apply_rescale(self.dicom_image, self.ds)
+        self.dicom_image = ImageProcessor.apply_rescale(
+            self.dicom_image, self.ds
+        )
 
         # Apply photometric interpretation
-        self.clipped_image = ImageProcessor.apply_photometric(self.dicom_image, self.ds)
+        self.clipped_image = ImageProcessor.apply_photometric(
+            self.dicom_image, self.ds
+        )
 
         # Flip vertically for display
         self.clipped_image = np.flipud(self.clipped_image)
 
-        # Determine modality and scale
+        # Determine modality
         if "X-Ray" in self.sop_class_name:
-            self.image_scale = XRAY_SCALE
             self.image_type = MODALITY_XRAY
         elif "CT" in self.sop_class_name:
-            self.image_scale = CT_SCALE
             self.image_type = MODALITY_CT
         elif "MR" in self.sop_class_name:
-            self.image_scale = MRI_SCALE
             self.image_type = MODALITY_MRI
             if self.gamma == self.config.gamma_def:
                 self.gamma = MRI_GAMMA
         else:
-            self.image_scale = US_SCALE
             self.image_type = MODALITY_US
             if self.gamma == self.config.gamma_def:
                 self.gamma = US_GAMMA
 
         self.is_series = (self.image_type != MODALITY_XRAY)
         self.height, self.width = self.clipped_image.shape
+
+        # Adaptive scaling: target a reasonable display size
+        # without exceeding max or going below min
+        max_dim = max(self.height, self.width)
+        if max_dim > 0:
+            self.image_scale = TARGET_DISPLAY_SIZE / max_dim
+            # Clamp the scale
+            min_scale = MIN_DISPLAY_SIZE / max_dim
+            max_scale = MAX_DISPLAY_SIZE / max_dim
+            self.image_scale = max(min_scale, min(max_scale, self.image_scale))
+            # Don't upscale beyond 1:1 unless image is very small
+            if max_dim >= TARGET_DISPLAY_SIZE:
+                self.image_scale = min(self.image_scale, 1.0)
+        else:
+            self.image_scale = 1.0
+
         self.height_scl = int(self.height * self.image_scale)
         self.width_scl = int(self.width * self.image_scale)
 
@@ -1767,7 +1787,7 @@ class DicomViewer:
         )
         self.max_bright = float(np.max(self.processed_image))
 
-        # Extract W/L presets from this image's metadata
+        # Extract W/L presets
         self.wl_presets = ImageProcessor.extract_wl_presets(self.ds)
 
     # ------------------------------------------------------------------
