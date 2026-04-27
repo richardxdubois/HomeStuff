@@ -843,7 +843,6 @@ class DicomViewer:
             visible=False,
         )
         self.fig_histogram.toolbar_location = "above"
-        self.fig_histogram.y_axis_type = "linear"
 
         self.histogram_source = ColumnDataSource(
             data={"top": [], "left": [], "right": []}
