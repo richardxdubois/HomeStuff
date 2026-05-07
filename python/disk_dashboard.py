@@ -14,6 +14,7 @@ from bokeh.palettes import Category10_6
 class DiskDashboard:
 
     DARK_BG = '#0e1117'
+    LIGHT_BG = '#F5F5F5'  # very light gray
     CARD_BG = '#1a1a2e'
     BORDER = '#2a2a4a'
     TEXT = '#fafafa'
@@ -160,18 +161,16 @@ class DiskDashboard:
         print(f"DiskDashboard: Written to {self.output_file}")
         return True
 
-
-
     def _styled_figure(self, title="", y_label="", height=420):
-        """Create a dark-themed Bokeh figure."""
+        """Create a colour-themed Bokeh figure."""
 
         fig = figure(
             x_axis_type='datetime',
             height=height,
             sizing_mode='stretch_width',
             tools="pan,wheel_zoom,box_zoom,reset,save",
-            background_fill_color=self.DARK_BG,
-            border_fill_color=self.DARK_BG,
+            background_fill_color=self.LIGHT_BG,
+            border_fill_color=self.LIGHT_BG,
             outline_line_color=None,
             title=title,
         )
@@ -305,11 +304,16 @@ class DiskDashboard:
         self._style_legend(fig_free)
         self._style_legend(fig_pct)
 
+        if total_days > 60:
+            slider_value = 30
+        else:
+            slider_value = max(total_days, 2)
+
         # Create slider that controls x_range of both charts
         slider = Slider(
             start=1,
             end=max(total_days, 2),
-            value=max(total_days, 2),
+            value=slider_value,
             step=1,
             title="Days of history",
             sizing_mode='stretch_width',
