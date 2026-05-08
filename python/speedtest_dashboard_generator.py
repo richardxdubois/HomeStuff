@@ -112,7 +112,7 @@ class DashboardGenerator:
 
         return p
 
-    def _create_date_slider(self, data_frame, source):
+    def _create_date_slider(self, data_frame, fig, source):
         """Creates a DateRangeSlider linked to the plot's data source via JavaScript."""
         if data_frame.empty:
             return Div(text="Not enough data for a slider.")
@@ -132,12 +132,16 @@ class DashboardGenerator:
             sizing_mode="stretch_width"
         )
 
+        fig.x_range = Range1d(start=initial_start, end=end_date)
         # JavaScript callback to filter the plot data based on the slider's range
-        callback = CustomJS(args=dict(source=source, original_source=ColumnDataSource(self.data)), code="""
+        callback = CustomJS(args=dict(source=source, original_source=ColumnDataSource(self.data), fig=fig)
+                            , code="""
             const data = source.data;
             const original_data = original_source.data;
             const start = cb_obj.value[0];
             const end = cb_obj.value[1];
+            fig.x_range.start = start;
+            fig.x_range.end = end;
 
             // Clear existing data
             Object.keys(data).forEach(key => data[key] = []);
@@ -230,7 +234,7 @@ class DashboardGenerator:
         # Create components
         timestamp_div = Div(text=f"<i>Dashboard generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>")
         plot = self._create_plot(source, ColumnDataSource(self.data))
-        slider = self._create_date_slider(self.data, source)
+        slider = self._create_date_slider(self.data, plot, source)
         table = self._create_table()
 
         # Arrange layout
