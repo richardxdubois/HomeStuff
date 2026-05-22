@@ -4,7 +4,12 @@ from bokeh.plotting import figure, curdoc
 from bokeh.models import (CheckboxGroup, DateRangeSlider, Select, Div,
                          HoverTool, BoxAnnotation, Button)
 from bokeh.layouts import column, row
+from tornado.ioloop import IOLoop
+
 import pandas as pd
+import os
+import signal
+
 from datetime import datetime, timedelta, time
 
 from Tide_analyzer import TideAnalyzer, TideConfig
@@ -95,13 +100,41 @@ def exit_callback():
     import threading
     def delayed_exit():
         import sys
-        sys.exit(0)
+        print("Exit button shutdown")
+        # Kill entire process group
+        os.killpg(os.getpgid(0), signal.SIGTERM)
 
     timer = threading.Timer(0.5, delayed_exit)
     timer.start()
 
+# ------------------------------------------------------------------
+    # Server control
+    # ------------------------------------------------------------------
+def _stop_server(self):
+    """Gracefully shut down the Bokeh server."""
+    #curdoc().add_next_tick_callback(
+    #    lambda: self._async_update_log("Server is shutting down...")
+    #
+    #curdoc().add_next_tick_callback(
+    #    lambda: self._async_change_button(self.exit_button, "light")
+    #)
+    status_div.text = "<p style='color: blue; font-size: 16px;'>✓ Exiting application...</p>"
 
-exit_button.on_click(exit_callback)
+    curdoc().add_next_tick_callback(_exit_server)
+
+async def _async_update_log(self, message: str):
+    self.log_div.text = message
+
+async def _exit_server():
+    print("Server is shutting down...")
+
+    IOLoop.current().stop()
+
+async def _async_change_button(self, button, color: str):
+    button.button_type = color
+
+#exit_button.on_click(exit_callback)
+exit_button.on_click(_stop_server)
 
 def slider_change_callback(attr, old, new):
     """Auto-reload when slider changes (after user stops dragging)."""
