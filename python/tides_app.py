@@ -86,10 +86,20 @@ load_button = Button(label="Load Tide Data", button_type="primary", width=150)
 # Exit button
 exit_button = Button(label="Exit App", button_type="danger", width=100)
 
+
 def exit_callback():
     """Shut down the Bokeh server."""
-    import sys
-    sys.exit(0)
+    status_div.text = "<p style='color: blue; font-size: 16px;'>✓ Exiting application...</p>"
+
+    # Give the browser time to display the message before shutdown
+    import threading
+    def delayed_exit():
+        import sys
+        sys.exit(0)
+
+    timer = threading.Timer(0.5, delayed_exit)
+    timer.start()
+
 
 exit_button.on_click(exit_callback)
 
