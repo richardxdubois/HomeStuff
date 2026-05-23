@@ -2,7 +2,7 @@
 
 from bokeh.plotting import figure, curdoc
 from bokeh.models import (CheckboxGroup, DateRangeSlider, Select, Div,
-                         HoverTool, BoxAnnotation, Button)
+                         HoverTool, BoxAnnotation, Button, DateRangePicker)
 from bokeh.layouts import column, row
 from tornado.ioloop import IOLoop
 
@@ -72,6 +72,13 @@ date_range_slider = DateRangeSlider(
     width=400
 )
 
+date_range_picker = DateRangePicker(
+    title="Select Date Range:",
+    value=(min_date.date(), max_date.date()),
+    min_date=min_date.date(),
+    max_date=max_date.date(),
+    width=300
+)
 weekends_only_checkbox = CheckboxGroup(
     labels=["Weekends Only"],
     active=[0] if config.config.get('dates', {}).get('weekends_only', False) else [],
@@ -148,6 +155,23 @@ weekends_only_checkbox.on_change('active', lambda attr, old, new: load_data_call
 
 # Use value_throttled instead of value - only fires when dragging stops
 date_range_slider.on_change('value_throttled', slider_change_callback)
+
+
+def sync_picker_from_slider(attr, old, new):
+    """Update date picker when slider moves."""
+    start_ts, end_ts = new
+
+    start_date = pd.Timestamp(start_ts, unit='ms').date()
+    end_date = pd.Timestamp(end_ts, unit='ms').date()
+
+    # Update picker without triggering callback
+    date_range_picker.remove_on_change('value', date_range_picker_cb)
+    date_range_picker.value = (start_date, end_date)
+    date_range_picker.on_change('value', date_range_picker_cb)
+
+
+# Add to existing slider callback
+date_range_slider.on_change('value', sync_picker_from_slider)
 
 # Status display
 status_div = Div(text="<p>Select parameters and click 'Load Tide Data'</p>", width=800)
@@ -514,6 +538,27 @@ load_button.on_click(load_data_callback)
 category_filter.on_change('active', lambda attr, old, new: update_plots())
 day_select.on_change('value', day_select_callback)
 
+
+def date_range_picker_cb(attr, old, new):
+    """Handle date range picker change."""
+    if new and len(new) == 2:
+        start_date, end_date = new
+
+        # Convert dates to timestamps for the slider
+        start_ts = pd.Timestamp(start_date).value / 1e6  # milliseconds
+        end_ts = pd.Timestamp(end_date).value / 1e6
+
+        # Update slider (without triggering its callback to avoid loop)
+        date_range_slider.value = (start_ts, end_ts)
+
+        # Trigger reload
+        load_data_callback()
+
+        status_div.text = f"Date range set to {start_date} to {end_date}"
+
+
+date_range_picker.on_change('value', date_range_picker_cb)
+
 # Layout
 title_div = Div(text="""
 <h1 style='font-family: Arial, sans-serif;'>🌊 Tide Prediction Tool for Kayaking</h1>
@@ -521,7 +566,7 @@ title_div = Div(text="""
 """, width=900)
 
 controls_row1 = row(location_select, window_start_select, window_end_select, weekends_only_checkbox)
-controls_row2 = row(date_range_slider, load_button, exit_button)
+controls_row2 = row(date_range_slider, date_range_picker, load_button, exit_button)
 controls_row3 = row(category_filter, day_select)
 
 layout = column(
