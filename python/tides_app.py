@@ -149,12 +149,55 @@ def slider_change_callback(attr, old, new):
 
 # Auto-reload callbacks for all controls
 location_select.on_change('value', lambda attr, old, new: load_data_callback())
-window_start_select.on_change('value', lambda attr, old, new: load_data_callback())
-window_end_select.on_change('value', lambda attr, old, new: load_data_callback())
+
 weekends_only_checkbox.on_change('active', lambda attr, old, new: load_data_callback())
 
 # Use value_throttled instead of value - only fires when dragging stops
 date_range_slider.on_change('value_throttled', slider_change_callback)
+
+
+def window_change_callback(attr, old, new):
+    """Re-categorize and update display when window times change."""
+    global date_categories, all_plots
+
+    if not current_analyzer or current_analyzer.df_hilo is None:
+        return  # No data loaded yet
+
+    window_start = int(window_start_select.value)
+    window_end = int(window_end_select.value)
+
+    # Re-categorize with new window
+    date_categories = categorize_dates(current_analyzer, current_dates, window_start, window_end)
+
+    # Update summary table
+    summary_html = create_summary_table(current_dates, date_categories, window_start, window_end)
+    summary_div.text = summary_html
+
+    # Update plots with new window (they need to redraw the green box)
+    # This requires recreating plots since window annotation is built-in
+    for date_str in current_dates:
+        if date_str in date_categories['good']:
+            category = 'good'
+        elif date_str in date_categories['marginal']:
+            category = 'marginal'
+        else:
+            category = 'other'
+
+        plot = create_day_plot(date_str, window_start, window_end, category)
+        if plot:
+            all_plots[date_str] = plot
+
+    # Update layout
+    plots_column.children = list(all_plots.values())
+    update_plots()
+    update_day_selector()
+
+    status_div.text = f"<p style='color: green;'>✓ Window updated. Found {len(date_categories['good'])} good, {len(date_categories['marginal'])} marginal, {len(date_categories['other'])} other.</p>"
+
+
+# Wire up the new callback
+window_start_select.on_change('value', window_change_callback)
+window_end_select.on_change('value', window_change_callback)
 
 
 def sync_picker_from_slider(attr, old, new):
@@ -268,8 +311,13 @@ def create_summary_table(dates, categories, window_start, window_end):
 
         # Format high tide
         if not highs.empty:
-            first_high = highs.iloc[0]
-            high_str = f"{first_high.name.strftime('%I:%M %p')} ({first_high['v']:.1f} ft)"
+            high_strs = []
+            for idx, high in highs.iterrows():
+                # Mark if it's in the target window
+                in_window = window_start <= idx.hour <= window_end
+                marker = " ⭐" if in_window else ""
+                high_strs.append(f"{idx.strftime('%I:%M %p')} ({high['v']:.1f} ft){marker}")
+            high_str = "<br>".join(high_strs)
         else:
             high_str = "N/A"
 
