@@ -56,12 +56,9 @@ window_end_select = Select(
 
 # Date range selector
 date_list = config.get_date_list()
-if date_list:
-    min_date = pd.to_datetime(min(date_list))
-    max_date = pd.to_datetime(max(date_list))
-else:
-    min_date = datetime.now()
-    max_date = datetime.now() + timedelta(days=30)
+
+min_date = datetime.now()
+max_date = datetime.now() + timedelta(days=30)
 
 date_range_slider = DateRangeSlider(
     title="Date Range:",
