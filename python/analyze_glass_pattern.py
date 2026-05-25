@@ -34,6 +34,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from collections import defaultdict
 from pathlib import Path
+import yaml
 
 
 # =============================================================================
@@ -1752,6 +1753,9 @@ class PatternAnalyzer:
         # Use binary as base, add numbers
         line_width_px = max(1, int(round(self.came_width * dpi)))
 
+        print(f"  Came width: {self.came_width}\" = {line_width_px}px")
+        print(f"  Technique: {self.technique}")
+
         img_h, img_w = self.gray.shape
         full_pattern = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
 
@@ -2525,6 +2529,531 @@ class PatternAnalyzer:
         except ImportError:
             cv2.imwrite(path, image)
 
+    def load_glass_config(self, config_path):
+        """Load glass assignments from a YAML configuration file.
+
+        Supports two formats per piece:
+            Simple:   1: "spectrum/318-2S.jpg"
+            Detailed: 1:
+                        scan: "spectrum/318-2S.jpg"
+                        fill: "stretch"   # or "tile" (default)
+
+        Args:
+            config_path: Path to YAML config file
+
+        Returns:
+            Dict of piece_id → glass info
+        """
+        import yaml
+
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        glass_library = Path(config.get('glass_library', '.'))
+        assignments = config.get('glass_assignments', {})
+        default_fill = config.get('default_fill', 'tile')
+
+        self.glass_library = glass_library
+        self.glass_assignments = {}
+        self.glass_scans = {}
+
+        for piece_id, value in assignments.items():
+            piece_id = int(piece_id)
+
+            # Handle both simple string and detailed dict formats
+            if isinstance(value, str):
+                scan_path = value
+                fill_mode = default_fill
+            elif isinstance(value, dict):
+                scan_path = value.get('scan', '')
+                fill_mode = value.get('fill', default_fill)
+            else:
+                print(f"  WARNING: Invalid config for piece {piece_id}")
+                continue
+
+            full_path = glass_library / scan_path
+
+            if not full_path.exists():
+                print(f"  WARNING: Glass scan not found: {full_path}")
+                continue
+
+            self.glass_assignments[piece_id] = {
+                'scan_path': scan_path,
+                'full_path': str(full_path),
+                'name': Path(scan_path).stem,
+                'manufacturer': Path(scan_path).parts[0]
+                if len(Path(scan_path).parts) > 1 else "Unknown",
+                'fill': fill_mode,
+            }
+
+            # Load scan image (cache to avoid reloading duplicates)
+            if scan_path not in self.glass_scans:
+                scan_img = cv2.imread(str(full_path))
+                if scan_img is not None:
+                    self.glass_scans[scan_path] = scan_img
+                    print(f"  Loaded: {scan_path} "
+                          f"({scan_img.shape[1]}x{scan_img.shape[0]})")
+                else:
+                    print(f"  WARNING: Could not read: {full_path}")
+
+        print(f"\nLoaded glass config: {len(self.glass_assignments)} "
+              f"piece assignments, {len(self.glass_scans)} unique scans")
+        print(f"  Default fill mode: {default_fill}")
+
+        self._update_groups_from_glass()
+
+        return self.glass_assignments
+
+    def _update_groups_from_glass(self):
+        """Update material groupings based on glass assignments.
+
+        Pieces assigned the same glass scan are grouped together
+        regardless of their K-means color group.
+        """
+        if not hasattr(self, 'glass_assignments'):
+            return
+
+        # Build groups by scan path
+        glass_groups = defaultdict(list)
+        for piece_id, info in self.glass_assignments.items():
+            glass_groups[info['scan_path']].append(piece_id)
+
+        self.glass_groups = {}
+        for scan_path, piece_ids in glass_groups.items():
+            info = self.glass_assignments[piece_ids[0]]
+            total_area = sum(
+                p.area_sq_inches for p in self.pieces
+                if p.id in piece_ids
+            )
+            self.glass_groups[scan_path] = {
+                'name': info['name'],
+                'manufacturer': info['manufacturer'],
+                'scan_path': scan_path,
+                'piece_ids': piece_ids,
+                'piece_count': len(piece_ids),
+                'total_area_sq_in': round(total_area, 2),
+            }
+
+    def _stretch_texture(self, texture, mask):
+        """Stretch a glass scan texture to fill a piece bounding box.
+
+        Resizes the texture to match the bounding box dimensions,
+        then applies the mask to cut out the piece shape.
+        Good for streaky/directional glass where grain matters.
+
+        Args:
+            texture: Glass scan image (BGR)
+            mask: Binary mask of piece shape (255 inside, 0 outside)
+
+        Returns:
+            Textured piece image (BGR), same size as mask, black outside piece
+        """
+        h, w = mask.shape[:2]
+
+        # Resize texture to fill the bounding box
+        stretched = cv2.resize(texture, (w, h), interpolation=cv2.INTER_AREA)
+
+        # Apply mask
+        result = np.zeros((h, w, 3), dtype=np.uint8)
+        result[mask > 0] = stretched[mask > 0]
+
+        return result
+
+    def _fill_piece_texture(self, texture, mask, fill_mode):
+        """Fill a piece with glass texture using specified mode.
+
+        Args:
+            texture: Glass scan image (BGR)
+            mask: Binary mask of piece shape
+            fill_mode: "tile" or "stretch"
+
+        Returns:
+            Textured piece image (BGR)
+        """
+        if fill_mode == "stretch":
+            return self._stretch_texture(texture, mask)
+        else:
+            return self._tile_texture(texture, mask)
+
+    def _tile_texture(self, texture, mask):
+        """Tile a glass scan texture to fill a piece mask.
+
+        Repeats the texture image to cover the bounding box of the
+        mask, then applies the mask to cut out the piece shape.
+
+        Args:
+            texture: Glass scan image (BGR)
+            mask: Binary mask of piece shape (255 inside, 0 outside)
+
+        Returns:
+            Textured piece image (BGR), same size as mask, black outside piece
+        """
+        h, w = mask.shape[:2]
+        tex_h, tex_w = texture.shape[:2]
+
+        # Tile texture to cover the full mask area
+        tiles_x = (w // tex_w) + 1
+        tiles_y = (h // tex_h) + 1
+
+        tiled = np.tile(texture, (tiles_y, tiles_x, 1))
+        tiled = tiled[:h, :w]
+
+        # Apply mask
+        result = np.zeros((h, w, 3), dtype=np.uint8)
+        result[mask > 0] = tiled[mask > 0]
+
+        return result
+
+    def generate_glass_visualization(self, prefix="pattern"):
+        """Generate a visualization showing actual glass textures in each piece.
+
+        Each piece with a glass assignment is filled with the tiled
+        glass scan. Unassigned pieces are shown in light grey.
+        Lead lines are drawn on top.
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Path to saved image
+        """
+        if not hasattr(self, 'glass_assignments'):
+            print("No glass config loaded. Use load_glass_config() first.")
+            return None
+
+        output_path = self._output_path(f"{prefix}_glass_preview.png")
+
+        img_h, img_w = self.gray.shape
+        preview = np.ones((img_h, img_w, 3), dtype=np.uint8) * 220  # light grey
+
+        for piece in self.pieces:
+            if piece.id not in self.glass_assignments:
+                # Unassigned — leave grey
+                continue
+
+            info = self.glass_assignments[piece.id]
+            scan_path = info['scan_path']
+
+            if scan_path not in self.glass_scans:
+                continue
+
+            texture = self.glass_scans[scan_path]
+
+            # Create mask for this piece
+            mask = np.zeros((img_h, img_w), dtype=np.uint8)
+            cv2.drawContours(mask, [piece.contour], -1, 255, -1)
+
+            # Get bounding box for efficiency
+            bx, by, bw, bh = piece.bounding_box
+
+            # Extract the piece region
+            piece_mask = mask[by:by + bh, bx:bx + bw]
+
+            # Tile texture to fill this region
+            #textured = self._tile_texture(texture, piece_mask)
+            fill_mode = info.get('fill', 'tile')
+            textured = self._fill_piece_texture(texture, piece_mask, fill_mode)
+
+            # Place textured piece into preview
+            preview[by:by + bh, bx:bx + bw][piece_mask > 0] = \
+                textured[piece_mask > 0]
+
+        # Draw lead lines on top
+        line_width_px = max(1, int(round(self.came_width * self.scale_dpi)))
+        # Use a thicker line for visual clarity in the preview
+        preview_line_width = max(line_width_px, 3)
+
+        for piece in self.pieces:
+            cv2.drawContours(
+                preview, [piece.contour], -1,
+                (40, 40, 40), preview_line_width, lineType=cv2.LINE_AA
+            )
+
+        # Add piece numbers
+        for piece in self.pieces:
+            cx, cy = piece.centroid
+            font_scale = max(
+                0.3, min(0.7, np.sqrt(piece.area_sq_inches) * 0.3)
+            )
+            text = str(piece.id)
+            (tw, th), _ = cv2.getTextSize(
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+            )
+            cv2.rectangle(
+                preview,
+                (cx - tw // 2 - 2, cy - th // 2 - 2),
+                (cx + tw // 2 + 2, cy + th // 2 + 2),
+                (255, 255, 255), -1
+            )
+            cv2.putText(
+                preview, text,
+                (cx - tw // 2, cy + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale,
+                (0, 0, 0), 1
+            )
+
+        cv2.imwrite(output_path, preview)
+        print(f"Saved glass preview: {output_path}")
+        return output_path
+
+    def generate_glass_report(self, prefix="pattern"):
+        """Generate a material report grouped by glass type.
+
+        Shows area totals per glass scan, grouped by manufacturer.
+
+        Args:
+            prefix: Output filename prefix
+
+        Returns:
+            Report text as string
+        """
+        if not hasattr(self, 'glass_groups'):
+            print("No glass config loaded.")
+            return ""
+
+        output_path = self._output_path(f"{prefix}_glass_report.txt")
+
+        lines = []
+        lines.append("=" * 60)
+        lines.append("GLASS MATERIAL REPORT — SHOPPING LIST")
+        lines.append("=" * 60)
+        lines.append("")
+
+        # Summary
+        assigned_pieces = len(self.glass_assignments)
+        total_pieces = len(self.pieces)
+        assigned_area = sum(
+            g['total_area_sq_in'] for g in self.glass_groups.values()
+        )
+        total_area = sum(p.area_sq_inches for p in self.pieces)
+        unassigned_area = total_area - assigned_area
+
+        lines.append(f"Pieces assigned: {assigned_pieces}/{total_pieces}")
+        lines.append(f"Area assigned: {assigned_area:.1f} sq in "
+                     f"({100 * assigned_area / total_area:.0f}%)")
+        if assigned_pieces < total_pieces:
+            unassigned_ids = [
+                p.id for p in self.pieces
+                if p.id not in self.glass_assignments
+            ]
+            lines.append(f"Unassigned pieces: {unassigned_ids} "
+                         f"({unassigned_area:.1f} sq in)")
+        lines.append("")
+
+        # Group by manufacturer
+        by_manufacturer = defaultdict(list)
+        for scan_path, group in self.glass_groups.items():
+            by_manufacturer[group['manufacturer']].append(group)
+
+        lines.append("-" * 60)
+        lines.append(
+            f"{'Glass':>30} {'Pieces':>8} {'Area':>10} "
+            f"{'Sq Ft':>8}"
+        )
+        lines.append("-" * 60)
+
+        for manufacturer in sorted(by_manufacturer.keys()):
+            lines.append(f"\n  {manufacturer}:")
+            groups = sorted(
+                by_manufacturer[manufacturer],
+                key=lambda g: -g['total_area_sq_in']
+            )
+            for group in groups:
+                sq_ft = group['total_area_sq_in'] / 144
+                lines.append(
+                    f"    {group['name']:>26} "
+                    f"{group['piece_count']:>8} "
+                    f"{group['total_area_sq_in']:>9.1f}\" "
+                    f"{sq_ft:>7.2f}"
+                )
+                lines.append(
+                    f"{'':>30} Pieces: {group['piece_ids']}"
+                )
+
+        # Add waste factor
+        lines.append("")
+        lines.append("-" * 60)
+        lines.append("WITH WASTE FACTOR (30% for cutting waste):")
+        lines.append("-" * 60)
+
+        waste = 1.30
+        for manufacturer in sorted(by_manufacturer.keys()):
+            lines.append(f"\n  {manufacturer}:")
+            groups = sorted(
+                by_manufacturer[manufacturer],
+                key=lambda g: -g['total_area_sq_in']
+            )
+            for group in groups:
+                area_with_waste = group['total_area_sq_in'] * waste
+                sq_ft = area_with_waste / 144
+                lines.append(
+                    f"    {group['name']:>26} "
+                    f"{area_with_waste:>9.1f}\" "
+                    f"{sq_ft:>7.2f} sq ft"
+                )
+
+        lines.append("")
+        lines.append("=" * 60)
+
+        report_text = "\n".join(lines)
+        with open(output_path, 'w') as f:
+            f.write(report_text)
+        print(f"\nSaved glass report: {output_path}")
+        print("\n" + report_text)
+
+        return report_text
+
+    def generate_bokeh_glass_figure(self, img_width, img_height):
+        """Build a Bokeh figure showing glass textures in pieces.
+
+        Similar to the color figure but uses actual glass scan
+        textures encoded as RGBA images.
+
+        Args:
+            img_width: Image width in pixels
+            img_height: Image height in pixels
+
+        Returns:
+            Bokeh figure, or None if no glass config
+        """
+        if not hasattr(self, 'glass_assignments') or not self.glass_assignments:
+            return None
+
+        from bokeh.plotting import figure
+        from bokeh.models import ColumnDataSource, HoverTool
+
+        # Build the glass preview image and use it as background
+        img_h, img_w = self.gray.shape
+        preview = np.ones((img_h, img_w, 3), dtype=np.uint8) * 220
+
+        for piece in self.pieces:
+            if piece.id not in self.glass_assignments:
+                continue
+            info = self.glass_assignments[piece.id]
+            scan_path = info['scan_path']
+            if scan_path not in self.glass_scans:
+                continue
+            texture = self.glass_scans[scan_path]
+            mask = np.zeros((img_h, img_w), dtype=np.uint8)
+            cv2.drawContours(mask, [piece.contour], -1, 255, -1)
+            bx, by, bw, bh = piece.bounding_box
+            piece_mask = mask[by:by + bh, bx:bx + bw]
+            #textured = self._tile_texture(texture, piece_mask)
+            info = self.glass_assignments[piece.id]
+            fill_mode = info.get('fill', 'tile')
+            textured = self._fill_piece_texture(texture, piece_mask, fill_mode)
+
+            preview[by:by + bh, bx:bx + bw][piece_mask > 0] = \
+                textured[piece_mask > 0]
+
+        # Draw lines
+        for piece in self.pieces:
+            cv2.drawContours(
+                preview, [piece.contour], -1,
+                (40, 40, 40), 3, lineType=cv2.LINE_AA
+            )
+
+        # Convert to RGBA uint32 for Bokeh
+        img_rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
+        img_rgba = np.zeros((img_h, img_w, 4), dtype=np.uint8)
+        img_rgba[:, :, :3] = img_rgb
+        img_rgba[:, :, 3] = 255
+        img_rgba = np.flipud(img_rgba)
+        img_uint32 = np.zeros((img_h, img_w), dtype=np.uint32)
+        view = img_uint32.view(dtype=np.uint8).reshape((img_h, img_w, 4))
+        view[:, :, :] = img_rgba
+
+        # Build figure
+        p = figure(
+            title="Glass Preview — Actual Glass Textures",
+            width=800,
+            height=int(800 * img_h / img_w),
+            x_range=(0, img_w),
+            y_range=(0, img_h),
+            tools="pan,wheel_zoom,box_zoom,reset,save",
+            active_scroll="wheel_zoom",
+            match_aspect=True,
+        )
+
+        p.image_rgba(
+            image=[img_uint32],
+            x=0, y=0,
+            dw=img_w, dh=img_h,
+        )
+
+        # Add invisible patches for hover
+        glass_data = defaultdict(list)
+        for piece in self.pieces:
+            epsilon = 0.01 * cv2.arcLength(piece.contour, True)
+            simplified = cv2.approxPolyDP(piece.contour, epsilon, True)
+            points = simplified.reshape(-1, 2)
+
+            xs = points[:, 0].tolist()
+            ys = (img_h - points[:, 1]).tolist()
+            xs.append(xs[0])
+            ys.append(ys[0])
+
+            glass_data['xs'].append(xs)
+            glass_data['ys'].append(ys)
+            glass_data['piece_id'].append(piece.id)
+            glass_data['area'].append(round(piece.area_sq_inches, 3))
+
+            if piece.id in self.glass_assignments:
+                info = self.glass_assignments[piece.id]
+                glass_data['glass_name'].append(info['name'])
+                glass_data['manufacturer'].append(info['manufacturer'])
+                glass_data['scan_path'].append(info['scan_path'])
+            else:
+                glass_data['glass_name'].append("Unassigned")
+                glass_data['manufacturer'].append("—")
+                glass_data['scan_path'].append("—")
+
+        glass_source = ColumnDataSource(data=dict(glass_data))
+
+        patches = p.patches(
+            'xs', 'ys',
+            source=glass_source,
+            fill_alpha=0,
+            line_alpha=0,
+        )
+
+        hover = HoverTool(
+            renderers=[patches],
+            tooltips="""
+            <div style="background: white; padding: 8px; border-radius: 4px;
+                        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">
+                <div style="font-weight: bold; font-size: 14px;">
+                    Piece #@piece_id</div>
+                <table>
+                    <tr><td>Glass:</td><td><b>@glass_name</b></td></tr>
+                    <tr><td>Manufacturer:</td><td>@manufacturer</td></tr>
+                    <tr><td>Area:</td><td><b>@area sq in</b></td></tr>
+                    <tr><td>Scan:</td><td>@scan_path</td></tr>
+                </table>
+            </div>
+            """,
+        )
+        p.add_tools(hover)
+        p.axis.visible = False
+        p.grid.visible = False
+
+        # Piece number labels
+        label_source = ColumnDataSource(data=dict(
+            x=[piece.centroid[0] for piece in self.pieces],
+            y=[img_h - piece.centroid[1] for piece in self.pieces],
+            text=[str(piece.id) for piece in self.pieces],
+        ))
+        p.text(
+            'x', 'y', 'text',
+            source=label_source,
+            text_font_size="8pt",
+            text_align="center",
+            text_baseline="middle",
+            text_color="#ffffff",
+            text_font_style="bold",
+        )
+
+        return p
 
     def generate_annotated_image(self, prefix="pattern"):
         """Create an annotated image with piece numbers and QA highlights.
@@ -2945,13 +3474,21 @@ class PatternAnalyzer:
         color_fig = self._build_bokeh_colored_figure(
             source, img_width, img_height
         )
+        # After the color figure section:
+        glass_fig = None
+        if hasattr(self, 'glass_assignments') and self.glass_assignments:
+            glass_fig = self.generate_bokeh_glass_figure(img_width, img_height)
 
-        if color_fig:
-            # Stack the two figures vertically on the left
+        if color_fig and glass_fig:
+            figures = column(p, color_fig, glass_fig)
+        elif color_fig:
             figures = column(p, color_fig)
-            layout = row(figures, right_panel)
+        elif glass_fig:
+            figures = column(p, glass_fig)
         else:
-            layout = row(p, right_panel)
+            figures = p
+
+        layout = row(figures, right_panel)
 
         save(layout)
         print(f"Saved interactive visualization: {output_path}")
@@ -5025,6 +5562,16 @@ Examples:
         '--num-colors', type=int, default=6,
         help='Number of color groups for clustering (default: 6)'
     )
+    color_group = parser.add_argument_group('Color Analysis')
+    color_group.add_argument(
+        '--glass-config', type=str, default=None,
+        help='YAML config file with glass scan assignments per piece'
+    )
+    color_group.add_argument(
+        '--glass-fill', type=str, default='tile',
+        choices=['tile', 'stretch'],
+        help='Default fill mode for glass textures (default: tile)'
+    )
     args = parser.parse_args()
 
     # --- Run analysis pipeline ---
@@ -5081,6 +5628,12 @@ Examples:
         )
         analyzer.generate_colored_pattern(prefix=args.prefix)
         analyzer.generate_color_report(prefix=args.prefix)
+
+    if args.glass_config:
+        print("\n--- Loading Glass Config ---")
+        analyzer.load_glass_config(args.glass_config)
+        analyzer.generate_glass_visualization(prefix=args.prefix)
+        analyzer.generate_glass_report(prefix=args.prefix)
 
     print("\n--- Generating Outputs ---")
     analyzer.generate_annotated_image(prefix=args.prefix)
