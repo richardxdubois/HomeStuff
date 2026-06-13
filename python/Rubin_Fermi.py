@@ -4,7 +4,8 @@ from astropy.coordinates import EarthLocation, AltAz, ICRS, GCRS, UnitSphericalR
 from astropy.time import Time
 import astropy.units as u
 import numpy as np
-
+import pickle
+import json
 
 @dataclass
 class FermiPass:
@@ -339,9 +340,228 @@ class FermiPassCalculator:
         return self.passes
 
 
+    import pickle
+    import json
+    from pathlib import Path
+
+
+    def save_passes(self, output_dir, file_prefix="fermi_passes"):
+        """
+        Save pass data in multiple formats
+
+        Parameters:
+        -----------
+        output_dir : str or Path
+            Directory to save output files
+        file_prefix : str
+            Prefix for output filenames
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save as pickle for easy Python loading
+        pickle_file = output_dir / f"{file_prefix}.pkl"
+        with open(pickle_file, 'wb') as f:
+            pickle.dump(self.passes, f)
+        print(f"Saved {len(self.passes)} passes to {pickle_file}")
+
+        # Save as JSON for readability/portability
+        json_data = []
+        for i, p in enumerate(self.passes):
+            json_data.append({
+                'pass_number': i + 1,
+                'start_time': p.start_time.iso,
+                'end_time': p.end_time.iso,
+                'duration_sec': (p.end_time - p.start_time).sec,
+                'n_samples': len(p.times),
+                'ra_range': [float(p.ra.min()), float(p.ra.max())],
+                'dec_range': [float(p.dec.min()), float(p.dec.max())],
+                'alt_range': [float(p.alt.min()), float(p.alt.max())],
+                'max_angular_velocity': float(p.max_angular_velocity)
+            })
+
+        json_file = output_dir / f"{file_prefix}.json"
+        with open(json_file, 'w') as f:
+            json.dump(json_data, f, indent=2)
+        print(f"Saved summary to {json_file}")
+
+        # Save as CSV for spreadsheet compatibility
+        import csv
+        csv_file = output_dir / f"{file_prefix}.csv"
+        with open(csv_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Pass', 'Start Time', 'End Time', 'Duration (s)',
+                             'Samples', 'RA Min', 'RA Max', 'Dec Min', 'Dec Max',
+                             'Alt Min', 'Alt Max', 'Max Velocity (deg/s)'])
+            for i, p in enumerate(self.passes):
+                writer.writerow([
+                    i + 1,
+                    p.start_time.iso,
+                    p.end_time.iso,
+                    (p.end_time - p.start_time).sec,
+                    len(p.times),
+                    f"{p.ra.min():.2f}",
+                    f"{p.ra.max():.2f}",
+                    f"{p.dec.min():.2f}",
+                    f"{p.dec.max():.2f}",
+                    f"{p.alt.min():.2f}",
+                    f"{p.alt.max():.2f}",
+                    f"{p.max_angular_velocity:.4f}"
+                ])
+        print(f"Saved CSV to {csv_file}")
+
+    def load_passes(self, pickle_file):
+        """
+        Load passes from a previously saved pickle file
+
+        Parameters:
+        -----------
+        pickle_file : str or Path
+            Path to pickle file containing saved passes
+        """
+        pickle_file = Path(pickle_file)
+
+        if not pickle_file.exists():
+            raise FileNotFoundError(f"Pickle file not found: {pickle_file}")
+
+        with open(pickle_file, 'rb') as f:
+            self.passes = pickle.load(f)
+
+        print(f"Loaded {len(self.passes)} passes from {pickle_file}")
+        return self.passes
+
+    def visualize_passes(self, output_dir, file_prefix="fermi_passes"):
+        """
+        Create Bokeh visualizations of Fermi passes
+
+        Parameters:
+        -----------
+        output_dir : str or Path
+            Directory to save output files
+        file_prefix : str
+            Prefix for output filenames
+        """
+        from bokeh.plotting import figure, save, output_file
+        from bokeh.models import HoverTool, ColumnDataSource
+        from bokeh.layouts import column, row
+        from bokeh.palettes import Viridis256
+        import numpy as np
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if len(self.passes) == 0:
+            print("No passes to visualize")
+            return
+
+        # Create sky map of all pass trajectories
+        sky_plot = figure(
+            width=900,
+            height=600,
+            title="Fermi Pass Trajectories Through Survey Area",
+            x_axis_label="RA (degrees)",
+            y_axis_label="Dec (degrees)",
+            tools="pan,wheel_zoom,box_zoom,reset,save"
+        )
+
+        # Plot each pass as a line
+        colors = Viridis256[::len(Viridis256) // min(len(self.passes), 256)]
+
+        for i, p in enumerate(self.passes):
+            color = colors[i % len(colors)]
+            # Only add legend for first 10 passes to avoid clutter
+            if i < 10:
+                sky_plot.line(p.ra, p.dec,
+                              line_width=2,
+                              alpha=0.6,
+                              color=color,
+                              legend_label=f"Pass {i + 1}")
+            else:
+                sky_plot.line(p.ra, p.dec,
+                              line_width=2,
+                              alpha=0.6,
+                              color=color)
+
+        # Add survey area boundaries
+        sky_plot.line([0, 360], [-70, -70], line_dash='dashed',
+                      color='red', alpha=0.3, legend_label="Survey bounds")
+        sky_plot.line([0, 360], [10, 10], line_dash='dashed',
+                      color='red', alpha=0.3)
+
+        sky_plot.legend.click_policy = "hide"
+        sky_plot.legend.location = "top_right"
+
+        # Create timeline plot
+        timeline_plot = figure(
+            width=900,
+            height=400,
+            title="Pass Timeline",
+            x_axis_label="Date",
+            y_axis_label="Duration (minutes)",
+            x_axis_type='datetime',
+            tools="pan,wheel_zoom,box_zoom,reset,save"
+        )
+
+        # Prepare data for timeline
+        start_times = [p.start_time.datetime for p in self.passes]
+        durations = [(p.end_time - p.start_time).sec / 60.0 for p in self.passes]
+        max_velocities = [p.max_angular_velocity for p in self.passes]
+        pass_numbers = list(range(1, len(self.passes) + 1))
+
+        # Color by velocity
+        from bokeh.transform import linear_cmap
+        mapper = linear_cmap(field_name='velocity',
+                             palette=Viridis256,
+                             low=min(max_velocities),
+                             high=max(max_velocities))
+
+        source = ColumnDataSource(data={
+            'start': start_times,
+            'duration': durations,
+            'velocity': max_velocities,
+            'pass_num': pass_numbers
+        })
+
+        timeline_plot.scatter('start', 'duration', size=10, source=source,
+                             color=mapper, alpha=0.8)
+
+        # Add hover tool
+        hover = HoverTool(tooltips=[
+            ("Pass", "@pass_num"),
+            ("Start", "@start{%F %T}"),
+            ("Duration", "@duration{0.1f} min"),
+            ("Max Velocity", "@velocity{0.3f} deg/s")
+        ], formatters={'@start': 'datetime'})
+
+        timeline_plot.add_tools(hover)
+
+        # Create velocity distribution histogram
+        hist_plot = figure(
+            width=900,
+            height=400,
+            title="Angular Velocity Distribution",
+            x_axis_label="Max Angular Velocity (deg/s)",
+            y_axis_label="Number of Passes",
+            tools="pan,wheel_zoom,box_zoom,reset,save"
+        )
+
+        hist, edges = np.histogram(max_velocities, bins=20)
+        hist_plot.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:],
+                       fill_color="navy", alpha=0.7, line_color="white")
+
+        # Save combined layout
+        layout = column(sky_plot, timeline_plot, hist_plot)
+
+        html_file = output_dir / f"{file_prefix}_visualization.html"
+        output_file(html_file)
+        save(layout)
+
+        print(f"Saved visualization to {html_file}")
+
 import argparse
 import yaml
 from pathlib import Path
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -359,91 +579,129 @@ def main():
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
-    # Extract parameters
-    ft2_file = config['ft2_file']
-    start_time = config.get('start_time', None)
-    end_time = config.get('end_time', None)
-    downsample_sec = config.get('downsample_sec', 30)
-    min_altitude = config.get('min_altitude', 20)
-    dec_range = config.get('dec_range', [-70, 10])
-    min_angular_velocity = config.get('min_angular_velocity', 0.1)
-    sun_alt_limit = config.get('sun_alt_limit', -18)
-    output_file = config.get('output_file', None)
+    mode = config.get('mode', 'compute')
+    output_dir = config.get('output_dir', None)
     verbose = config.get('verbose', True)
 
-    # Run calculation
-    if verbose:
-        print(f"Loading FT2 file: {ft2_file}")
-    calculator = FermiPassCalculator(ft2_file, start_time, end_time)
+    if mode == 'visualize':
+        # Visualization-only mode
+        passes_file = config.get('passes_file')
+        if not passes_file:
+            raise ValueError("In visualize mode, must specify 'passes_file' in config")
 
-    if verbose:
-        print(f"Loading and downsampling to {downsample_sec}s cadence...")
-    calculator.load_ft2(downsample_sec=downsample_sec)
-    if verbose:
-        print(f"  Loaded {len(calculator.times)} time samples")
-
-    if verbose:
-        print("Computing topocentric coordinates...")
-    calculator.compute_topocentric()
-
-    # Add this after compute_topocentric() in main:
-    if verbose:
-        # Check what's happening during night
-        from astropy.coordinates import get_sun
-        sun_positions = []
-        for t in calculator.times[::60]:  # Sample every 60th point to speed up
-            sun_alt = get_sun(t).transform_to(
-                AltAz(obstime=t, location=calculator.rubin_location)
-            ).alt.deg
-            sun_positions.append(sun_alt)
-
-        sun_positions = np.array(sun_positions)
-        night_mask = sun_positions < -18
-
-        print(f"\nNight-time statistics:")
-        print(f"  Fraction of time at night (sun < -18°): {night_mask.sum() / len(night_mask):.2%}")
-        print(f"  Night time samples: {night_mask.sum() * 60} out of {len(calculator.times)}")
-
-        # Check Fermi altitude distribution during night
-        if night_mask.sum() > 0:
-            night_indices = np.where(night_mask)[0] * 60
-            night_alts = calculator.sky_coords['alt'][night_indices]
-            above_20_night = np.sum(night_alts > 20)
-            print(f"  Fermi above 20° during night: {above_20_night} samples")
-
-    if verbose:
-        print(f"Finding passes (alt > {min_altitude}°, dec in {dec_range})...")
-    passes = calculator.find_survey_passes(
-        min_altitude=min_altitude * u.deg,
-        dec_range=(dec_range[0] * u.deg, dec_range[1] * u.deg),
-        min_angular_velocity=min_angular_velocity
-    )
-
-    if verbose:
-        print("Computing pass parameters...")
-    calculator.compute_pass_parameters()
-
-    if verbose:
-        print(f"Filtering for night-time passes (sun < {sun_alt_limit}°)...")
-    night_passes = calculator.filter_night_passes(sun_alt_limit=sun_alt_limit * u.deg)
-
-    if verbose:
-        print(f"\nFound {len(night_passes)} night-time passes through survey area:")
-        for i, p in enumerate(night_passes):
-            duration = (p.end_time - p.start_time).sec
-            n_samples = len(p.times)
-            print(f"  Pass {i + 1}: {p.start_time.iso} - {p.end_time.iso}")
-            print(
-                f"    Duration: {duration:.1f}s, Samples: {n_samples}, Max velocity: {p.max_angular_velocity:.3f} deg/s")
-            print(f"    RA range: {p.ra.min():.2f} - {p.ra.max():.2f}°")
-            print(f"    Dec range: {p.dec.min():.2f} - {p.dec.max():.2f}°")
-
-    # Optional: save results
-    if output_file:
         if verbose:
-            print(f"\nSaving results to {output_file}")
+            print(f"Loading passes from {passes_file}")
 
+        # Create calculator just for visualization
+        calculator = FermiPassCalculator(ft2_file=None)
+        calculator.load_passes(passes_file)
 
+        if output_dir:
+            if verbose:
+                print(f"\nCreating visualizations in {output_dir}")
+            calculator.visualize_passes(output_dir)
+        else:
+            print("Warning: No output_dir specified, skipping visualization save")
+
+    elif mode == 'compute':
+        # Full computation mode
+        ft2_file = config['ft2_file']
+        start_time = config.get('start_time', None)
+        end_time = config.get('end_time', None)
+        downsample_sec = config.get('downsample_sec', 30)
+        min_altitude = config.get('min_altitude', 20)
+        dec_range = config.get('dec_range', [-70, 10])
+        min_angular_velocity = config.get('min_angular_velocity', 0.1)
+        sun_alt_limit = config.get('sun_alt_limit', -18)
+
+        # Run calculation
+        if verbose:
+            print(f"Loading FT2 file: {ft2_file}")
+        calculator = FermiPassCalculator(ft2_file, start_time, end_time)
+
+        if verbose:
+            print(f"Loading and downsampling to {downsample_sec}s cadence...")
+        calculator.load_ft2(downsample_sec=downsample_sec)
+        if verbose:
+            print(f"  Loaded {len(calculator.times)} time samples")
+            print(f"  Time range: {calculator.times[0].iso} to {calculator.times[-1].iso}")
+            print(f"  Duration: {(calculator.times[-1] - calculator.times[0]).to(u.day):.1f}")
+
+        if verbose:
+            print("Computing topocentric coordinates...")
+        calculator.compute_topocentric()
+
+        if verbose:
+            # Diagnostic: check if coordinates are changing at all
+            print(f"\nDiagnostic info:")
+            print(f"  Total time span: {calculator.times[0].iso} to {calculator.times[-1].iso}")
+            print(f"  Number of samples: {len(calculator.times)}")
+            print(f"  RA range: {calculator.sky_coords['ra'].min():.2f} to {calculator.sky_coords['ra'].max():.2f}")
+            print(f"  Dec range: {calculator.sky_coords['dec'].min():.2f} to {calculator.sky_coords['dec'].max():.2f}")
+            print(f"  Alt range: {calculator.sky_coords['alt'].min():.2f} to {calculator.sky_coords['alt'].max():.2f}")
+
+            # Check how many points are above horizon
+            above_horizon = np.sum(calculator.sky_coords['alt'] > 0)
+            above_20 = np.sum(calculator.sky_coords['alt'] > 20)
+            print(f"  Points above horizon (alt > 0): {above_horizon}")
+            print(f"  Points above 20 deg: {above_20}")
+
+            # Check a few consecutive samples
+            print(f"\nFirst 5 positions:")
+            for i in range(min(5, len(calculator.times))):
+                print(
+                    f"    {calculator.times[i].iso}: RA={calculator.sky_coords['ra'][i]:.6f}, Dec={calculator.sky_coords['dec'][i]:.6f}, Alt={calculator.sky_coords['alt'][i]:.2f}")
+
+        if verbose:
+            print(f"Finding passes (alt > {min_altitude}°, dec in {dec_range})...")
+        passes = calculator.find_survey_passes(
+            min_altitude=min_altitude * u.deg,
+            dec_range=(dec_range[0] * u.deg, dec_range[1] * u.deg),
+            min_angular_velocity=min_angular_velocity
+        )
+
+        if verbose:
+            print("Computing pass parameters...")
+        calculator.compute_pass_parameters()
+
+        if verbose:
+            print(f"Filtering for night-time passes (sun < {sun_alt_limit}°)...")
+        night_passes = calculator.filter_night_passes(sun_alt_limit=sun_alt_limit * u.deg)
+
+        if verbose:
+            print(f"\nFound {len(night_passes)} night-time passes through survey area:")
+
+            # Show monthly distribution
+            from collections import defaultdict
+            monthly_counts = defaultdict(int)
+            for p in night_passes:
+                month_key = p.start_time.datetime.strftime('%Y-%m')
+                monthly_counts[month_key] += 1
+
+            print(f"\nMonthly distribution:")
+            for month in sorted(monthly_counts.keys()):
+                print(f"  {month}: {monthly_counts[month]} passes")
+
+            for i, p in enumerate(night_passes):
+                duration = (p.end_time - p.start_time).sec
+                n_samples = len(p.times)
+                print(f"  Pass {i + 1}: {p.start_time.iso} - {p.end_time.iso}")
+                print(
+                    f"    Duration: {duration:.1f}s, Samples: {n_samples}, Max velocity: {p.max_angular_velocity:.3f} deg/s")
+                print(f"    RA range: {p.ra.min():.2f} - {p.ra.max():.2f}°")
+                print(f"    Dec range: {p.dec.min():.2f} - {p.dec.max():.2f}°")
+
+        # Save and visualize results
+        if output_dir and len(night_passes) > 0:
+            if verbose:
+                print(f"\nSaving results to {output_dir}")
+            calculator.save_passes(output_dir)
+            calculator.visualize_passes(output_dir)
+        elif output_dir and len(night_passes) == 0:
+            print("\nNo passes to save")
+
+    else:
+        raise ValueError(f"Unknown mode: {mode}. Must be 'compute' or 'visualize'")
 
 
 if __name__ == '__main__':
