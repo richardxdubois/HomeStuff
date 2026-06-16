@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from astropy.io import fits
-from astropy.coordinates import EarthLocation, AltAz, ICRS, GCRS, UnitSphericalRepresentation
+from astropy.coordinates import EarthLocation, AltAz, ICRS, GCRS, CartesianRepresentation
 from astropy.time import Time
 import astropy.units as u
 import numpy as np
 import pickle
 import json
+
+# in collaboration with Anthropic Claude - 2026
 
 @dataclass
 class FermiPass:
@@ -113,70 +115,53 @@ class FermiPassCalculator:
         if self.times is None or self.positions is None:
             raise ValueError("Must call load_ft2() first")
 
-        from astropy.coordinates import ITRS, CartesianRepresentation
+        from astropy.coordinates import SkyCoord, AltAz
 
-        # Get Rubin's ITRS coordinates at each time
-        rubin_itrs = self.rubin_location.get_itrs(obstime=self.times)
+        # Direct spherical conversion from ECI Cartesian
+        x = self.positions[:, 0]
+        y = self.positions[:, 1]
+        z = self.positions[:, 2]
 
-        # Convert Rubin from ITRS (Earth-fixed) to GCRS (inertial)
-        rubin_gcrs = rubin_itrs.transform_to(GCRS(obstime=self.times))
+        r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
 
-        # Fermi position in GCRS (SC_POSITION is already in ECI ~ GCRS)
-        fermi_x = self.positions[:, 0] * u.m
-        fermi_y = self.positions[:, 1] * u.m
-        fermi_z = self.positions[:, 2] * u.m
+        # Standard spherical coordinate conversion
+        ra_rad = np.arctan2(y, x)
+        dec_rad = np.arcsin(z / r)
 
-        # DIAGNOSTIC: Check Fermi position changes
-        fermi_mag = np.sqrt(fermi_x ** 2 + fermi_y ** 2 + fermi_z ** 2)
-        print(f"\nFermi position diagnostics:")
-        print(f"  Magnitude range: {fermi_mag.min():.0f} to {fermi_mag.max():.0f}")
+        # Convert to degrees
+        ra_deg = np.degrees(ra_rad)
+        dec_deg = np.degrees(dec_rad)
 
-        # Check first few Fermi positions vs Rubin positions
-        print(f"  First 3 Fermi positions (GCRS, km):")
-        for i in range(3):
-            print(f"    [{fermi_x[i].value / 1000:.1f}, {fermi_y[i].value / 1000:.1f}, {fermi_z[i].value / 1000:.1f}]")
+        # Wrap RA to [0, 360)
+        ra_deg = (ra_deg + 360) % 360
 
-        print(f"  First 3 Rubin positions (GCRS, km):")
-        for i in range(3):
-            rx = rubin_gcrs.cartesian.x[i].to(u.km).value
-            ry = rubin_gcrs.cartesian.y[i].to(u.km).value
-            rz = rubin_gcrs.cartesian.z[i].to(u.km).value
-            print(f"    [{rx:.1f}, {ry:.1f}, {rz:.1f}]")
-
-        # Vector FROM Rubin TO Fermi
-        dx = fermi_x - rubin_gcrs.cartesian.x
-        dy = fermi_y - rubin_gcrs.cartesian.y
-        dz = fermi_z - rubin_gcrs.cartesian.z
-
-        print(f"  First 3 topocentric vectors (km):")
-        for i in range(3):
-            print(f"    [{dx[i].to(u.km).value:.1f}, {dy[i].to(u.km).value:.1f}, {dz[i].to(u.km).value:.1f}]")
-
-        # Create topocentric GCRS coordinates
-        topo_gcrs = GCRS(
-            CartesianRepresentation(dx, dy, dz),
-            obstime=None
+        # For Alt/Az, create SkyCoord with these RA/Dec
+        fermi_coords = SkyCoord(
+            ra=ra_deg * u.deg,
+            dec=dec_deg * u.deg,
+            distance=r * u.m,
+            frame='icrs',
+            obstime=self.times
         )
 
-        # Transform to ICRS for RA/Dec
-        icrs_coords = topo_gcrs.transform_to(ICRS())
-
-        print(f"  First 3 RA/Dec:")
-        for i in range(3):
-            print(f"    RA={icrs_coords.ra[i].deg:.6f}, Dec={icrs_coords.dec[i].deg:.6f}")
-
         # Transform to AltAz
-        altaz_coords = topo_gcrs.transform_to(AltAz(obstime=self.times, location=self.rubin_location))
-
-        topo_spherical = CartesianRepresentation(dx, dy, dz).represent_as(UnitSphericalRepresentation)
+        altaz = fermi_coords.transform_to(
+            AltAz(obstime=self.times, location=self.rubin_location)
+        )
 
         # Store results
         self.sky_coords = {
-            'ra': topo_spherical.lon.deg,
-            'dec': topo_spherical.lat.deg,
-            'alt': altaz_coords.alt.deg,
-            'az': altaz_coords.az.deg
+            'ra': ra_deg,
+            'dec': dec_deg,
+            'alt': altaz.alt.deg,
+            'az': altaz.az.deg
         }
+
+        # DIAGNOSTIC
+        print(f"\nDirect conversion check (first 10 samples):")
+        for i in range(10):
+            print(f"  {self.times[i].iso}: RA={ra_deg[i]:.2f}, Dec={dec_deg[i]:.2f}")
+
 
     def find_survey_passes(self, min_altitude=20 * u.deg,
                            dec_range=(-70, 10) * u.deg,
@@ -225,6 +210,15 @@ class FermiPassCalculator:
         # Angular velocity in deg/sec (pad with 0 at end to match array length)
         ang_velocity = np.concatenate([ang_sep / time_diff, [0.0]])
 
+        # Right after: ang_velocity = ang_sep / time_diff
+        print(f"\nVelocity calculation details:")
+        print(f"  First 5 RA values: {self.sky_coords['ra'][:5]}")
+        print(f"  First 5 RA diffs: {ra_diff[:5]}")
+        print(f"  First 5 angular separations: {ang_sep[:5]} deg")
+        print(f"  First 5 time diffs: {time_diff[:5]} sec")
+        print(f"  First 5 velocities: {ang_velocity[:5]} deg/s")
+        print(f"  Max velocity: {ang_velocity.max():.6f} deg/s")
+
         print(f"\nVelocity calculation diagnostics:")
         print(f"  Number of ang_sep values: {len(ang_sep)}")
         print(f"  ang_sep range: {ang_sep.min():.6f} to {ang_sep.max():.6f} deg")
@@ -239,6 +233,14 @@ class FermiPassCalculator:
         dec_mask = ((self.sky_coords['dec'] >= dec_range[0].value) &
                     (self.sky_coords['dec'] <= dec_range[1].value))
         velocity_mask = ang_velocity >= min_angular_velocity
+
+        # ADD DIAGNOSTICS HERE:
+        print(f"\nPass finding diagnostics:")
+        print(f"  Total samples: {len(self.sky_coords['alt'])}")
+        print(f"  Altitude mask (alt >= {min_altitude.value}°): {alt_mask.sum()} samples pass")
+        print(f"  Dec mask ({dec_range[0].value}° to {dec_range[1].value}°): {dec_mask.sum()} samples pass")
+        print(f"  Velocity mask (>= {min_angular_velocity} deg/s): {velocity_mask.sum()} samples pass")
+        print(f"  All three masks combined: {(alt_mask & dec_mask & velocity_mask).sum()} samples pass")
 
         in_survey = alt_mask & dec_mask & velocity_mask
 
@@ -315,7 +317,21 @@ class FermiPassCalculator:
 
         night_passes = []
 
+        # DIAGNOSTIC: Check a few passes from different times of year
+        print(f"\nSun altitude diagnostics for sample passes:")
+        sample_indices = [0, len(self.passes) // 4, len(self.passes) // 2, 3 * len(self.passes) // 4, -1]
+        for idx in sample_indices:
+            if idx >= len(self.passes):
+                continue
+            p = self.passes[idx]
+            sun_start = get_sun(p.start_time).transform_to(
+                AltAz(obstime=p.start_time, location=self.rubin_location)
+            )
+            print(
+                f"  Pass {idx + 1} at {p.start_time.iso}: sun alt = {sun_start.alt.deg:.1f}°, RA={p.ra.min():.1f}°, Dec={p.dec.min():.1f}°")
+
         print(f"\nChecking sun altitude for {len(self.passes)} passes:")
+
         for i, pass_obj in enumerate(self.passes):
             # Get sun position at start and end of pass
             sun_start = get_sun(pass_obj.start_time).transform_to(
@@ -327,14 +343,14 @@ class FermiPassCalculator:
 
             sun_alt_max = max(sun_start.alt.deg, sun_end.alt.deg)
 
-            print(f"  Pass {i + 1} ({pass_obj.start_time.iso}): sun alt = {sun_alt_max:.1f}°", end="")
+            #print(f"  Pass {i + 1} ({pass_obj.start_time.iso}): sun alt = {sun_alt_max:.1f}°", end="")
 
             # Keep pass if sun is below limit for entire duration
-            if sun_start.alt < sun_alt_limit and sun_end.alt < sun_alt_limit:
-                night_passes.append(pass_obj)
-                print(" ✓ NIGHT")
-            else:
-                print(" ✗ DAY/TWILIGHT")
+            #if sun_start.alt < sun_alt_limit and sun_end.alt < sun_alt_limit:
+            #    night_passes.append(pass_obj)
+            #    print(" ✓ NIGHT")
+            #else:
+            #    print(" ✗ DAY/TWILIGHT")
 
         self.passes = night_passes
         return self.passes
@@ -631,6 +647,151 @@ def main():
             print("Computing topocentric coordinates...")
         calculator.compute_topocentric()
 
+        # Check with civil twilight instead of astronomical night:
+        if verbose:
+            from astropy.coordinates import get_sun
+
+            for sun_limit in [-6, -12, -18]:  # Civil, Nautical, Astronomical
+                print(f"\nSearching with sun < {sun_limit}° (Fermi > {min_altitude}°):")
+
+                count = 0
+                for idx in range(0, len(calculator.times), 100):
+                    sun = get_sun(calculator.times[idx]).transform_to(
+                        AltAz(obstime=calculator.times[idx], location=calculator.rubin_location)
+                    )
+                    if sun.alt.deg < sun_limit and calculator.sky_coords['alt'][idx] > min_altitude:
+                        count += 1
+                        if count <= 3:
+                            print(
+                                f"  {calculator.times[idx].iso}: sun={sun.alt.deg:.1f}°, Fermi={calculator.sky_coords['alt'][idx]:.1f}°")
+
+                print(f"  Total: {count} samples (in 1% sample)")
+
+        # Add after compute_topocentric():
+        if verbose:
+            from astropy.coordinates import get_sun
+            print(f"\nSearching for night + visible combinations:")
+
+            night_and_visible = 0
+            for idx in range(0, len(calculator.times), 100):
+                sun = get_sun(calculator.times[idx]).transform_to(
+                    AltAz(obstime=calculator.times[idx], location=calculator.rubin_location)
+                )
+                if sun.alt.deg < -18 and calculator.sky_coords['alt'][idx] > min_altitude:
+                    night_and_visible += 1
+                    if night_and_visible <= 5:  # Print first 5
+                        print(
+                            f"  FOUND: {calculator.times[idx].iso}, sun={sun.alt.deg:.1f}°, Fermi={calculator.sky_coords['alt'][idx]:.1f}°")
+
+            print(f"  Total samples with sun<-18 AND Fermi>20: {night_and_visible} (in 1% sample)")
+
+        # After compute_topocentric() in main:
+        if verbose:
+            from astropy.coordinates import get_sun
+
+            print(f"\nNov-Jan nighttime Fermi diagnostics:")
+
+            # Focus on Nov-Jan samples
+            nov_jan_night_samples = []
+            for idx in range(0, len(calculator.times), 100):
+                month = calculator.times[idx].datetime.month
+                if month in [11, 12, 1]:  # Nov, Dec, Jan
+                    sun = get_sun(calculator.times[idx]).transform_to(
+                        AltAz(obstime=calculator.times[idx], location=calculator.rubin_location)
+                    )
+                    if sun.alt.deg < -18:
+                        nov_jan_night_samples.append(idx)
+
+            print(f"  Found {len(nov_jan_night_samples)} Nov-Jan nighttime samples (in 1% sample)")
+
+            if len(nov_jan_night_samples) > 0:
+                # Check first few
+                print(f"  First 10 Nov-Jan night samples:")
+                for idx in nov_jan_night_samples[:10]:
+                    print(f"    {calculator.times[idx].iso}: alt={calculator.sky_coords['alt'][idx]:.1f}°, "
+                          f"RA={calculator.sky_coords['ra'][idx]:.1f}°, dec={calculator.sky_coords['dec'][idx]:.1f}°")
+
+        # After compute_topocentric() in main:
+        if verbose:
+            # Check what months have nighttime data
+            from astropy.coordinates import get_sun
+            from collections import defaultdict
+
+            print(f"\nNighttime samples by month:")
+            monthly_night = defaultdict(int)
+
+            # Sample every 100th point
+            for idx in range(0, len(calculator.times), 100):
+                sun = get_sun(calculator.times[idx]).transform_to(
+                    AltAz(obstime=calculator.times[idx], location=calculator.rubin_location)
+                )
+                if sun.alt.deg < -18:
+                    month = calculator.times[idx].datetime.strftime('%Y-%m')
+                    monthly_night[month] += 1
+
+            for month in sorted(monthly_night.keys()):
+                print(f"  {month}: {monthly_night[month]} nighttime samples (in 1% sample)")
+
+        if verbose:
+            # Check when it's nighttime
+            from astropy.coordinates import get_sun
+            print(f"\nNight-time analysis across all samples:")
+
+            # Sample every 1000th point to speed up
+            sample_indices = np.arange(0, len(calculator.times), 1000)
+            night_count = 0
+
+            for idx in sample_indices[:20]:  # Just check first 20 samples
+                sun = get_sun(calculator.times[idx]).transform_to(
+                    AltAz(obstime=calculator.times[idx], location=calculator.rubin_location)
+                )
+                is_night = sun.alt.deg < -18
+                if is_night:
+                    night_count += 1
+                    print(
+                        f"  NIGHT at {calculator.times[idx].iso}: sun={sun.alt.deg:.1f}°, Fermi alt={calculator.sky_coords['alt'][idx]:.1f}°, vel=(will calc)")
+
+
+        # Add this right after compute_topocentric() in main():
+        if verbose:
+            print(f"\nAltitude diagnostics:")
+            print(f"  Alt range: {calculator.sky_coords['alt'].min():.2f} to {calculator.sky_coords['alt'].max():.2f}°")
+            print(f"  Samples with alt > 0: {np.sum(calculator.sky_coords['alt'] > 0)}")
+            print(f"  Samples with alt > 20: {np.sum(calculator.sky_coords['alt'] > 20)}")
+
+            print(f"\nVelocity diagnostics (will compute):")
+            # Quick velocity check
+            ra = calculator.sky_coords['ra']
+            dec = calculator.sky_coords['dec']
+            ra_diff = np.diff(ra)
+            dec_diff = np.diff(dec)
+            ra_diff = np.where(ra_diff > 180, ra_diff - 360, ra_diff)
+            ra_diff = np.where(ra_diff < -180, ra_diff + 360, ra_diff)
+            dec_avg = (dec[:-1] + dec[1:]) / 2
+            ang_sep = np.sqrt((ra_diff * np.cos(np.radians(dec_avg))) ** 2 + dec_diff ** 2)
+            time_diff = np.diff(calculator.times.mjd) * 86400
+            ang_velocity = ang_sep / time_diff
+            print(f"  Velocity range: {ang_velocity.min():.6f} to {ang_velocity.max():.6f} deg/s")
+
+        print(f"\nGeocentric declination distribution:")
+        print(f"  Dec range: {calculator.sky_coords['dec'].min():.2f} to {calculator.sky_coords['dec'].max():.2f}°")
+
+        if verbose:
+            print("\nDeclination diagnostics:")
+            print(f"  Min dec computed: {calculator.sky_coords['dec'].min():.2f}°")
+            print(f"  Max dec computed: {calculator.sky_coords['dec'].max():.2f}°")
+            print(f"  Number of samples with dec < 0: {np.sum(calculator.sky_coords['dec'] < 0)}")
+            print(f"  Number of samples with dec < -30: {np.sum(calculator.sky_coords['dec'] < -30)}")
+
+            # Sample some negative dec values if they exist
+            neg_dec_indices = np.where(calculator.sky_coords['dec'] < 0)[0]
+            if len(neg_dec_indices) > 0:
+                print(f"\n  Sample negative dec positions (first 5):")
+                for i in neg_dec_indices[:5]:
+                    print(f"    Time: {calculator.times[i].iso}")
+                    print(
+                        f"    RA={calculator.sky_coords['ra'][i]:.2f}, Dec={calculator.sky_coords['dec'][i]:.2f}, Alt={calculator.sky_coords['alt'][i]:.2f}")
+
         if verbose:
             # Diagnostic: check if coordinates are changing at all
             print(f"\nDiagnostic info:")
@@ -661,12 +822,32 @@ def main():
         )
 
         if verbose:
+            print(f"\nFound {len(passes)} passes BEFORE night filtering")
+            if len(passes) > 0:
+                print(f"  First pass: {passes[0].start_time.iso}")
+                print(f"  Dec range of first pass: {passes[0].dec.min():.2f} to {passes[0].dec.max():.2f}°")
+
+        if verbose:
             print("Computing pass parameters...")
         calculator.compute_pass_parameters()
 
         if verbose:
             print(f"Filtering for night-time passes (sun < {sun_alt_limit}°)...")
         night_passes = calculator.filter_night_passes(sun_alt_limit=sun_alt_limit * u.deg)
+
+        # Check Nov-Jan passes specifically
+        if verbose:
+            print(f"\nChecking Nov-Jan passes specifically:")
+            nov_jan_passes = [p for p in passes if p.start_time.datetime.month in [11, 12, 1]]
+            print(f"  Total Nov-Jan passes (before night filter): {len(nov_jan_passes)}")
+
+            if len(nov_jan_passes) > 0:
+                for i, p in enumerate(nov_jan_passes[:5]):
+                    sun = get_sun(p.start_time).transform_to(
+                        AltAz(obstime=p.start_time, location=calculator.rubin_location)
+                    )
+                    print(
+                        f"    Pass {i + 1}: {p.start_time.iso}, sun={sun.alt.deg:.1f}°, Fermi alt={p.alt.min():.1f}° to {p.alt.max():.1f}°")
 
         if verbose:
             print(f"\nFound {len(night_passes)} night-time passes through survey area:")
