@@ -259,10 +259,10 @@ class FermiPassCalculator:
             # Altitude: Are ALL points above minimum?
             pass_obj.passes_altitude = np.all(pass_obj.alt >= min_altitude.value)
 
-            # Declination: Are ALL points in range?
-            pass_obj.passes_declination = np.all(
-                (pass_obj.dec >= dec_range[0].value) &
-                (pass_obj.dec <= dec_range[1].value)
+            # Declination: Does pass overlap with range?
+            pass_obj.passes_declination = (
+                    (pass_obj.dec.min() <= dec_range[1].value) and
+                    (pass_obj.dec.max() >= dec_range[0].value)
             )
 
             # Velocity: Is ANY point above threshold?
@@ -796,6 +796,31 @@ def main():
         if verbose:
             print(f"Evaluating night-time constraint (sun < {sun_alt_limit}°)...")
         calculator.filter_night_passes(sun_alt_limit=sun_alt_limit * u.deg)
+
+        # After filter_night_passes() in main:
+        if verbose:
+            night_passes = [p for p in passes if p.passes_night]
+            if night_passes:
+                print(f"\nNight passes - altitude ranges:")
+                for p in night_passes[:10]:
+                    print(f"  {p.start_time.iso}: alt {p.alt.min():.1f}° to {p.alt.max():.1f}°, "
+                          f"(fails alt: {not p.passes_altitude})")
+
+                # Summary stats
+                night_alt_max = max(p.alt.max() for p in night_passes)
+                night_alt_min = min(p.alt.min() for p in night_passes)
+                print(f"\n  Night passes altitude summary:")
+                print(f"    Highest altitude during any night pass: {night_alt_max:.1f}°")
+                print(f"    Lowest altitude during any night pass: {night_alt_min:.1f}°")
+
+        # After filter_night_passes() in main:
+        #if verbose:
+        #    dec_passes = [p for p in passes if p.passes_declination]
+        #    print(f"\nThe {len(dec_passes)} passes that meet declination filter:")
+        #   for p in dec_passes:
+        #       print(f"  {p.start_time.iso}: duration={(p.end_time - p.start_time).sec:.0f}s, "
+        #              f"dec range={p.dec.min():.1f}° to {p.dec.max():.1f}°, "
+        #              f"alt range={p.alt.min():.1f}° to {p.alt.max():.1f}°")
 
         if verbose:
             # Filter statistics
