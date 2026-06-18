@@ -375,30 +375,52 @@ def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer
     overlaps : list of dict
         Candidate overlaps with distance and timing info, including CCD matches
     """
-    # Fermi trajectory endpoints
-    ra_start = fermi_pass.ra[0]
-    dec_start = fermi_pass.dec[0]
-    ra_end = fermi_pass.ra[-1]
-    dec_end = fermi_pass.dec[-1]
-
     overlaps = []
+    min_dist_seen = float('inf')
 
     for visit in rubin_visits:
         # Quick time check
         if not (fermi_pass.start_time <= visit['obs_time'] <= fermi_pass.end_time):
             continue
 
-        # Geometric check: distance to Fermi's path
-        dist = point_to_arc_distance(
-            visit['pointing_ra'], visit['pointing_dec'],
-            ra_start, dec_start,
-            ra_end, dec_end
-        )
+        # Geometric check: minimum distance to ANY point on Fermi's actual trajectory
+        # Calculate angular separation to all Fermi positions
+        visit_ra = visit['pointing_ra']
+        visit_dec = visit['pointing_dec']
+
+        # Calculate separation to each point in Fermi's trajectory
+        # Handle RA wraparound
+        ra_diffs = fermi_pass.ra - visit_ra
+        ra_diffs = np.where(ra_diffs > 180, ra_diffs - 360, ra_diffs)
+        ra_diffs = np.where(ra_diffs < -180, ra_diffs + 360, ra_diffs)
+
+        dec_diffs = fermi_pass.dec - visit_dec
+
+        # Angular separation using spherical geometry
+        # Convert to radians
+        ra_diffs_rad = np.radians(ra_diffs)
+        dec_diffs_rad = np.radians(dec_diffs)
+        visit_dec_rad = np.radians(visit_dec)
+        fermi_dec_rad = np.radians(fermi_pass.dec)
+
+        # Haversine formula for great circle distance
+        a = np.sin(dec_diffs_rad / 2) ** 2 + \
+            np.cos(visit_dec_rad) * np.cos(fermi_dec_rad) * np.sin(ra_diffs_rad / 2) ** 2
+        separations = 2 * np.arcsin(np.sqrt(a))
+        separations_deg = np.degrees(separations)
+
+        dist = np.min(separations_deg)
+
+        # Track minimum
+        if dist < min_dist_seen:
+            min_dist_seen = dist
 
         if dist < (fov_radius + buffer):
             # Get Fermi positions during this visit
-            visit_start = Time(visit['timespan'].begin.tai, format='mjd', scale='tai')
-            visit_end = Time(visit['timespan'].end.tai, format='mjd', scale='tai')
+            visit_start = Time(visit['timespan'].begin if not hasattr(visit['timespan'].begin, 'astropy')
+                               else visit['timespan'].begin.astropy, format='mjd', scale='tai')
+            visit_end = Time(visit['timespan'].end if not hasattr(visit['timespan'].end, 'astropy')
+                             else visit['timespan'].end.astropy, format='mjd', scale='tai')
 
             # Find Fermi positions during exposure
             time_mask = (fermi_pass.times >= visit_start) & (fermi_pass.times <= visit_end)
@@ -429,8 +451,11 @@ def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer
                 'num_ccds': len(ccd_matches)
             })
 
-    return overlaps
+    # DEBUG: print if we had visits but no matches
+    if len(rubin_visits) > 0 and len(overlaps) == 0 and verbose:
+        print(f"    Closest visit was {min_dist_seen:.2f}° from Fermi path (threshold: {fov_radius + buffer:.2f}°)")
 
+    return overlaps
 
 def search_all_passes(passes, butler, instrument='LSSTComCam',
                       filter_passes=True, fov_radius=1.75, check_ccds=True, verbose=True):
@@ -711,6 +736,290 @@ def query_and_cache_visits(butler, start_time, end_time, instrument, output_file
 
     return visits
 
+def search_all_passes_with_cache(passes, cached_visits, instrument='LSSTComCam',
+                                 filter_passes=True, fov_radius=1.75,
+                                 check_ccds=False, butler=None, verbose=True):
+    """
+    Search all Fermi passes for overlaps using pre-cached visits.
+
+    Parameters:
+    -----------
+    passes : list
+        List of FermiPass objects
+    cached_visits : list of dict
+        Pre-loaded visit information
+    instrument : str
+        Rubin instrument name (for filtering)
+    filter_passes : bool
+        If True, only search passes meeting all filter criteria
+    fov_radius : float
+        Field of view radius in degrees
+    check_ccds : bool
+        If True, determine which CCDs Fermi crosses (requires butler)
+    butler : lsst.daf.butler.Butler or None
+        Butler instance (only needed if check_ccds=True)
+    verbose : bool
+        Print progress
+
+    Returns:
+    --------
+    all_overlaps : list of dict
+        All candidate overlaps found
+    """
+    # Filter passes if requested
+    if filter_passes:
+        search_passes = [p for p in passes if p.passes_all_filters]
+        if verbose:
+            print(f"\nSearching {len(search_passes)} passes that meet all filter criteria")
+    else:
+        search_passes = passes
+        if verbose:
+            print(f"\nSearching all {len(search_passes)} passes")
+
+    if len(search_passes) == 0:
+        print("No passes to search!")
+        return []
+
+    # Filter cached visits by instrument
+    instrument_visits = [v for v in cached_visits if v['instrument'] == instrument]
+    if verbose:
+        print(f"Using {len(instrument_visits)} cached {instrument} visits")
+
+    if check_ccds and butler is None:
+        print("WARNING: check_ccds=True but no Butler provided - skipping CCD matching")
+        check_ccds = False
+
+    all_overlaps = []
+
+    for i, fermi_pass in enumerate(search_passes):
+        if verbose:
+            print(f"\nPass {i + 1}/{len(search_passes)}: {fermi_pass.start_time.iso} to {fermi_pass.end_time.iso}")
+            print(f"  Duration: {(fermi_pass.end_time - fermi_pass.start_time).sec / 60:.1f} min")
+            print(f"  RA: {fermi_pass.ra.min():.1f}° to {fermi_pass.ra.max():.1f}°")
+            print(f"  Dec: {fermi_pass.dec.min():.1f}° to {fermi_pass.dec.max():.1f}°")
+
+        # Filter cached visits to those during this pass
+        pass_visits = [
+            v for v in instrument_visits
+            if fermi_pass.start_time <= v['obs_time'] <= fermi_pass.end_time
+        ]
+
+        if verbose:
+            print(f"  Found {len(pass_visits)} visits during this time")
+
+        if len(pass_visits) == 0:
+            continue
+
+        # Find overlaps
+        overlaps = find_pass_overlaps(
+            fermi_pass,
+            pass_visits,
+            butler,
+            fov_radius=fov_radius,
+            check_ccds=check_ccds,
+            instrument=instrument,
+            verbose=verbose
+        )
+
+        if len(overlaps) > 0:
+            if verbose:
+                print(f"  *** Found {len(overlaps)} potential overlaps! ***")
+
+            # Add pass information to overlaps
+            for overlap in overlaps:
+                overlap['fermi_pass_index'] = i
+                overlap['fermi_start_time'] = fermi_pass.start_time
+                overlap['fermi_end_time'] = fermi_pass.end_time
+                overlap['fermi_ra_range'] = (fermi_pass.ra.min(), fermi_pass.ra.max())
+                overlap['fermi_dec_range'] = (fermi_pass.dec.min(), fermi_pass.dec.max())
+                overlap['fermi_max_velocity'] = fermi_pass.max_angular_velocity
+
+            all_overlaps.extend(overlaps)
+
+            if verbose:
+                for overlap in overlaps:
+                    status = "WITHIN FOV" if overlap['within_fov'] else "nearby"
+                    ccd_info = f", {overlap['num_ccds']} CCDs" if check_ccds else ""
+                    print(
+                        f"    Visit {overlap['visit_id']}: {status}, dist={overlap['distance_to_fermi_path']:.2f}°{ccd_info}")
+
+    return all_overlaps
+
+
+def save_overlaps(overlaps, output_file):
+    """Save overlaps to file"""
+    import json
+
+    output_file = Path(output_file)
+
+    # Convert to JSON-serializable format
+    output_data = []
+    for overlap in overlaps:
+        data = {
+            'fermi_pass_index': overlap['fermi_pass_index'],
+            'fermi_start_time': overlap['fermi_start_time'].iso,
+            'fermi_end_time': overlap['fermi_end_time'].iso,
+            'fermi_ra_range': overlap['fermi_ra_range'],
+            'fermi_dec_range': overlap['fermi_dec_range'],
+            'fermi_max_velocity_deg_per_s': overlap['fermi_max_velocity'],
+            'rubin_visit_id': overlap['visit_id'],
+            'rubin_obs_time': overlap['obs_time'].iso,
+            'rubin_pointing_ra': overlap['pointing_ra'],
+            'rubin_pointing_dec': overlap['pointing_dec'],
+            'distance_to_fermi_path_deg': overlap['distance_to_fermi_path'],
+            'within_fov': overlap['within_fov'],
+            'instrument': overlap['instrument'],
+            'num_ccds': overlap['num_ccds'],
+            'ccd_matches': overlap['ccd_matches']
+        }
+        output_data.append(data)
+
+    with open(output_file, 'w') as f:
+        json.dump(output_data, f, indent=2)
+
+    print(f"\nSaved {len(overlaps)} overlaps to {output_file}")
+
+
+def query_and_cache_visits(butler, start_time, end_time, instrument, output_file):
+    """
+    Query Butler for visits in time range and cache to pickle file.
+
+    Parameters:
+    -----------
+    butler : lsst.daf.butler.Butler
+        Butler instance
+    start_time : astropy.time.Time
+        Start of time range
+    end_time : astropy.time.Time
+        End of time range
+    instrument : str
+        Instrument name
+    output_file : str or Path
+        Path to save pickle file
+
+    Returns:
+    --------
+    visits : list of dict
+        Visit information
+    """
+    from lsst.daf.butler import Timespan
+    import lsst.geom as geom
+
+    print(f"\n{'=' * 60}")
+    print(f"QUERYING VISITS")
+    print(f"{'=' * 60}")
+    print(f"Time range: {start_time.iso} to {end_time.iso}")
+    print(f"Instrument: {instrument}")
+    print(f"Output: {output_file}")
+    print()
+
+    # Create timespan for query
+    timespan = Timespan(begin=start_time, end=end_time)
+
+    try:
+        where_clause = f"instrument = '{instrument}' AND visit.timespan OVERLAPS timespan"
+        bind_params = {"timespan": timespan}
+
+        print("Executing Butler query...")
+        visit_records = butler.query_dimension_records(
+            "visit",
+            where=where_clause,
+            bind=bind_params
+        )
+
+        # Convert to list to get count
+        visit_list = list(visit_records)
+        print(f"Found {len(visit_list)} visits")
+
+    except Exception as e:
+        print(f"ERROR: Butler query failed: {e}")
+        return []
+
+    print("\nProcessing visit records...")
+    visits = []
+    for i, visit in enumerate(visit_list):
+        if (i + 1) % 100 == 0:
+            print(f"  Processed {i + 1}/{len(visit_list)} visits...")
+
+        try:
+            # Extract pointing - handle both old and new region types
+            if hasattr(visit.region, 'center'):
+                # Old style with center attribute
+                ra = visit.region.center.getRa().asDegrees()
+                dec = visit.region.center.getDec().asDegrees()
+            else:
+                # New style - region is a ConvexPolygon, compute centroid
+                # Get bounding circle center as approximation
+                bounding_circle = visit.region.getBoundingCircle()
+                center_vector = bounding_circle.getCenter()
+
+                # Convert UnitVector3d to lon/lat
+                # UnitVector3d has x, y, z components
+                lon = np.arctan2(center_vector.y(), center_vector.x())
+                lat = np.arcsin(center_vector.z())
+
+                # Convert to degrees
+                ra = np.degrees(lon)
+                dec = np.degrees(lat)
+
+                # Normalize RA to [0, 360)
+                if ra < 0:
+                    ra += 360.0
+
+            # Get observation time (midpoint)
+            # Handle both old (with .astropy) and new (already astropy Time) formats
+            begin_time = visit.timespan.begin
+            end_time = visit.timespan.end
+
+            if hasattr(begin_time, 'astropy'):
+                # Old format - convert to astropy
+                begin_astropy = begin_time.astropy
+                end_astropy = end_time.astropy
+            else:
+                # New format - already astropy Time objects
+                begin_astropy = begin_time
+                end_astropy = end_time
+
+            mid_astropy = begin_astropy + (end_astropy - begin_astropy) / 2
+
+            visits.append({
+                'visit_id': visit.id,
+                'obs_time': mid_astropy,
+                'pointing_ra': ra,
+                'pointing_dec': dec,
+                'instrument': instrument,
+                'timespan': visit.timespan
+            })
+        except Exception as e:
+            print(f"  Warning: Could not process visit {visit.id}: {e}")
+            continue
+
+    print(f"\nSuccessfully processed {len(visits)} visits")
+
+    # Save to pickle
+    output_file = Path(output_file)
+    with open(output_file, 'wb') as f:
+        pickle.dump(visits, f)
+
+    print(f"Saved visits to {output_file}")
+
+    # Print summary statistics
+    print(f"\n{'=' * 60}")
+    print(f"VISIT SUMMARY")
+    print(f"{'=' * 60}")
+    if len(visits) > 0:
+        ras = [v['pointing_ra'] for v in visits]
+        decs = [v['pointing_dec'] for v in visits]
+        times = [v['obs_time'].iso for v in visits]
+
+        print(f"Total visits: {len(visits)}")
+        print(f"RA range: {min(ras):.2f}° to {max(ras):.2f}°")
+        print(f"Dec range: {min(decs):.2f}° to {max(decs):.2f}°")
+        print(f"First observation: {min(times)}")
+        print(f"Last observation: {max(times)}")
+
+    return visits
+
 
 def load_cached_visits(cache_file):
     """
@@ -766,13 +1075,11 @@ def main():
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
-    print(f"DEBUG: Loaded config file: {args.config}")
-    print(f"DEBUG: Config keys: {list(config.keys())}")
-    print(f"DEBUG: butler_repo from config: {config.get('butler_repo', 'KEY_NOT_FOUND')}")
-
     # Extract parameters
     passes_file = config['passes_file']
     butler_repo = config.get('butler_repo', None)
+    if butler_repo == 'None':
+        butler_repo = None
     instrument = config.get('instrument', 'LSSTComCam')
     filter_passes = config.get('filter_passes_only', True)
     fov_radius = config.get('fov_radius', 1.75)
@@ -792,15 +1099,9 @@ def main():
 
     # Initialize Butler if needed
     butler = None
-    need_butler = (not args.use_cache) or args.query_only
+    need_butler = args.query_only or (check_ccds and args.use_cache) or (not args.use_cache)
 
-    print(f"DEBUG: args.query_only = {args.query_only}")
-    print(f"DEBUG: args.use_cache = {args.use_cache}")
-    print(f"DEBUG: butler_repo = '{butler_repo}'")
-    need_butler = (not args.use_cache) or args.query_only
-    print(f"DEBUG: need_butler = {need_butler}")
-
-    if butler_repo and need_butler:
+    if need_butler and butler_repo:
         if not HAVE_BUTLER:
             print("ERROR: Butler requested but lsst.daf.butler not available")
             print("Install Rubin Science Pipelines or set butler_repo to null in config")
@@ -843,37 +1144,41 @@ def main():
         print("No passes to search!")
         return 0
 
-    # For overlap search, we need visits
-    # Either from cache or by querying per-pass
+    # Search for overlaps
     if args.use_cache:
-        # Load all visits from cache and filter per pass in search_all_passes
-        print(f"\nUsing cached visits from {args.use_cache}")
+        # Use cached visits
+        if verbose:
+            print(f"\nUsing cached visits from {args.use_cache}")
         cached_visits = load_cached_visits(args.use_cache)
 
         if len(cached_visits) == 0:
             return 1
 
-        # We'll need to modify search_all_passes to accept pre-loaded visits
-        # For now, just show this isn't fully implemented
-        print("NOTE: Using cached visits requires modified search logic")
-        print("Currently, search_all_passes queries per-pass")
-        print("This will be implemented in next iteration")
-        return 0
+        overlaps = search_all_passes_with_cache(
+            passes,
+            cached_visits,
+            instrument=instrument,
+            filter_passes=filter_passes,
+            fov_radius=fov_radius,
+            check_ccds=check_ccds,
+            butler=butler,  # Pass butler if available for CCD checking
+            verbose=verbose
+        )
+    else:
+        # Query Butler per-pass (original approach)
+        if butler is None:
+            print("ERROR: Need Butler connection when not using cache")
+            return 1
 
-    # Search for overlaps (queries Butler per pass)
-    if butler is None:
-        print("ERROR: Need either Butler connection or --use-cache")
-        return 1
-
-    overlaps = search_all_passes(
-        passes,
-        butler,
-        instrument=instrument,
-        filter_passes=filter_passes,
-        fov_radius=fov_radius,
-        check_ccds=check_ccds,
-        verbose=verbose
-    )
+        overlaps = search_all_passes(
+            passes,
+            butler,
+            instrument=instrument,
+            filter_passes=filter_passes,
+            fov_radius=fov_radius,
+            check_ccds=check_ccds,
+            verbose=verbose
+        )
 
     # Summary
     print(f"\n{'=' * 60}")
