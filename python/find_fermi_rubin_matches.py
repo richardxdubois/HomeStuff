@@ -18,7 +18,7 @@ from Rubin_Fermi import FermiPass
 
 # For Rubin data access
 try:
-    from lsst.daf.butler import Butler
+    from lsst.daf.butler import Butler, Timespan
 
     HAVE_BUTLER = True
 except ImportError:
@@ -190,12 +190,16 @@ def get_rubin_visits_butler(butler, start_time, end_time, instrument='LSSTComCam
     # Convert to TAI
     start_tai = start_time.tai.datetime64
     end_tai = end_time.tai.datetime64
+    timespan = Timespan(begin=start_time, end=end_time)
 
     try:
-        visit_records = butler.registry.queryDimensionRecords(
-            'visit',
-            where="visit.timespan OVERLAPS T(?,?) AND instrument = ?",
-            bind=(start_tai, end_tai, instrument)
+        where_clause = "instrument = 'LSSTCam' AND visit.timespan OVERLAPS timespan"
+        bind_params = {"timespan": timespan}
+
+        visit_records = butler.query_dimension_records(
+            "visit",
+            where=where_clause,
+            bind=bind_params
         )
     except Exception as e:
         print(f"  Warning: Butler query failed: {e}")
@@ -567,6 +571,175 @@ def save_overlaps(overlaps, output_file):
     print(f"\nSaved {len(overlaps)} overlaps to {output_file}")
 
 
+def query_and_cache_visits(butler, start_time, end_time, instrument, output_file):
+    """
+    Query Butler for visits in time range and cache to pickle file.
+
+    Parameters:
+    -----------
+    butler : lsst.daf.butler.Butler
+        Butler instance
+    start_time : astropy.time.Time
+        Start of time range
+    end_time : astropy.time.Time
+        End of time range
+    instrument : str
+        Instrument name
+    output_file : str or Path
+        Path to save pickle file
+
+    Returns:
+    --------
+    visits : list of dict
+        Visit information
+    """
+    from lsst.daf.butler import Timespan
+    import lsst.geom as geom
+
+    print(f"\n{'=' * 60}")
+    print(f"QUERYING VISITS")
+    print(f"{'=' * 60}")
+    print(f"Time range: {start_time.iso} to {end_time.iso}")
+    print(f"Instrument: {instrument}")
+    print(f"Output: {output_file}")
+    print()
+
+    # Create timespan for query
+    timespan = Timespan(begin=start_time, end=end_time)
+
+    try:
+        where_clause = f"instrument = '{instrument}' AND visit.timespan OVERLAPS timespan"
+        bind_params = {"timespan": timespan}
+
+        print("Executing Butler query...")
+        visit_records = butler.query_dimension_records(
+            "visit",
+            where=where_clause,
+            bind=bind_params
+        )
+
+        # Convert to list to get count
+        visit_list = list(visit_records)
+        print(f"Found {len(visit_list)} visits")
+
+    except Exception as e:
+        print(f"ERROR: Butler query failed: {e}")
+        return []
+
+    print("\nProcessing visit records...")
+    visits = []
+    for i, visit in enumerate(visit_list):
+        if (i + 1) % 100 == 0:
+            print(f"  Processed {i + 1}/{len(visit_list)} visits...")
+
+        try:
+            # Extract pointing - handle both old and new region types
+            if hasattr(visit.region, 'center'):
+                # Old style with center attribute
+                ra = visit.region.center.getRa().asDegrees()
+                dec = visit.region.center.getDec().asDegrees()
+            else:
+                # New style - region is a ConvexPolygon, compute centroid
+                # Get bounding circle center as approximation
+                bounding_circle = visit.region.getBoundingCircle()
+                center_vector = bounding_circle.getCenter()
+
+                # Convert UnitVector3d to lon/lat
+                # UnitVector3d has x, y, z components
+                lon = np.arctan2(center_vector.y(), center_vector.x())
+                lat = np.arcsin(center_vector.z())
+
+                # Convert to degrees
+                ra = np.degrees(lon)
+                dec = np.degrees(lat)
+
+                # Normalize RA to [0, 360)
+                if ra < 0:
+                    ra += 360.0
+
+            # Get observation time (midpoint)
+            # Handle both old (with .astropy) and new (already astropy Time) formats
+            begin_time = visit.timespan.begin
+            end_time = visit.timespan.end
+
+            if hasattr(begin_time, 'astropy'):
+                # Old format - convert to astropy
+                begin_astropy = begin_time.astropy
+                end_astropy = end_time.astropy
+            else:
+                # New format - already astropy Time objects
+                begin_astropy = begin_time
+                end_astropy = end_time
+
+            mid_astropy = begin_astropy + (end_astropy - begin_astropy) / 2
+
+            visits.append({
+                'visit_id': visit.id,
+                'obs_time': mid_astropy,
+                'pointing_ra': ra,
+                'pointing_dec': dec,
+                'instrument': instrument,
+                'timespan': visit.timespan
+            })
+        except Exception as e:
+            print(f"  Warning: Could not process visit {visit.id}: {e}")
+            continue
+
+    print(f"\nSuccessfully processed {len(visits)} visits")
+
+    # Save to pickle
+    output_file = Path(output_file)
+    with open(output_file, 'wb') as f:
+        pickle.dump(visits, f)
+
+    print(f"Saved visits to {output_file}")
+
+    # Print summary statistics
+    print(f"\n{'=' * 60}")
+    print(f"VISIT SUMMARY")
+    print(f"{'=' * 60}")
+    if len(visits) > 0:
+        ras = [v['pointing_ra'] for v in visits]
+        decs = [v['pointing_dec'] for v in visits]
+        times = [v['obs_time'].iso for v in visits]
+
+        print(f"Total visits: {len(visits)}")
+        print(f"RA range: {min(ras):.2f}° to {max(ras):.2f}°")
+        print(f"Dec range: {min(decs):.2f}° to {max(decs):.2f}°")
+        print(f"First observation: {min(times)}")
+        print(f"Last observation: {max(times)}")
+
+    return visits
+
+
+def load_cached_visits(cache_file):
+    """
+    Load previously cached visits from pickle file.
+
+    Parameters:
+    -----------
+    cache_file : str or Path
+        Path to pickle file
+
+    Returns:
+    --------
+    visits : list of dict
+        Visit information
+    """
+    cache_file = Path(cache_file)
+
+    if not cache_file.exists():
+        print(f"ERROR: Cache file not found: {cache_file}")
+        return []
+
+    print(f"Loading cached visits from {cache_file}")
+    with open(cache_file, 'rb') as f:
+        visits = pickle.load(f)
+
+    print(f"Loaded {len(visits)} visits from cache")
+    return visits
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Find overlaps between Fermi passes and Rubin observations'
@@ -576,12 +749,26 @@ def main():
         type=str,
         help='Path to YAML configuration file'
     )
+    parser.add_argument(
+        '--query-only',
+        action='store_true',
+        help='Only query and cache visits, do not search for overlaps'
+    )
+    parser.add_argument(
+        '--use-cache',
+        type=str,
+        help='Use cached visits from pickle file instead of querying Butler'
+    )
 
     args = parser.parse_args()
 
     # Load configuration
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
+
+    print(f"DEBUG: Loaded config file: {args.config}")
+    print(f"DEBUG: Config keys: {list(config.keys())}")
+    print(f"DEBUG: butler_repo from config: {config.get('butler_repo', 'KEY_NOT_FOUND')}")
 
     # Extract parameters
     passes_file = config['passes_file']
@@ -595,19 +782,25 @@ def main():
     verbose = config.get('verbose', True)
 
     # Time filtering parameters
-    pass_start_time = config.get('pass_start_time', None)  # e.g., "2025-12-20"
-    pass_end_time = config.get('pass_end_time', None)  # e.g., "2026-01-10"
+    pass_start_time = config.get('pass_start_time', None)
+    pass_end_time = config.get('pass_end_time', None)
 
-    # Load Fermi passes with time filtering
-    if verbose:
-        print(f"Loading Fermi passes from {passes_file}")
-    passes = load_fermi_passes(passes_file,
-                               start_time=pass_start_time,
-                               end_time=pass_end_time)
+    # Visit cache parameters
+    visit_cache_file = config.get('visit_cache_file', 'rubin_visits_cache.pkl')
+    visit_query_start = config.get('visit_query_start', pass_start_time)
+    visit_query_end = config.get('visit_query_end', pass_end_time)
 
-    # Initialize Butler if available
+    # Initialize Butler if needed
     butler = None
-    if butler_repo:
+    need_butler = (not args.use_cache) or args.query_only
+
+    print(f"DEBUG: args.query_only = {args.query_only}")
+    print(f"DEBUG: args.use_cache = {args.use_cache}")
+    print(f"DEBUG: butler_repo = '{butler_repo}'")
+    need_butler = (not args.use_cache) or args.query_only
+    print(f"DEBUG: need_butler = {need_butler}")
+
+    if butler_repo and need_butler:
         if not HAVE_BUTLER:
             print("ERROR: Butler requested but lsst.daf.butler not available")
             print("Install Rubin Science Pipelines or set butler_repo to null in config")
@@ -621,11 +814,57 @@ def main():
         except Exception as e:
             print(f"ERROR: Could not initialize Butler: {e}")
             return 1
-    else:
-        print("WARNING: No butler_repo specified - will not query Rubin observations")
-        print("Set butler_repo in config to enable overlap search")
 
-    # Search for overlaps
+    # Handle query-only mode
+    if args.query_only:
+        if butler is None:
+            print("ERROR: --query-only requires butler_repo in config")
+            return 1
+
+        if visit_query_start is None or visit_query_end is None:
+            print("ERROR: --query-only requires visit_query_start and visit_query_end in config")
+            return 1
+
+        start_time = Time(visit_query_start, format='iso')
+        end_time = Time(visit_query_end, format='iso')
+
+        query_and_cache_visits(butler, start_time, end_time, instrument, visit_cache_file)
+        print("\nQuery complete. Run without --query-only to search for overlaps.")
+        return 0
+
+    # Load Fermi passes with time filtering
+    if verbose:
+        print(f"Loading Fermi passes from {passes_file}")
+    passes = load_fermi_passes(passes_file,
+                               start_time=pass_start_time,
+                               end_time=pass_end_time)
+
+    if len(passes) == 0:
+        print("No passes to search!")
+        return 0
+
+    # For overlap search, we need visits
+    # Either from cache or by querying per-pass
+    if args.use_cache:
+        # Load all visits from cache and filter per pass in search_all_passes
+        print(f"\nUsing cached visits from {args.use_cache}")
+        cached_visits = load_cached_visits(args.use_cache)
+
+        if len(cached_visits) == 0:
+            return 1
+
+        # We'll need to modify search_all_passes to accept pre-loaded visits
+        # For now, just show this isn't fully implemented
+        print("NOTE: Using cached visits requires modified search logic")
+        print("Currently, search_all_passes queries per-pass")
+        print("This will be implemented in next iteration")
+        return 0
+
+    # Search for overlaps (queries Butler per pass)
+    if butler is None:
+        print("ERROR: Need either Butler connection or --use-cache")
+        return 1
+
     overlaps = search_all_passes(
         passes,
         butler,
@@ -675,3 +914,4 @@ if __name__ == '__main__':
     import sys
 
     sys.exit(main())
+
