@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-find_fermi_rubin_overlaps.py
+find_fermi_rubin_matches.py
 
 Search for overlaps between Fermi satellite passes and Rubin Observatory visits.
 Loads pre-computed Fermi passes and queries Rubin observation database for
-potential detections.
+potential detections. Now includes CCD-level matching.
 """
 
 import argparse
@@ -14,6 +14,7 @@ import numpy as np
 from pathlib import Path
 from astropy.time import Time
 import astropy.units as u
+from Rubin_Fermi import FermiPass
 
 # For Rubin data access
 try:
@@ -117,24 +118,55 @@ def point_to_arc_distance(ra_point, dec_point, ra_start, dec_start, ra_end, dec_
         return np.degrees(min(dist_to_start, dist_to_end))
 
 
-def load_fermi_passes(pickle_file):
+def load_fermi_passes(pickle_file, start_time=None, end_time=None):
     """
-    Load Fermi passes from pickle file
+    Load Fermi passes from pickle file with optional time filtering
 
     Parameters:
     -----------
     pickle_file : str or Path
         Path to pickle file containing passes
+    start_time : str or astropy.time.Time, optional
+        Only include passes that end after this time (ISO format string or Time object)
+    end_time : str or astropy.time.Time, optional
+        Only include passes that start before this time (ISO format string or Time object)
 
     Returns:
     --------
     passes : list
-        List of FermiPass objects
+        List of FermiPass objects (filtered by time if specified)
     """
     with open(pickle_file, 'rb') as f:
         passes = pickle.load(f)
 
     print(f"Loaded {len(passes)} Fermi passes from {pickle_file}")
+
+    # Apply time filtering if requested
+    if start_time is not None or end_time is not None:
+        # Convert to Time objects if needed
+        if start_time is not None and isinstance(start_time, str):
+            start_time = Time(start_time, format='iso')
+        if end_time is not None and isinstance(end_time, str):
+            end_time = Time(end_time, format='iso')
+
+        original_count = len(passes)
+        filtered_passes = []
+
+        for p in passes:
+            # Keep pass if it overlaps the time window
+            if start_time is not None and p.end_time < start_time:
+                continue
+            if end_time is not None and p.start_time > end_time:
+                continue
+            filtered_passes.append(p)
+
+        passes = filtered_passes
+        print(f"Time filter applied: {original_count} -> {len(passes)} passes")
+        if start_time:
+            print(f"  After: {start_time.iso}")
+        if end_time:
+            print(f"  Before: {end_time.iso}")
+
     return passes
 
 
@@ -195,7 +227,123 @@ def get_rubin_visits_butler(butler, start_time, end_time, instrument='LSSTComCam
     return visits
 
 
-def find_pass_overlaps(fermi_pass, rubin_visits, fov_radius=1.75, buffer=0.1):
+def find_ccd_matches(butler, visit_id, fermi_ra, fermi_dec, instrument='LSSTComCam', verbose=False):
+    """
+    Determine which CCDs Fermi's position falls on.
+
+    Parameters:
+    -----------
+    butler : lsst.daf.butler.Butler
+        Butler instance
+    visit_id : int
+        Visit identifier
+    fermi_ra : array-like
+        Fermi RA positions during exposure (degrees)
+    fermi_dec : array-like
+        Fermi Dec positions during exposure (degrees)
+    instrument : str
+        Instrument name
+    verbose : bool
+        Print detailed information
+
+    Returns:
+    --------
+    list of dicts with CCD match information
+    """
+    ccd_matches = []
+
+    try:
+        # Get camera geometry
+        camera = butler.get('camera', instrument=instrument)
+
+        if verbose:
+            print(f"    Camera has {len(camera)} detectors")
+
+        # Check each detector
+        for detector in camera:
+            detector_id = detector.getId()
+            detector_name = detector.getName()
+
+            try:
+                # Get WCS for this detector/visit
+                wcs = butler.get('wcs',
+                                 dataId={'visit': visit_id,
+                                         'detector': detector_id,
+                                         'instrument': instrument})
+
+                # Get detector bounding box
+                bbox = detector.getBBox()
+
+                # Get corners in sky coordinates
+                corners_pix = [
+                    (bbox.getMinX(), bbox.getMinY()),
+                    (bbox.getMaxX(), bbox.getMinY()),
+                    (bbox.getMaxX(), bbox.getMaxY()),
+                    (bbox.getMinX(), bbox.getMaxY())
+                ]
+
+                corners_sky = [wcs.pixelToSky(x, y) for x, y in corners_pix]
+
+                # Get RA/Dec ranges
+                corner_ras = [c.getRa().asDegrees() for c in corners_sky]
+                corner_decs = [c.getDec().asDegrees() for c in corners_sky]
+
+                ra_min, ra_max = min(corner_ras), max(corner_ras)
+                dec_min, dec_max = min(corner_decs), max(corner_decs)
+
+                # Check if any Fermi position falls within this detector
+                # Simple bounding box check
+                for i, (fra, fdec) in enumerate(zip(fermi_ra, fermi_dec)):
+                    # Handle RA wraparound if needed
+                    if ra_max - ra_min > 180:  # Wraparound case
+                        in_ra = (fra >= ra_min or fra <= ra_max)
+                    else:
+                        in_ra = (ra_min <= fra <= ra_max)
+
+                    in_dec = (dec_min <= fdec <= dec_max)
+
+                    if in_ra and in_dec:
+                        # Found a match - try to get pixel coordinates
+                        try:
+                            pixel_pos = wcs.skyToPixel(corners_sky[0].__class__(
+                                fra * corners_sky[0].getRa().Units,
+                                fdec * corners_sky[0].getDec().Units
+                            ))
+                            pixel_x, pixel_y = pixel_pos
+                        except:
+                            pixel_x, pixel_y = None, None
+
+                        ccd_matches.append({
+                            'detector_id': detector_id,
+                            'detector_name': detector_name,
+                            'fermi_ra': fra,
+                            'fermi_dec': fdec,
+                            'pixel_x': pixel_x,
+                            'pixel_y': pixel_y,
+                            'time_index': i
+                        })
+                        break  # Just record that this CCD has a match
+
+            except Exception as e:
+                # WCS might not be available for all detectors
+                if verbose:
+                    print(f"    Could not check detector {detector_name}: {e}")
+                continue
+
+    except Exception as e:
+        if verbose:
+            print(f"    Could not load camera geometry: {e}")
+        return []
+
+    if ccd_matches and verbose:
+        print(f"    Fermi crosses {len(ccd_matches)} CCDs: " +
+              ", ".join([m['detector_name'] for m in ccd_matches]))
+
+    return ccd_matches
+
+
+def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer=0.1,
+                       check_ccds=True, instrument='LSSTComCam', verbose=False):
     """
     Find Rubin visits that potentially overlap with a Fermi pass
 
@@ -205,15 +353,23 @@ def find_pass_overlaps(fermi_pass, rubin_visits, fov_radius=1.75, buffer=0.1):
         Fermi pass object with trajectory
     rubin_visits : list of dict
         Rubin visit information
+    butler : lsst.daf.butler.Butler or None
+        Butler instance for CCD queries
     fov_radius : float
         Rubin field of view radius in degrees (default 1.75 for 3.5° diameter)
     buffer : float
         Additional buffer in degrees for conservative matching
+    check_ccds : bool
+        If True, determine which CCDs Fermi crosses
+    instrument : str
+        Instrument name for CCD queries
+    verbose : bool
+        Print detailed CCD information
 
     Returns:
     --------
     overlaps : list of dict
-        Candidate overlaps with distance and timing info
+        Candidate overlaps with distance and timing info, including CCD matches
     """
     # Fermi trajectory endpoints
     ra_start = fermi_pass.ra[0]
@@ -236,6 +392,27 @@ def find_pass_overlaps(fermi_pass, rubin_visits, fov_radius=1.75, buffer=0.1):
         )
 
         if dist < (fov_radius + buffer):
+            # Get Fermi positions during this visit
+            visit_start = Time(visit['timespan'].begin.tai, format='mjd', scale='tai')
+            visit_end = Time(visit['timespan'].end.tai, format='mjd', scale='tai')
+
+            # Find Fermi positions during exposure
+            time_mask = (fermi_pass.times >= visit_start) & (fermi_pass.times <= visit_end)
+            fermi_ra_during = fermi_pass.ra[time_mask]
+            fermi_dec_during = fermi_pass.dec[time_mask]
+
+            # Find CCD matches if requested
+            ccd_matches = []
+            if check_ccds and butler is not None and len(fermi_ra_during) > 0:
+                ccd_matches = find_ccd_matches(
+                    butler,
+                    visit['visit_id'],
+                    fermi_ra_during,
+                    fermi_dec_during,
+                    instrument=instrument,
+                    verbose=verbose
+                )
+
             overlaps.append({
                 'visit_id': visit['visit_id'],
                 'obs_time': visit['obs_time'],
@@ -243,14 +420,16 @@ def find_pass_overlaps(fermi_pass, rubin_visits, fov_radius=1.75, buffer=0.1):
                 'pointing_dec': visit['pointing_dec'],
                 'distance_to_fermi_path': dist,
                 'within_fov': dist < fov_radius,
-                'instrument': visit['instrument']
+                'instrument': visit['instrument'],
+                'ccd_matches': ccd_matches,
+                'num_ccds': len(ccd_matches)
             })
 
     return overlaps
 
 
 def search_all_passes(passes, butler, instrument='LSSTComCam',
-                      filter_passes=True, fov_radius=1.75, verbose=True):
+                      filter_passes=True, fov_radius=1.75, check_ccds=True, verbose=True):
     """
     Search all Fermi passes for overlaps with Rubin observations
 
@@ -266,6 +445,8 @@ def search_all_passes(passes, butler, instrument='LSSTComCam',
         If True, only search passes meeting all filter criteria
     fov_radius : float
         Field of view radius in degrees
+    check_ccds : bool
+        If True, determine which CCDs Fermi crosses
     verbose : bool
         Print progress
 
@@ -317,7 +498,15 @@ def search_all_passes(passes, butler, instrument='LSSTComCam',
             continue
 
         # Find overlaps
-        overlaps = find_pass_overlaps(fermi_pass, rubin_visits, fov_radius=fov_radius)
+        overlaps = find_pass_overlaps(
+            fermi_pass,
+            rubin_visits,
+            butler,
+            fov_radius=fov_radius,
+            check_ccds=check_ccds,
+            instrument=instrument,
+            verbose=verbose
+        )
 
         if len(overlaps) > 0:
             if verbose:
@@ -337,7 +526,9 @@ def search_all_passes(passes, butler, instrument='LSSTComCam',
             if verbose:
                 for overlap in overlaps:
                     status = "WITHIN FOV" if overlap['within_fov'] else "nearby"
-                    print(f"    Visit {overlap['visit_id']}: {status}, dist={overlap['distance_to_fermi_path']:.2f}°")
+                    ccd_info = f", {overlap['num_ccds']} CCDs" if check_ccds else ""
+                    print(
+                        f"    Visit {overlap['visit_id']}: {status}, dist={overlap['distance_to_fermi_path']:.2f}°{ccd_info}")
 
     return all_overlaps
 
@@ -364,7 +555,9 @@ def save_overlaps(overlaps, output_file):
             'rubin_pointing_dec': overlap['pointing_dec'],
             'distance_to_fermi_path_deg': overlap['distance_to_fermi_path'],
             'within_fov': overlap['within_fov'],
-            'instrument': overlap['instrument']
+            'instrument': overlap['instrument'],
+            'num_ccds': overlap['num_ccds'],
+            'ccd_matches': overlap['ccd_matches']
         }
         output_data.append(data)
 
@@ -379,7 +572,7 @@ def main():
         description='Find overlaps between Fermi passes and Rubin observations'
     )
     parser.add_argument(
-        'config',
+        '--config',
         type=str,
         help='Path to YAML configuration file'
     )
@@ -397,13 +590,20 @@ def main():
     filter_passes = config.get('filter_passes_only', True)
     fov_radius = config.get('fov_radius', 1.75)
     fov_buffer = config.get('fov_buffer', 0.1)
+    check_ccds = config.get('check_ccds', True)
     output_file = config.get('output_file', 'fermi_rubin_overlaps.json')
     verbose = config.get('verbose', True)
 
-    # Load Fermi passes
+    # Time filtering parameters
+    pass_start_time = config.get('pass_start_time', None)  # e.g., "2025-12-20"
+    pass_end_time = config.get('pass_end_time', None)  # e.g., "2026-01-10"
+
+    # Load Fermi passes with time filtering
     if verbose:
         print(f"Loading Fermi passes from {passes_file}")
-    passes = load_fermi_passes(passes_file)
+    passes = load_fermi_passes(passes_file,
+                               start_time=pass_start_time,
+                               end_time=pass_end_time)
 
     # Initialize Butler if available
     butler = None
@@ -432,6 +632,7 @@ def main():
         instrument=instrument,
         filter_passes=filter_passes,
         fov_radius=fov_radius,
+        check_ccds=check_ccds,
         verbose=verbose
     )
 
@@ -446,6 +647,10 @@ def main():
         within_fov = sum(1 for o in overlaps if o['within_fov'])
         print(f"  Within FOV (< {fov_radius}°): {within_fov}")
         print(f"  Nearby (< {fov_radius + fov_buffer}°): {len(overlaps) - within_fov}")
+
+        if check_ccds:
+            total_ccds = sum(o['num_ccds'] for o in overlaps)
+            print(f"  Total CCD matches: {total_ccds}")
 
         # Group by Fermi pass
         from collections import defaultdict
