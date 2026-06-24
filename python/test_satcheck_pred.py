@@ -4,8 +4,6 @@ from astropy.time import Time
 
 #utc_time_str = "2025-11-26 08:05:46"
 utc_time_str = "2025-11-26 07:47:54"
-dt = datetime.strptime(utc_time_str, "%Y-%m-%d %H:%M:%S")
-dt = dt.replace(tzinfo=timezone.utc)
 
 utc_Time = Time(utc_time_str)
 jd = utc_Time.jd
