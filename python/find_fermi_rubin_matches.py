@@ -347,7 +347,8 @@ def find_ccd_matches(butler, visit_id, fermi_ra, fermi_dec, instrument='LSSTComC
 
 
 def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer=0.1,
-                       check_ccds=True, instrument='LSSTComCam', verbose=False):
+                       check_ccds=True, instrument='LSSTComCam', verbose=False,
+                       n_trajectory_points=10):
     """
     Find Rubin visits that potentially overlap with a Fermi pass
 
@@ -369,11 +370,14 @@ def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer
         Instrument name for CCD queries
     verbose : bool
         Print detailed CCD information
+    n_trajectory_points : int
+        Number of trajectory points to include around closest approach
 
     Returns:
     --------
     overlaps : list of dict
         Candidate overlaps with distance and timing info, including CCD matches
+        and trajectory points
     """
     overlaps = []
     min_dist_seen = float('inf')
@@ -417,15 +421,37 @@ def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer
 
         if dist < (fov_radius + buffer):
             # Get Fermi positions during this visit
-            visit_start = Time(visit['timespan'].begin if not hasattr(visit['timespan'].begin, 'astropy')
-                               else visit['timespan'].begin.astropy, format='mjd', scale='tai')
-            visit_end = Time(visit['timespan'].end if not hasattr(visit['timespan'].end, 'astropy')
-                             else visit['timespan'].end.astropy, format='mjd', scale='tai')
+            visit_start = visit['timespan'].begin if not hasattr(visit['timespan'].begin, 'astropy') else visit[
+                'timespan'].begin.astropy
+            visit_end = visit['timespan'].end if not hasattr(visit['timespan'].end, 'astropy') else visit[
+                'timespan'].end.astropy
 
             # Find Fermi positions during exposure
             time_mask = (fermi_pass.times >= visit_start) & (fermi_pass.times <= visit_end)
             fermi_ra_during = fermi_pass.ra[time_mask]
             fermi_dec_during = fermi_pass.dec[time_mask]
+            fermi_times_during = fermi_pass.times[time_mask]
+
+            # Find index of closest approach
+            closest_idx = np.argmin(separations_deg)
+
+            # Extract trajectory points around closest approach
+            # Get indices for points before and after closest approach
+            half_points = n_trajectory_points // 2
+            start_idx = max(0, closest_idx - half_points)
+            end_idx = min(len(fermi_pass.ra), closest_idx + half_points + 1)
+
+            trajectory_points = []
+            for i in range(start_idx, end_idx):
+                trajectory_points.append({
+                    'ra': float(fermi_pass.ra[i]),
+                    'dec': float(fermi_pass.dec[i]),
+                    'time': fermi_pass.times[i].iso,
+                    'time_mjd': float(fermi_pass.times[i].mjd),
+                    'alt': float(fermi_pass.alt[i]) if hasattr(fermi_pass, 'alt') else None,
+                    'az': float(fermi_pass.az[i]) if hasattr(fermi_pass, 'az') else None,
+                    'is_closest': (i == closest_idx)
+                })
 
             # Find CCD matches if requested
             ccd_matches = []
@@ -445,10 +471,14 @@ def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer
                 'pointing_ra': visit['pointing_ra'],
                 'pointing_dec': visit['pointing_dec'],
                 'distance_to_fermi_path': dist,
+                'closest_approach_ra': float(fermi_pass.ra[closest_idx]),
+                'closest_approach_dec': float(fermi_pass.dec[closest_idx]),
+                'closest_approach_time': fermi_pass.times[closest_idx].iso,
                 'within_fov': dist < fov_radius,
                 'instrument': visit['instrument'],
                 'ccd_matches': ccd_matches,
-                'num_ccds': len(ccd_matches)
+                'num_ccds': len(ccd_matches),
+                'trajectory_points': trajectory_points
             })
 
     # DEBUG: print if we had visits but no matches
@@ -738,7 +768,8 @@ def query_and_cache_visits(butler, start_time, end_time, instrument, output_file
 
 def search_all_passes_with_cache(passes, cached_visits, instrument='LSSTComCam',
                                  filter_passes=True, fov_radius=1.75,
-                                 check_ccds=False, butler=None, verbose=True):
+                                 check_ccds=False, butler=None, verbose=True,
+                                 n_trajectory_points=10):
     """
     Search all Fermi passes for overlaps using pre-cached visits.
 
@@ -818,7 +849,8 @@ def search_all_passes_with_cache(passes, cached_visits, instrument='LSSTComCam',
             fov_radius=fov_radius,
             check_ccds=check_ccds,
             instrument=instrument,
-            verbose=verbose
+            verbose=verbose,
+            n_trajectory_points=n_trajectory_points
         )
 
         if len(overlaps) > 0:
@@ -847,38 +879,89 @@ def search_all_passes_with_cache(passes, cached_visits, instrument='LSSTComCam',
 
 
 def save_overlaps(overlaps, output_file):
-    """Save overlaps to file"""
-    import json
+    """Save overlaps to YAML file with trajectory points"""
+    import yaml
 
     output_file = Path(output_file)
 
-    # Convert to JSON-serializable format
-    output_data = []
+    # Group overlaps by visit_id
+    from collections import defaultdict
+    visits_data = defaultdict(list)
+
     for overlap in overlaps:
-        data = {
+        visit_id = overlap['visit_id']
+
+        # Format trajectory points
+        trajectory = []
+        for point in overlap['trajectory_points']:
+            # Extract just the time portion (HH:MM:SS)
+            time_str = point['time'].split('T')[1].split('.')[0] if 'T' in point['time'] else point['time']
+
+            trajectory.append({
+                'ra': round(point['ra'], 1),
+                'dec': round(point['dec'], 1),
+                'time': time_str
+            })
+
+        overlap_data = {
             'fermi_pass_index': overlap['fermi_pass_index'],
             'fermi_start_time': overlap['fermi_start_time'].iso,
             'fermi_end_time': overlap['fermi_end_time'].iso,
-            'fermi_ra_range': overlap['fermi_ra_range'],
-            'fermi_dec_range': overlap['fermi_dec_range'],
-            'fermi_max_velocity_deg_per_s': overlap['fermi_max_velocity'],
-            'rubin_visit_id': overlap['visit_id'],
             'rubin_obs_time': overlap['obs_time'].iso,
-            'rubin_pointing_ra': overlap['pointing_ra'],
-            'rubin_pointing_dec': overlap['pointing_dec'],
-            'distance_to_fermi_path_deg': overlap['distance_to_fermi_path'],
+            'rubin_pointing_ra': round(overlap['pointing_ra'], 2),
+            'rubin_pointing_dec': round(overlap['pointing_dec'], 2),
+            'distance_to_fermi_path_deg': round(overlap['distance_to_fermi_path'], 2),
+            'closest_approach_ra': round(overlap['closest_approach_ra'], 2),
+            'closest_approach_dec': round(overlap['closest_approach_dec'], 2),
+            'closest_approach_time': overlap['closest_approach_time'],
             'within_fov': overlap['within_fov'],
-            'instrument': overlap['instrument'],
             'num_ccds': overlap['num_ccds'],
-            'ccd_matches': overlap['ccd_matches']
+            'trajectory': trajectory
         }
-        output_data.append(data)
 
+        visits_data[visit_id].append(overlap_data)
+
+    # Build output structure
+    output_data = {'visits': []}
+
+    for visit_id, overlap_list in sorted(visits_data.items()):
+        visit_entry = {
+            'visit_id': visit_id,
+            'overlaps': overlap_list
+        }
+        output_data['visits'].append(visit_entry)
+
+    # Write YAML with custom formatting
     with open(output_file, 'w') as f:
-        json.dump(output_data, f, indent=2)
+        # Write custom YAML with cleaner formatting for trajectory
+        f.write("visits:\n\n")
+
+        for visit in output_data['visits']:
+            f.write(f"  - visit_id: {visit['visit_id']}\n")
+            f.write(f"    overlaps:\n")
+
+            for overlap in visit['overlaps']:
+                f.write(f"      - fermi_pass_index: {overlap['fermi_pass_index']}\n")
+                f.write(f"        fermi_start_time: {overlap['fermi_start_time']}\n")
+                f.write(f"        fermi_end_time: {overlap['fermi_end_time']}\n")
+                f.write(f"        rubin_obs_time: {overlap['rubin_obs_time']}\n")
+                f.write(f"        rubin_pointing_ra: {overlap['rubin_pointing_ra']}\n")
+                f.write(f"        rubin_pointing_dec: {overlap['rubin_pointing_dec']}\n")
+                f.write(f"        distance_to_fermi_path_deg: {overlap['distance_to_fermi_path_deg']}\n")
+                f.write(f"        closest_approach_ra: {overlap['closest_approach_ra']}\n")
+                f.write(f"        closest_approach_dec: {overlap['closest_approach_dec']}\n")
+                f.write(f"        closest_approach_time: {overlap['closest_approach_time']}\n")
+                f.write(f"        within_fov: {overlap['within_fov']}\n")
+                f.write(f"        num_ccds: {overlap['num_ccds']}\n")
+                f.write(f"        trajectory:\n")
+
+                for point in overlap['trajectory']:
+                    # Inline format for trajectory points
+                    f.write(f"          - {{ra: {point['ra']}, dec: {point['dec']}, time: \"{point['time']}\"}}\n")
+
+                f.write("\n")
 
     print(f"\nSaved {len(overlaps)} overlaps to {output_file}")
-
 
 def query_and_cache_visits(butler, start_time, end_time, instrument, output_file):
     """

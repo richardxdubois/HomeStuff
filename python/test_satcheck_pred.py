@@ -3,16 +3,19 @@ from datetime import datetime, timezone, date
 from astropy.time import Time
 
 #utc_time_str = "2025-11-26 08:05:46"
-utc_time_str = "2025-11-26 07:47:54"
+#utc_time_str = "2025-11-26 07:47:54"
+#utc_time_str = "2024-08-21 13:51:54"
+#utc_time_str = "2025-03-15 21:03:12"
+utc_time_str = "2024-10-27 09:16:14"
 
 utc_Time = Time(utc_time_str)
 jd = utc_Time.jd
 
 start_jd = jd
-stop_jd = start_jd
+stop_jd = start_jd + 0.0002
 
 # .2 is 4.8 hours
-step_jd = 0.2
+step_jd = 0.0001
 
 observer_latitude =  -30.244714  # Rubin Latitude
 observer_longitude =  -70.747658  # Rubin Longitude
@@ -54,6 +57,7 @@ for satellite in satellite_list:
         altitude_deg = satellite_data[altitude_index]
         ra_deg = satellite_data[ra_index]
         dec_deg = satellite_data[dec_index]
+        print("alt=",altitude_deg, "ra=",ra_deg, "dec=",dec_deg)
 
         # Check if the satellite is visible
         if altitude_deg > 0:

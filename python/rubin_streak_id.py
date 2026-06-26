@@ -169,6 +169,93 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
 
     print(f"Public catalog satellites: {len(satellites)} found")
 
+    # VERIFY FERMI POSITION - Do this before plotting
+    if fermi_overlaps:
+        for i, overlap in enumerate(fermi_overlaps):
+            if 'trajectory' in overlap:
+                trajectory = overlap['trajectory']
+                ra_points = [point['ra'] for point in trajectory]
+                dec_points = [point['dec'] for point in trajectory]
+                time_points = [point['time'] for point in trajectory]
+
+                print(f"  Fermi trajectory: {len(ra_points)} points")
+
+                # Find closest approach to field center
+                distances = []
+                for ra_p, dec_p in zip(ra_points, dec_points):
+                    d_ra = (ra_p - ra_center) * np.cos(np.radians(dec_center))
+                    d_dec = dec_p - dec_center
+                    dist = np.sqrt(d_ra ** 2 + d_dec ** 2)
+                    distances.append(dist)
+
+                min_idx = np.argmin(distances)
+                closest_ra = ra_points[min_idx]
+                closest_dec = dec_points[min_idx]
+                closest_time = time_points[min_idx]
+
+                print(f"\n  Your matching code says:")
+                print(f"    Fermi closest approach at: {closest_time}")
+                print(f"    Position: RA={closest_ra:.3f}°, Dec={closest_dec:.3f}°")
+                print(f"    Distance from field center: {distances[min_idx]:.3f}°")
+
+                # Time conversion check
+                closest_time_astropy = Time(closest_time)
+                query_jd = closest_time_astropy.jd
+
+                print(f"\n  Time conversion check:")
+                print(f"    Input time string: {closest_time}")
+                print(f"    Astropy Time object: {closest_time_astropy.iso}")
+                print(f"    Julian Date: {query_jd}")
+                print(f"    Visit exposure midpoint: {exp_midpt.iso}")
+                print(f"    Visit JD: {exp_midpt.jd}")
+                print(f"    Difference: {(closest_time_astropy.jd - exp_midpt.jd) * 86400:.1f} seconds")
+
+                # Check if a known satellite appears (for testing)
+                print(f"\n  Testing: Checking if SatChecker finds NOAA 16 DEB (42428)...")
+
+                test_found = False
+                for sat_name in satellites.keys():
+                    if '42428' in sat_name or 'NOAA 16 DEB' in sat_name.upper():
+                        test_found = True
+                        print(f"  ✓ TEST SATELLITE FOUND: {sat_name}")
+                        print(f"    (This confirms our checking logic works)")
+
+                if not test_found:
+                    print(f"  ✗ Hmm, test satellite not found either - something wrong with logic")
+
+                # Check if Fermi appears in the satellites already found
+                print(f"\n  Checking if SatChecker finds Fermi during visit exposure...")
+                print(f"  (Using same query as main FOV search)")
+
+                fermi_found = False
+                for sat_name in satellites.keys():
+                    if '33053' in sat_name or 'FERMI' in sat_name.upper() or 'GLAST' in sat_name.upper():
+                        fermi_found = True
+                        print(f"  ✓ FERMI FOUND in main query: {sat_name}")
+
+                        # Compare position
+                        fermi_positions = satellites[sat_name]
+                        if fermi_positions:
+                            # Find position closest to exposure midpoint
+                            mid_jd = exp_midpt.jd
+                            closest_pos_idx = min(range(len(fermi_positions)),
+                                                  key=lambda i: abs(fermi_positions[i][2] - mid_jd))
+
+                            satchecker_ra = fermi_positions[closest_pos_idx][0]
+                            satchecker_dec = fermi_positions[closest_pos_idx][1]
+                            satchecker_jd = fermi_positions[closest_pos_idx][2]
+
+                            print(f"  SatChecker position at JD {satchecker_jd}:")
+                            print(f"    RA={satchecker_ra:.3f}°, Dec={satchecker_dec:.3f}°")
+                            print(f"  Your matching code at closest approach:")
+                            print(f"    RA={closest_ra:.3f}°, Dec={closest_dec:.3f}°")
+
+                if not fermi_found:
+                    print(f"  ✗ Fermi NOT in the main SatChecker query results")
+                    print(f"  → Fermi (NORAD 33053) is likely not in SatChecker's database")
+                    print(f"  → SatChecker focuses on Starlink, OneWeb, and debris")
+                    print(f"  → NASA science missions may not be included")
+
     # Create Bokeh figure
     p = figure(
         width=800,
@@ -247,98 +334,6 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
 
     # Plot Fermi overlaps
     if fermi_overlaps:
-
-        for i, overlap in enumerate(fermi_overlaps):
-            if 'trajectory' in overlap:
-                trajectory = overlap['trajectory']
-                ra_points = [point['ra'] for point in trajectory]
-                dec_points = [point['dec'] for point in trajectory]
-                time_points = [point['time'] for point in trajectory]
-
-                print(f"  Fermi trajectory: {len(ra_points)} points")
-
-                # Find closest approach to field center
-                distances = []
-                for ra_p, dec_p in zip(ra_points, dec_points):
-                    d_ra = (ra_p - ra_center) * np.cos(np.radians(dec_center))
-                    d_dec = dec_p - dec_center
-                    dist = np.sqrt(d_ra ** 2 + d_dec ** 2)
-                    distances.append(dist)
-
-                min_idx = np.argmin(distances)
-                closest_ra = ra_points[min_idx]
-                closest_dec = dec_points[min_idx]
-                closest_time = time_points[min_idx]
-
-                print(f"\n  Your matching code says:")
-                print(f"    Fermi closest approach at: {closest_time}")
-                print(f"    Position: RA={closest_ra:.3f}°, Dec={closest_dec:.3f}°")
-                print(f"    Distance from field center: {distances[min_idx]:.3f}°")
-
-                # Check SatChecker for Fermi using the FOV query endpoint
-                # Query a small FOV centered on Fermi's predicted position
-                closest_time_astropy = Time(closest_time)
-                query_jd = closest_time_astropy.jd
-
-                # Use a small FOV radius centered on Fermi's position
-                fermi_fov_radius = 0.5  # 0.5 degree radius around Fermi's position
-                query_duration = 60  # 60 seconds around the time
-
-                fermi_url = f"https://satchecker.cps.iau.org/fov/satellite-passes/?latitude={latitude}&longitude={longitude}&elevation={elevation}&start_time_jd={query_jd - 30 / 86400}&duration={query_duration}&ra={closest_ra}&dec={closest_dec}&fov_radius={fermi_fov_radius}&group_by=satellite&async=False"
-
-                print(f"\n  Checking SatChecker around Fermi's predicted position...")
-                print(f"  Query: RA={closest_ra:.3f}°, Dec={closest_dec:.3f}°, radius={fermi_fov_radius}°")
-                print(f"  Time: JD {query_jd} ± 30s")
-
-                try:
-                    fermi_response = requests.get(fermi_url, timeout=30)
-                    if fermi_response.status_code == 200:
-                        fermi_data = fermi_response.json()
-                        satellites_found = fermi_data.get('data', {}).get('satellites', {})
-
-                        print(f"  SatChecker found {len(satellites_found)} satellite(s) in this region:")
-
-                        fermi_found = False
-                        for sat_name, sat_data in satellites_found.items():
-                            print(f"    - {sat_name}")
-
-                            # Check if this is Fermi (NORAD 33053)
-                            if '33053' in sat_name or 'FERMI' in sat_name.upper():
-                                fermi_found = True
-                                print(f"      ✓ FERMI FOUND in SatChecker!")
-
-                                # Get position from first point
-                                if sat_data.get('positions'):
-                                    pos = sat_data['positions'][0]
-                                    satchecker_ra = pos.get('ra')
-                                    satchecker_dec = pos.get('dec')
-
-                                    print(
-                                        f"      SatChecker position: RA={satchecker_ra:.3f}°, Dec={satchecker_dec:.3f}°")
-
-                                    ra_diff = abs(satchecker_ra - closest_ra)
-                                    dec_diff = abs(satchecker_dec - closest_dec)
-
-                                    print(f"      Difference from your code:")
-                                    print(f"        ΔRA: {ra_diff:.3f}°")
-                                    print(f"        ΔDec: {dec_diff:.3f}°")
-
-                                    if ra_diff < 0.1 and dec_diff < 0.1:
-                                        print(f"      ✓ Positions match well!")
-                                    else:
-                                        print(f"      ⚠ Significant position difference!")
-
-                        if not fermi_found:
-                            print(f"  ✗ Fermi (NORAD 33053) NOT found by SatChecker at this position/time")
-                            print(f"  → This suggests Fermi is not in SatChecker's satellite database")
-                    else:
-                        print(f"  SatChecker query failed: status {fermi_response.status_code}")
-
-                except Exception as e:
-                    print(f"  Error querying SatChecker: {e}")
-
-        # NOW do the plotting (keep existing plotting code)
-
         fermi_lines = []
         for i, overlap in enumerate(fermi_overlaps):
             if 'trajectory' in overlap:
@@ -346,8 +341,6 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
                 ra_points = [point['ra'] for point in trajectory]
                 dec_points = [point['dec'] for point in trajectory]
                 time_points = [point['time'] for point in trajectory]
-
-                print(f"  Fermi trajectory: {len(ra_points)} points")
 
                 fermi_line = p.line(ra_points, dec_points,
                                     color='red', line_width=3, alpha=0.9,
