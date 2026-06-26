@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
 """
-FT2 Data Gap and Location Analysis Tool (with SAA Overlay)
+FT2 Data Gap and Location Analysis Tool (with SAA and Rubin Overlay)
 
-This script reads a Fermi FT2 file and analyzes telemetry gaps.
-It produces a single, combined HTML file containing two plots:
+This script reads a Fermi FT2 file and analyzes telemetry gaps. It produces
+a single, combined HTML file containing two plots:
 
 1. A time series of gap durations ("swiss cheese" map).
-2. A Latitude vs. Longitude scatter plot showing where gaps begin.
+2. A Latitude vs. Longitude scatter plot showing where gaps begin, with the
+   official Fermi SAA operational boundary and Rubin Observatory's location overlaid.
 
-It now includes an optional feature to overlay a provided SAA boundary outline
-on the geographic plot for definitive comparison.
+This script has no external map data dependencies.
 
 Usage:
-    python check_ft2_gaps.py /path/to/file.fits --saa-outline /path/to/saa.csv
+    python check_ft2_gaps.py /path/to/your/ft2_file.fits
 """
 import argparse
 import numpy as np
@@ -26,10 +26,10 @@ from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.layouts import column
 
 
-def analyze_gaps_geographically(ft2_path: str, saa_outline_file: str = None):
+def analyze_gaps_geographically(ft2_path: str):
     """
     Loads an FT2 file, finds time gaps, and generates a combined report plot,
-    optionally overlaying a provided SAA boundary.
+    overlaying the official Fermi SAA boundary and a marker for Rubin Observatory.
     """
     # ... (Steps 1, 2, and 3 are unchanged) ...
     print(f"--- Loading FT2 file: {ft2_path} ---")
@@ -79,7 +79,7 @@ def analyze_gaps_geographically(ft2_path: str, saa_outline_file: str = None):
     gap_lons = gap_starts_itrs.earth_location.lon.wrap_at('180d').deg
     gap_lats = gap_starts_itrs.earth_location.lat.deg
 
-    # --- Step 4: Create Both Plots (but don't save yet) ---
+    # --- Step 4: Create Both Plots ---
     print("Generating plot components...")
 
     # Plot 1: Time Series
@@ -104,15 +104,16 @@ def analyze_gaps_geographically(ft2_path: str, saa_outline_file: str = None):
     p_map.add_tools(HoverTool(
         tooltips=[("Lon, Lat", "(@lon{0.2f}, @lat{0.2f})"), ("Time", "@time"), ("Gap Duration", "@duration{0.0f} s")]))
 
-    # --- NEW: Load and plot the SAA outline if the file is provided ---
-    if saa_outline_file:
-        print(f"Loading and overlaying SAA outline from: {saa_outline_file}")
-        try:
-            # Assumes a simple two-column text file: lon,lat
-            saa_lon, saa_lat = np.loadtxt(saa_outline_file, delimiter=',', unpack=True)
-            p_map.line(saa_lon, saa_lat, line_width=3, color='cyan', alpha=0.8, legend_label="SAA Outline")
-        except Exception as e:
-            print(f"WARNING: Could not load or plot the SAA outline file. Error: {e}")
+    # Official Fermi SAA Outline
+    saa_longitude = [33.9, -30.0, -36.0, -42.0, -58.8, -97.5, -98.5, -86.1, -60.0, -40.0, -20.0, 0.0, 33.9]
+    saa_latitude = [-30.0, 3.0, 4.6, 4.6, 0.7, -9.9, -12.5, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0]
+    p_map.line(saa_longitude, saa_latitude, line_width=3, color='cyan', alpha=0.8, legend_label="Official SAA Outline")
+
+    # --- NEW: Add a marker for Rubin Observatory ---
+    rubin_lon = -70.74755
+    rubin_lat = -30.24463
+    p_map.scatter(x=[rubin_lon], y=[rubin_lat], marker='star', size=20, color='gold',
+                  line_color='black', line_width=1, legend_label='Rubin Observatory')
     # --- END NEW SECTION ---
 
     p_map.legend.location = "top_left"
@@ -133,9 +134,6 @@ if __name__ == '__main__':
     parser.add_argument('ft2_file', nargs='?', default=None, help='Path to the FT2 FITS file to analyze.')
     parser.add_argument('--ft2_file', dest='ft2_file_named',
                         help='Path to the FT2 FITS file to analyze (alternative flag).')
-    # --- NEW: Add argument for the SAA outline file ---
-    parser.add_argument('--saa-outline', help='Path to a CSV file (lon,lat) defining the SAA outline.')
-
     args = parser.parse_args()
 
     file_path = args.ft2_file if args.ft2_file is not None else args.ft2_file_named
@@ -143,5 +141,4 @@ if __name__ == '__main__':
     if not file_path:
         parser.error("No FT2 file specified.")
 
-    # Pass the new argument to the main function
-    analyze_gaps_geographically(file_path, saa_outline_file=args.saa_outline)
+    analyze_gaps_geographically(file_path)
