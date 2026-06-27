@@ -15,6 +15,7 @@ from pathlib import Path
 from astropy.time import Time
 import astropy.units as u
 from Rubin_Fermi import FermiPass
+from collections import Counter
 
 # For Rubin data access
 try:
@@ -119,51 +120,31 @@ def point_to_arc_distance(ra_point, dec_point, ra_start, dec_start, ra_end, dec_
 
 
 def load_fermi_passes(pickle_file, start_time=None, end_time=None):
-    """
-    Load Fermi passes from pickle file with optional time filtering
-
-    Parameters:
-    -----------
-    pickle_file : str or Path
-        Path to pickle file containing passes
-    start_time : str or astropy.time.Time, optional
-        Only include passes that end after this time (ISO format string or Time object)
-    end_time : str or astropy.time.Time, optional
-        Only include passes that start before this time (ISO format string or Time object)
-
-    Returns:
-    --------
-    passes : list
-        List of FermiPass objects (filtered by time if specified)
-    """
+    """Load Fermi passes from pickle file with optional time filtering."""
     with open(pickle_file, 'rb') as f:
         passes = pickle.load(f)
 
     print(f"Loaded {len(passes)} Fermi passes from {pickle_file}")
 
-    # Apply time filtering if requested
     if start_time is not None or end_time is not None:
-        # Convert to Time objects if needed
         if start_time is not None and isinstance(start_time, str):
             start_time = Time(start_time, format='iso')
         if end_time is not None and isinstance(end_time, str):
             end_time = Time(end_time, format='iso')
 
         original_count = len(passes)
-        filtered_passes = []
-
+        filtered = []
         for p in passes:
-            # Keep pass if it overlaps the time window
             if start_time is not None and p.end_time < start_time:
                 continue
             if end_time is not None and p.start_time > end_time:
                 continue
-            filtered_passes.append(p)
+            filtered.append(p)
 
-        passes = filtered_passes
+        passes = filtered
         print(f"Time filter applied: {original_count} -> {len(passes)} passes")
         if start_time:
-            print(f"  After: {start_time.iso}")
+            print(f"  After:  {start_time.iso}")
         if end_time:
             print(f"  Before: {end_time.iso}")
 
@@ -346,146 +327,88 @@ def find_ccd_matches(butler, visit_id, fermi_ra, fermi_dec, instrument='LSSTComC
     return ccd_matches
 
 
-def find_pass_overlaps(fermi_pass, rubin_visits, butler, fov_radius=1.75, buffer=0.1,
-                       check_ccds=True, instrument='LSSTComCam', verbose=False,
-                       n_trajectory_points=10):
+def find_pass_overlaps(fermi_pass, rubin_visits, fov_radius=1.75, buffer=0.1,
+                       verbose=False, n_trajectory_points=10):
     """
-    Find Rubin visits that potentially overlap with a Fermi pass
+    Find Rubin visits that potentially overlap with a Fermi pass.
 
-    Parameters:
-    -----------
-    fermi_pass : FermiPass
-        Fermi pass object with trajectory
-    rubin_visits : list of dict
-        Rubin visit information
-    butler : lsst.daf.butler.Butler or None
-        Butler instance for CCD queries
-    fov_radius : float
-        Rubin field of view radius in degrees (default 1.75 for 3.5° diameter)
-    buffer : float
-        Additional buffer in degrees for conservative matching
-    check_ccds : bool
-        If True, determine which CCDs Fermi crosses
-    instrument : str
-        Instrument name for CCD queries
-    verbose : bool
-        Print detailed CCD information
-    n_trajectory_points : int
-        Number of trajectory points to include around closest approach
-
-    Returns:
-    --------
+    Returns
+    -------
     overlaps : list of dict
-        Candidate overlaps with distance and timing info, including CCD matches
-        and trajectory points
+        Candidate overlaps (those within fov_radius + buffer of Fermi's track).
+    min_dist_seen : float
+        Closest angular distance (deg) between any visit pointing and Fermi's
+        track for this pass, regardless of threshold. Used for global tracking.
+    min_dist_visit : dict or None
+        The visit dict that produced min_dist_seen (for reporting its Dec, etc).
     """
     overlaps = []
     min_dist_seen = float('inf')
+    min_dist_visit = None
+    min_dist_time = None
+    min_dist_radec = None
 
     for visit in rubin_visits:
-        # Quick time check
-        if not (fermi_pass.start_time <= visit['obs_time'] <= fermi_pass.end_time):
-            continue
-
-        # Geometric check: minimum distance to ANY point on Fermi's actual trajectory
-        # Calculate angular separation to all Fermi positions
         visit_ra = visit['pointing_ra']
         visit_dec = visit['pointing_dec']
 
-        # Calculate separation to each point in Fermi's trajectory
-        # Handle RA wraparound
+        # Angular separation from visit pointing to every Fermi trajectory point
         ra_diffs = fermi_pass.ra - visit_ra
         ra_diffs = np.where(ra_diffs > 180, ra_diffs - 360, ra_diffs)
         ra_diffs = np.where(ra_diffs < -180, ra_diffs + 360, ra_diffs)
 
-        dec_diffs = fermi_pass.dec - visit_dec
-
-        # Angular separation using spherical geometry
-        # Convert to radians
         ra_diffs_rad = np.radians(ra_diffs)
-        dec_diffs_rad = np.radians(dec_diffs)
+        dec_diffs_rad = np.radians(fermi_pass.dec - visit_dec)
         visit_dec_rad = np.radians(visit_dec)
         fermi_dec_rad = np.radians(fermi_pass.dec)
 
-        # Haversine formula for great circle distance
-        a = np.sin(dec_diffs_rad / 2) ** 2 + \
-            np.cos(visit_dec_rad) * np.cos(fermi_dec_rad) * np.sin(ra_diffs_rad / 2) ** 2
-        separations = 2 * np.arcsin(np.sqrt(a))
-        separations_deg = np.degrees(separations)
-
+        a = (np.sin(dec_diffs_rad / 2) ** 2 +
+             np.cos(visit_dec_rad) * np.cos(fermi_dec_rad) *
+             np.sin(ra_diffs_rad / 2) ** 2)
+        separations_deg = np.degrees(2 * np.arcsin(np.sqrt(a)))
         dist = np.min(separations_deg)
 
-        # Track minimum
         if dist < min_dist_seen:
             min_dist_seen = dist
+            min_dist_visit = visit
+            idx = int(np.argmin(separations_deg))  # <-- add
+            min_dist_time = fermi_pass.times[idx].iso  # <-- add
+            min_dist_radec = (float(fermi_pass.ra[idx]),  # <-- add
+                              float(fermi_pass.dec[idx]))  # <-- add
 
         if dist < (fov_radius + buffer):
-            # Get Fermi positions during this visit
-            visit_start = visit['timespan'].begin if not hasattr(visit['timespan'].begin, 'astropy') else visit[
-                'timespan'].begin.astropy
-            visit_end = visit['timespan'].end if not hasattr(visit['timespan'].end, 'astropy') else visit[
-                'timespan'].end.astropy
+            closest_idx = int(np.argmin(separations_deg))
 
-            # Find Fermi positions during exposure
-            time_mask = (fermi_pass.times >= visit_start) & (fermi_pass.times <= visit_end)
-            fermi_ra_during = fermi_pass.ra[time_mask]
-            fermi_dec_during = fermi_pass.dec[time_mask]
-            fermi_times_during = fermi_pass.times[time_mask]
-
-            # Find index of closest approach
-            closest_idx = np.argmin(separations_deg)
-
-            # Extract trajectory points around closest approach
-            # Get indices for points before and after closest approach
-            half_points = n_trajectory_points // 2
-            start_idx = max(0, closest_idx - half_points)
-            end_idx = min(len(fermi_pass.ra), closest_idx + half_points + 1)
+            half = n_trajectory_points // 2
+            s_idx = max(0, closest_idx - half)
+            e_idx = min(len(fermi_pass.ra), closest_idx + half + 1)
 
             trajectory_points = []
-            for i in range(start_idx, end_idx):
+            for k in range(s_idx, e_idx):
                 trajectory_points.append({
-                    'ra': float(fermi_pass.ra[i]),
-                    'dec': float(fermi_pass.dec[i]),
-                    'time': fermi_pass.times[i].iso,
-                    'time_mjd': float(fermi_pass.times[i].mjd),
-                    'alt': float(fermi_pass.alt[i]) if hasattr(fermi_pass, 'alt') else None,
-                    'az': float(fermi_pass.az[i]) if hasattr(fermi_pass, 'az') else None,
-                    'is_closest': (i == closest_idx)
+                    'ra': float(fermi_pass.ra[k]),
+                    'dec': float(fermi_pass.dec[k]),
+                    'time': fermi_pass.times[k].iso,
+                    'time_mjd': float(fermi_pass.times[k].mjd),
+                    'alt': float(fermi_pass.alt[k]) if hasattr(fermi_pass, 'alt') else None,
+                    'az': float(fermi_pass.az[k]) if hasattr(fermi_pass, 'az') else None,
+                    'is_closest': (k == closest_idx)
                 })
-
-            # Find CCD matches if requested
-            ccd_matches = []
-            if check_ccds and butler is not None and len(fermi_ra_during) > 0:
-                ccd_matches = find_ccd_matches(
-                    butler,
-                    visit['visit_id'],
-                    fermi_ra_during,
-                    fermi_dec_during,
-                    instrument=instrument,
-                    verbose=verbose
-                )
-
             overlaps.append({
-                'visit_id': visit['visit_id'],
-                'obs_time': visit['obs_time'],
-                'pointing_ra': visit['pointing_ra'],
-                'pointing_dec': visit['pointing_dec'],
-                'distance_to_fermi_path': dist,
-                'closest_approach_ra': float(fermi_pass.ra[closest_idx]),
-                'closest_approach_dec': float(fermi_pass.dec[closest_idx]),
-                'closest_approach_time': fermi_pass.times[closest_idx].iso,
-                'within_fov': dist < fov_radius,
-                'instrument': visit['instrument'],
-                'ccd_matches': ccd_matches,
-                'num_ccds': len(ccd_matches),
-                'trajectory_points': trajectory_points
-            })
+                            'visit_id': visit['visit_id'],
+                            'obs_time': visit['obs_time'],
+                            'pointing_ra': visit['pointing_ra'],
+                            'pointing_dec': visit['pointing_dec'],
+                            'distance_to_fermi_path': dist,
+                            'closest_approach_ra': float(fermi_pass.ra[closest_idx]),
+                            'closest_approach_dec': float(fermi_pass.dec[closest_idx]),
+                            'closest_approach_time': fermi_pass.times[closest_idx].iso,
+                            'within_fov': dist < fov_radius,
+                            'instrument': visit['instrument'],
+                            'trajectory_points': trajectory_points
+                        })
 
-    # DEBUG: print if we had visits but no matches
-    if len(rubin_visits) > 0 and len(overlaps) == 0 and verbose:
-        print(f"    Closest visit was {min_dist_seen:.2f}° from Fermi path (threshold: {fov_radius + buffer:.2f}°)")
-
-    return overlaps
+    return overlaps, min_dist_seen, min_dist_visit, min_dist_time, min_dist_radec
 
 def search_all_passes(passes, butler, instrument='LSSTComCam',
                       filter_passes=True, fov_radius=1.75, check_ccds=True, verbose=True):
@@ -768,112 +691,107 @@ def query_and_cache_visits(butler, start_time, end_time, instrument, output_file
 
 def search_all_passes_with_cache(passes, cached_visits, instrument='LSSTComCam',
                                  filter_passes=True, fov_radius=1.75,
-                                 check_ccds=False, butler=None, verbose=True,
+                                 buffer=0.1, verbose=True,
                                  n_trajectory_points=10):
-    """
-    Search all Fermi passes for overlaps using pre-cached visits.
-
-    Parameters:
-    -----------
-    passes : list
-        List of FermiPass objects
-    cached_visits : list of dict
-        Pre-loaded visit information
-    instrument : str
-        Rubin instrument name (for filtering)
-    filter_passes : bool
-        If True, only search passes meeting all filter criteria
-    fov_radius : float
-        Field of view radius in degrees
-    check_ccds : bool
-        If True, determine which CCDs Fermi crosses (requires butler)
-    butler : lsst.daf.butler.Butler or None
-        Butler instance (only needed if check_ccds=True)
-    verbose : bool
-        Print progress
-
-    Returns:
-    --------
-    all_overlaps : list of dict
-        All candidate overlaps found
-    """
-    # Filter passes if requested
     if filter_passes:
         search_passes = [p for p in passes if p.passes_all_filters]
-        if verbose:
-            print(f"\nSearching {len(search_passes)} passes that meet all filter criteria")
+        print(f"\nSearching {len(search_passes)} passes meeting all filters")
     else:
         search_passes = passes
-        if verbose:
-            print(f"\nSearching all {len(search_passes)} passes")
+        print(f"\nSearching all {len(search_passes)} passes")
 
     if len(search_passes) == 0:
         print("No passes to search!")
         return []
 
-    # Filter cached visits by instrument
     instrument_visits = [v for v in cached_visits if v['instrument'] == instrument]
-    if verbose:
-        print(f"Using {len(instrument_visits)} cached {instrument} visits")
+    print(f"Using {len(instrument_visits)} cached {instrument} visits")
+    if len(instrument_visits) == 0:
+        return []
 
-    if check_ccds and butler is None:
-        print("WARNING: check_ccds=True but no Butler provided - skipping CCD matching")
-        check_ccds = False
+    # Precompute sorted UTC-MJD floats once (fast binary-search windowing)
+    visit_mjd = np.array([v['obs_time'].utc.mjd for v in instrument_visits])
+    order = np.argsort(visit_mjd)
+    visit_mjd_sorted = visit_mjd[order]
+    visits_sorted = [instrument_visits[i] for i in order]
 
     all_overlaps = []
+    global_min = {'dist': float('inf'), 'pass_index': None,
+                  'pass_time': None, 'visit': None,
+                  'min_time': None, 'min_radec': None}  # <-- add
+    pass_minima = []
 
     for i, fermi_pass in enumerate(search_passes):
         if verbose:
-            print(f"\nPass {i + 1}/{len(search_passes)}: {fermi_pass.start_time.iso} to {fermi_pass.end_time.iso}")
-            print(f"  Duration: {(fermi_pass.end_time - fermi_pass.start_time).sec / 60:.1f} min")
-            print(f"  RA: {fermi_pass.ra.min():.1f}° to {fermi_pass.ra.max():.1f}°")
-            print(f"  Dec: {fermi_pass.dec.min():.1f}° to {fermi_pass.dec.max():.1f}°")
+            print(f"\nPass {i+1}/{len(search_passes)}: "
+                  f"{fermi_pass.start_time.iso} to {fermi_pass.end_time.iso}")
+            print(f"  Dec: {fermi_pass.dec.min():.1f}..{fermi_pass.dec.max():.1f}  "
+                  f"RA: {fermi_pass.ra.min():.1f}..{fermi_pass.ra.max():.1f}")
 
-        # Filter cached visits to those during this pass
-        pass_visits = [
-            v for v in instrument_visits
-            if fermi_pass.start_time <= v['obs_time'] <= fermi_pass.end_time
-        ]
+        lo = np.searchsorted(visit_mjd_sorted, fermi_pass.start_time.utc.mjd, side='left')
+        hi = np.searchsorted(visit_mjd_sorted, fermi_pass.end_time.utc.mjd, side='right')
+        pass_visits = visits_sorted[lo:hi]
 
         if verbose:
-            print(f"  Found {len(pass_visits)} visits during this time")
-
+            print(f"  {len(pass_visits)} visits during this pass")
         if len(pass_visits) == 0:
             continue
 
-        # Find overlaps
-        overlaps = find_pass_overlaps(
-            fermi_pass,
-            pass_visits,
-            butler,
-            fov_radius=fov_radius,
-            check_ccds=check_ccds,
-            instrument=instrument,
-            verbose=verbose,
-            n_trajectory_points=n_trajectory_points
-        )
+        overlaps, pass_min, pass_min_visit, pass_min_time, pass_min_radec = find_pass_overlaps(
+            fermi_pass, pass_visits, fov_radius=fov_radius,
+            buffer=buffer, verbose=verbose,
+            n_trajectory_points=n_trajectory_points)
 
-        if len(overlaps) > 0:
-            if verbose:
-                print(f"  *** Found {len(overlaps)} potential overlaps! ***")
+        if pass_min < global_min['dist']:
+            global_min.update({'dist': pass_min, 'pass_index': i,
+                               'pass_time': fermi_pass.start_time.iso,
+                               'visit': pass_min_visit,
+                               'min_time': pass_min_time,  # <-- add
+                               'min_radec': pass_min_radec})  # <-- add
 
-            # Add pass information to overlaps
-            for overlap in overlaps:
-                overlap['fermi_pass_index'] = i
-                overlap['fermi_start_time'] = fermi_pass.start_time
-                overlap['fermi_end_time'] = fermi_pass.end_time
-                overlap['fermi_ra_range'] = (fermi_pass.ra.min(), fermi_pass.ra.max())
-                overlap['fermi_dec_range'] = (fermi_pass.dec.min(), fermi_pass.dec.max())
-                overlap['fermi_max_velocity'] = fermi_pass.max_angular_velocity
+        if pass_min < float('inf'):
+            vdec = pass_min_visit['pointing_dec'] if pass_min_visit else None
+            pass_minima.append((pass_min, i, fermi_pass.start_time.iso, vdec))
 
+        if verbose and pass_min < float('inf'):
+            print(f"  closest this pass: {pass_min:.2f}°")
+
+        if overlaps:
+            print(f"  *** {len(overlaps)} overlaps within FOV! ***")
+            for o in overlaps:
+                o['fermi_pass_index'] = i
+                o['fermi_start_time'] = fermi_pass.start_time
+                o['fermi_end_time'] = fermi_pass.end_time
+                o['fermi_ra_range'] = (fermi_pass.ra.min(), fermi_pass.ra.max())
+                o['fermi_dec_range'] = (fermi_pass.dec.min(), fermi_pass.dec.max())
+                o['fermi_max_velocity'] = fermi_pass.max_angular_velocity
             all_overlaps.extend(overlaps)
 
-            if verbose:
-                for overlap in overlaps:
-                    status = "WITHIN FOV" if overlap['within_fov'] else "nearby"
-                    ccd_info = f", {overlap['num_ccds']} CCDs" if check_ccds else ""
-                    print(
-                        f"    Visit {overlap['visit_id']}: {status}, dist={overlap['distance_to_fermi_path']:.2f}°{ccd_info}")
+    # Global closest-approach summary
+    print(f"\n{'=' * 60}")
+    print("GLOBAL CLOSEST APPROACH (all passes, any distance)")
+    print(f"{'=' * 60}")
+    if global_min['pass_index'] is not None:
+        gm = global_min
+        print(f"  Closest: {gm['dist']:.2f}°  at pass {gm['pass_index'] + 1}")
+        print(f"  Pass start time:    {gm['pass_time']}")
+        if gm['min_time'] is not None:
+            print(f"  Closest-point time: {gm['min_time']}   <-- use THIS for SatChecker")
+        if gm['min_radec'] is not None:
+            print(f"  Fermi at closest:   RA={gm['min_radec'][0]:.2f}° "
+                  f"Dec={gm['min_radec'][1]:.2f}°")
+        if gm['visit'] is not None:
+            print(f"  Nearest visit:      RA={gm['visit']['pointing_ra']:.2f}° "
+                  f"Dec={gm['visit']['pointing_dec']:.2f}°  "
+                  f"(visit {gm['visit']['visit_id']})")
+    print(f"{'=' * 60}\n")
+
+    pass_minima.sort()
+    print("Closest 10 approaches across all passes:")
+    for d, idx, t, vdec in pass_minima[:10]:
+        vdec_str = f"{vdec:+.1f}°" if vdec is not None else "  n/a"
+        print(f"  {d:5.2f}°  pass {idx + 1:3d}  {t}  (visit Dec {vdec_str})")
+    print(f"{'=' * 60}\n")
 
     return all_overlaps
 
@@ -915,7 +833,6 @@ def save_overlaps(overlaps, output_file):
             'closest_approach_dec': round(overlap['closest_approach_dec'], 2),
             'closest_approach_time': overlap['closest_approach_time'],
             'within_fov': overlap['within_fov'],
-            'num_ccds': overlap['num_ccds'],
             'trajectory': trajectory
         }
 
@@ -952,7 +869,6 @@ def save_overlaps(overlaps, output_file):
                 f.write(f"        closest_approach_dec: {overlap['closest_approach_dec']}\n")
                 f.write(f"        closest_approach_time: {overlap['closest_approach_time']}\n")
                 f.write(f"        within_fov: {overlap['within_fov']}\n")
-                f.write(f"        num_ccds: {overlap['num_ccds']}\n")
                 f.write(f"        trajectory:\n")
 
                 for point in overlap['trajectory']:
@@ -1134,8 +1050,6 @@ def load_cached_visits(cache_file):
 
 def print_visit_histogram(visits, label="cached visits"):
     """Print a month-by-month histogram of visits and the largest time gaps."""
-    from collections import Counter
-
     if len(visits) == 0:
         print("No visits to histogram.")
         return
@@ -1147,7 +1061,6 @@ def print_visit_histogram(visits, label="cached visits"):
     print(f"{'=' * 60}")
     print(f"Span: {times.min().iso}  ->  {times.max().iso}\n")
 
-    # Bucket by calendar month via ISO 'YYYY-MM' prefix
     months = [t.iso[:7] for t in times]
     counts = Counter(months)
     maxc = max(counts.values())
@@ -1161,7 +1074,6 @@ def print_visit_histogram(visits, label="cached visits"):
     print("-" * 60)
     print(f"{'TOTAL':<10} {len(visits):>8}")
 
-    # Largest gaps = observing-run boundaries
     print("\nLargest gaps between consecutive visits (> 0.5 d):")
     mjd_sorted = np.sort(times.mjd)
     gaps = np.diff(mjd_sorted)
@@ -1286,8 +1198,6 @@ def main():
             instrument=instrument,
             filter_passes=filter_passes,
             fov_radius=fov_radius,
-            check_ccds=check_ccds,
-            butler=butler,  # Pass butler if available for CCD checking
             verbose=verbose
         )
     else:
