@@ -130,6 +130,196 @@ class FermiPassCalculator:
             print(f"\nFT2 DATA INTEGRITY REPORT - check:")
             # ... (rest of the diagnostics will follow) ...
 
+    def load_tle(self, start_time, end_time, time_step_seconds=30.0,
+                 norad_id=33053,
+                 tle_url='https://celestrak.org/NORAD/elements/gp.php?GROUP=science&FORMAT=tle',
+                 verbose=True):
+
+        """
+        Populate self.times and self.positions by propagating a TLE via Skyfield.
+
+        CAVEAT — current-epoch feed, not a historical archive:
+        CelesTrak's live feed returns only the single most-recent element set for
+        each satellite (one epoch). SGP4 propagation error grows with distance from
+        that epoch in EITHER direction — roughly km/day and compounding past a week
+        or two. Propagating ~6 months produces hundreds-to-thousands of km of
+        along-track error.
+
+        This is the root cause of the "excellent in June 2026 / poor in December
+        2025" pattern seen during validation: the cached TLE's epoch was ~June 2026,
+        so December 2025 required ~6 months of BACK-propagation.
+
+        Use this method only for genuine near-future prediction (within ~1-2 weeks
+        of the current epoch). For historical analysis, use load_ascii() with the
+        definitive engineering-telemetry file. As a fallback without telemetry,
+        fetch a time-series of archived TLEs (e.g. Space-Track) and always
+        propagate from the nearest-in-time epoch.
+
+        Parameters
+        ----------
+        start_time, end_time : astropy.Time or str
+            Time range to generate positions over.
+        time_step_seconds : float
+            Propagation cadence in seconds.
+        norad_id : int
+            Satellite catalog number (Fermi = 33053).
+        tle_url : str
+            CelesTrak GP query URL.
+        verbose : bool
+            Print progress / epoch info.
+        """
+
+        from skyfield.api import load
+        import numpy as np
+        import astropy.units as u
+
+        if verbose:
+            print("--- Initializing Skyfield TLE Propagator ---")
+        load.verbose = False
+        ts = load.timescale()
+
+        try:
+            satellites = load.tle_file(tle_url, reload=True)
+        except Exception as e:
+            raise RuntimeError(f"Could not download TLE data. Check internet. Details: {e}")
+
+        try:
+            fermi_satellite = {sat.model.satnum: sat for sat in satellites}[norad_id]
+        except KeyError:
+            raise RuntimeError(f"Could not find satellite (NORAD ID {norad_id}) in TLE list.")
+
+        if verbose:
+            print(f"Loaded TLE for: {fermi_satellite.name}")
+            print(f"TLE Epoch: {fermi_satellite.epoch.utc_strftime()}")
+
+        start_time = Time(start_time, scale='utc')
+        end_time = Time(end_time, scale='utc')
+        num_steps = int((end_time - start_time).sec / time_step_seconds)
+        times_array = start_time + np.arange(num_steps) * time_step_seconds * u.s
+
+        if verbose:
+            print(f"Generating {len(times_array)} position points...")
+        t_skyfield = ts.from_astropy(times_array)
+        geocentric = fermi_satellite.at(t_skyfield)
+
+        self.times = times_array
+        self.positions = geocentric.position.m.T
+
+        if verbose:
+            print("Position generation complete.")
+
+        return self.times, self.positions
+
+    def load_ascii(self, ascii_file, frame='gcrs', expected_cadence_sec=30.0,
+                   units='m', validate_beta=False, verbose=True):
+        """
+        Load Fermi ECI trajectory from the engineering-telemetry ASCII file.
+
+        Actual format (no header, comma-separated, time quoted):
+            "2025-12-01 00:00:00.940104",1764547200.940104,-2407610.0,6270908.5,-1497560.5
+             [0] ISO UTC (quoted)         [1] Unix time      [2] X  [3] Y  [4] Z   (meters, ECI)
+
+        Notes / gotchas baked in:
+          * Time is parsed from col 0 (ISO, sub-second). Col 1 is UNIX time
+            (1970 epoch) -- NOT Fermi MET (2001 epoch); used only as a cross-check.
+          * Positions are in METERS (this file), unlike the km tle2beta sample.
+          * Frame is ECI; 'gcrs' is the correct astropy choice (J2000-ish).
+          * No Rad/beta columns, so integrity is checked via plausible LEO radius.
+        """
+        import numpy as np
+        import astropy.units as u
+        from astropy.time import Time
+        from pathlib import Path
+
+        ascii_file = Path(ascii_file)
+        if not ascii_file.exists():
+            raise FileNotFoundError(f"ASCII telemetry file not found: {ascii_file}")
+
+        iso_str, unix_col, xyz = [], [], []
+        with open(ascii_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(',')
+                if len(parts) < 5:
+                    continue
+                try:
+                    t = parts[0].strip().strip('"').strip()
+                    unix_t = float(parts[1])
+                    x, y, z = float(parts[2]), float(parts[3]), float(parts[4])
+                except (ValueError, IndexError):
+                    continue
+                iso_str.append(t)
+                unix_col.append(unix_t)
+                xyz.append((x, y, z))
+
+        if not iso_str:
+            raise ValueError(f"No parseable rows in {ascii_file}.")
+
+        # Parse authoritative time from the ISO column (carries sub-second precision)
+        times = Time(iso_str, format='iso', scale='utc')
+        unix_col = np.array(unix_col)
+        pos = np.array(xyz)  # meters, ECI
+
+        # --- Cross-check: col 1 is Unix time, must agree with col 0 ---------------
+        # (Guards against the "assumed Fermi MET-2001" 55-year error.)
+        unix_from_iso = times.unix
+        max_dt = np.max(np.abs(unix_from_iso - unix_col))
+        if max_dt > 1.0:
+            print(f"  WARNING: col 1 disagrees with col 0 by up to {max_dt:.1f}s. "
+                  f"Col 1 is NOT Unix time as assumed -- check epoch (Fermi MET? GPS?).")
+        elif verbose:
+            print(f"  Time cross-check OK (col1 = Unix time, max Δ {max_dt:.3f}s)")
+
+        # --- Unit / units handling ------------------------------------------------
+        if units == 'km':
+            pos = pos * 1000.0
+        elif units != 'm':
+            raise ValueError(f"units must be 'm' or 'km', got {units!r}")
+
+        # --- Integrity: radius must be plausible LEO (replaces missing Rad col) ---
+        radius_km = np.sqrt(np.sum(pos ** 2, axis=1)) / 1000.0
+        r_med = np.median(radius_km)
+        if not (6600 < r_med < 7300):
+            raise ValueError(
+                f"Median radius {r_med:.0f} km is not plausible LEO. "
+                f"Likely a UNIT error -- if file is in km, set units='km' "
+                f"(km misread as m gives ~millions of km; m misread as km gives ~7 km)."
+            )
+        if verbose:
+            print(f"  Radius OK: median {r_med:.1f} km (~{r_med - 6371:.0f} km altitude)")
+
+        # --- Cadence check --------------------------------------------------------
+        if len(times) > 1:
+            dt_sec = np.diff(times.mjd) * 86400
+            med_cad = np.median(dt_sec)
+            if verbose:
+                print(f"  Median cadence {med_cad:.1f}s (expected ~{expected_cadence_sec:.0f}s)")
+            if abs(med_cad - expected_cadence_sec) > 0.5 * expected_cadence_sec:
+                print(f"  WARNING: cadence {med_cad:.1f}s != expected "
+                      f"{expected_cadence_sec:.0f}s; transits need ~30s sampling.")
+            n_gaps = np.sum(dt_sec > 5 * expected_cadence_sec)
+            if n_gaps:
+                print(f"  NOTE: {n_gaps} gaps > {5 * expected_cadence_sec:.0f}s "
+                      f"(telemetry expected continuous through SAA).")
+
+        # --- Frame: ECI -> store as GCRS (already inertial; gcrs is correct) ------
+        if frame.lower() != 'gcrs':
+            # TEME/ITRS conversion path retained from earlier draft if ever needed
+            raise NotImplementedError(
+                f"This file is ECI; use frame='gcrs'. (Got {frame!r}.)")
+        self.times = times
+        self.positions = pos
+        self.beta = None  # no beta column in this format
+
+        if verbose:
+            print(f"  Time span: {times[0].iso} -> {times[-1].iso}")
+            print(f"  Stored {len(times)} GCRS positions. Ready for compute_topocentric().\n")
+
+        return self.times, self.positions
+
+
     def compute_topocentric(self, rubin_loc=None):
         """
         Computes topocentric coordinates using the standard, canonical astropy method.
@@ -239,35 +429,66 @@ class FermiPassCalculator:
         # Angular velocity in deg/sec (pad with 0 at end)
         ang_velocity = np.concatenate([ang_sep / time_diff, np.array([0.0])])
 
-        # Find segment boundaries based on:
-        # 1. Data continuity (time gaps < 5 minutes)
-        # 2. RA discontinuities (large jumps indicating separate passes)
+        # ====================================================================
+        # SEGMENT FINDING — corrected for gap-free telemetry
+        # ====================================================================
+        # A "pass" must be a single ABOVE-HORIZON transit. Previously the edge
+        # handling prepended index 0 as a "start" whenever the data was
+        # continuous, which (with gap-free telemetry) glued the entire
+        # below-horizon arc onto the front of each real transit. We now gate
+        # the segment purely on visibility and pair starts->ends correctly.
 
-        continuous_data = time_diff < 300  # Gaps < 5 minutes
+        # Use the real altitude floor, not 0, so segments are actual usable
+        # transits. (alt > 0 admits horizon-skimming junk; min_altitude is the
+        # observing floor we care about.)
+        visible_mask = alt > min_altitude.value
 
-        # Detect RA jumps (use raw ra_diff, not wrapped)
-        # A jump > max_ra_jump degrees indicates a new pass
-        ra_discontinuity = np.abs(ra_diff) > max_ra_jump
+        vis = visible_mask.astype(int)
+        transitions = np.diff(vis)
+        starts = list(np.where(transitions == 1)[0] + 1)  # rises
+        ends = list(np.where(transitions == -1)[0] + 1)  # sets
 
-        # Combined mask: break on either data gap OR RA jump
-        continuous_mask = np.concatenate([continuous_data & ~ra_discontinuity, [True]])
+        # Edge cases: gate on VISIBILITY at the ends, not on data continuity.
+        if vis[0] == 1:
+            starts = [0] + starts
+        if vis[-1] == 1:
+            ends = ends + [len(vis)]
 
-        # Only look at data where the satellite is actually visible
-        visible_mask = alt > 0.0  # or alt > min_altitude.value
+        # After the edge fix, starts and ends are equal length and interleaved:
+        # starts[k] < ends[k] < starts[k+1] for every k.
+        assert len(starts) == len(ends), (
+            f"start/end mismatch: {len(starts)} starts vs {len(ends)} ends"
+        )
 
-        # Find transitions where it rises and sets
-        transitions = np.diff(visible_mask.astype(int))
-        starts = np.where(transitions == 1)[0] + 1
-        ends = np.where(transitions == -1)[0] + 1
+        # Optionally split a transit further if there's a genuine data gap or a
+        # large RA jump WITHIN it (shouldn't happen for clean telemetry, but
+        # harmless to keep — protects the FT2 path too).
+        time_diff_full = np.diff(self.times.mjd) * 86400
+        ra_diff_full = np.diff(ra)
 
-        # Handle edge cases
-        if continuous_mask[0]:
-            starts = np.concatenate([[0], starts])
-        if continuous_mask[-1]:
-            ends = np.concatenate([ends, [len(continuous_mask)]])
+        def split_on_breaks(s, e):
+            """Yield sub-segments of [s,e) broken on time gaps / RA jumps."""
+            sub_start = s
+            for i in range(s, e - 1):
+                if time_diff_full[i] >= 300 or abs(ra_diff_full[i]) > max_ra_jump:
+                    if i + 1 - sub_start >= 2:
+                        yield (sub_start, i + 1)
+                    sub_start = i + 1
+            if e - sub_start >= 2:
+
+                yield (sub_start, e)
+
+        segments = []
+        for s, e in zip(starts, ends):
+            segments.extend(split_on_breaks(s, e))
 
         # Create passes and evaluate filters
         self.passes = []
+
+        for start_idx, end_idx in segments:
+            # Skip very short segments
+            if end_idx - start_idx < 2:
+                continue
 
         for start_idx, end_idx in zip(starts, ends):
             # Skip very short segments
@@ -309,6 +530,33 @@ class FermiPassCalculator:
             pass_obj.passes_night = False
 
             self.passes.append(pass_obj)
+
+        p = self.passes[0]
+        print("\n" + "=" * 60)
+        print("DEBUG: first pass anatomy")
+        print("=" * 60)
+        print(f"  start -> end : {p.start_time.iso}  ->  {p.end_time.iso}")
+        print(f"  duration     : {(p.end_time - p.start_time).sec/60:.1f} min")
+        print(f"  n samples    : {len(p.times)}")
+        print(f"  alt range    : {p.alt.min():.1f}  ..  {p.alt.max():.1f}")
+        print(f"  dec range    : {p.dec.min():.1f}  ..  {p.dec.max():.1f}")
+        print(f"  ra  range    : {p.ra.min():.1f}  ..  {p.ra.max():.1f}")
+
+        # THE KEY DIAGNOSTIC: how many altitude humps?
+        # A clean single transit = one rise-and-set = one local maximum.
+
+        a = p.alt
+        # count interior local maxima
+        humps = np.sum((a[1:-1] > a[:-2]) & (a[1:-1] > a[2:]))
+        # count horizon crossings (alt sign changes through 0)
+        crossings = np.sum(np.diff(np.sign(a)) != 0)
+        print(f"  alt humps    : {humps}   (1 = clean single transit)")
+        print(f"  horizon xings: {crossings}  (2 = one rise + one set)")
+
+        # show the alt profile coarsely so you can eyeball the shape
+        step = max(1, len(a)//20)
+        print("  alt profile  :", " ".join(f"{v:5.1f}" for v in a[::step]))
+        print("=" * 60 + "\n")
 
         return self.passes
 
@@ -919,6 +1167,105 @@ class FermiPassCalculator:
         save(p)
         print(f"Saved gap visualization to {output_filename}")
 
+# -------------------------------------------------------------------------
+    # CONFIG VALIDATION — fail fast on misconfiguration
+    # -------------------------------------------------------------------------
+def validate_config(config):
+    """Check required keys per source/mode, warn on unknowns, apply
+    documented defaults. Raises ValueError on fatal problems."""
+
+    source = config.get('source', 'tle').lower()
+    mode = config.get('mode', 'compute').lower()
+
+    # --- Enumerated-value checks ---
+    valid_sources = {'tle', 'ft2', 'ascii'}
+    valid_modes = {'compute', 'visualize'}
+    if source not in valid_sources:
+        raise ValueError(
+            f"Invalid source: {source!r}. Must be one of {sorted(valid_sources)}."
+        )
+    if mode not in valid_modes:
+        raise ValueError(
+            f"Invalid mode: {mode!r}. Must be one of {sorted(valid_modes)}."
+        )
+
+    # --- Required keys per mode/source ---
+    required = []
+    if mode == 'visualize':
+        required.append('passes_file')
+    else:  # compute
+        if source == 'tle':
+            required += ['start_time', 'end_time']
+        elif source == 'ft2':
+            required.append('ft2_file')
+        elif source == 'ascii':
+            required.append('ascii_file')
+
+    missing = [k for k in required if config.get(k) is None]
+    if missing:
+        raise ValueError(
+            f"Missing required config key(s) for source={source}, "
+            f"mode={mode}: {missing}"
+        )
+
+    # --- Conditional requirement: specific-gap plot needs a target ---
+    if config.get('visualize_specific_gap', False) and not config.get('gap_target_time'):
+        raise ValueError(
+            "visualize_specific_gap is true but 'gap_target_time' is not set."
+        )
+
+    # --- File existence checks (where a path is expected to pre-exist) ---
+    path_keys = []
+    if mode == 'visualize':
+        path_keys.append('passes_file')
+    elif source == 'ft2':
+        path_keys.append('ft2_file')
+    elif source == 'ascii':
+        path_keys.append('ascii_file')
+    for key in path_keys:
+        p = Path(config[key])
+        if not p.exists():
+            raise FileNotFoundError(f"{key} does not exist: {p}")
+
+    # --- Sanity checks on physical parameters ---
+    sun_alt = config.get('sun_alt_limit', -12)
+    if sun_alt > 0:
+        print(f"WARNING: sun_alt_limit={sun_alt} is above the horizon; "
+              f"this admits daytime passes. Rubin twilight ops use -12.")
+    min_alt = config.get('min_altitude', 20)
+    if not (0 <= min_alt <= 90):
+        raise ValueError(f"min_altitude={min_alt} must be in [0, 90] degrees.")
+    dec_range = config.get('dec_range', [-70, 10])
+    if (len(dec_range) != 2 or dec_range[0] >= dec_range[1]
+            or not all(-90 <= d <= 90 for d in dec_range)):
+        raise ValueError(
+            f"dec_range={dec_range} must be [min, max] within [-90, 90] and min < max."
+        )
+
+    # --- Time-range ordering (compute mode, where applicable) ---
+    if config.get('start_time') and config.get('end_time'):
+        t0, t1 = Time(config['start_time']), Time(config['end_time'])
+        if t0 >= t1:
+            raise ValueError(
+                f"start_time ({t0.iso}) must be before end_time ({t1.iso})."
+            )
+
+    # --- Warn on unknown keys (typo catcher) ---
+    known_keys = {
+        'source', 'mode', 'start_time', 'end_time', 'time_step_seconds',
+        'ft2_file', 'downsample_sec', 'ascii_file', 'passes_file',
+        'min_altitude', 'dec_range', 'min_angular_velocity', 'max_ra_jump',
+        'sun_alt_limit', 'output_dir', 'viz_filter_mode', 'viz_max_passes',
+        'visualize_all_gaps', 'visualize_specific_gap', 'gap_target_time',
+        'verbose',
+    }
+    unknown = set(config) - known_keys
+    if unknown:
+        print(f"WARNING: unrecognized config key(s) ignored: {sorted(unknown)}")
+
+    return source, mode
+
+
 import argparse
 import yaml
 from pathlib import Path
@@ -929,96 +1276,131 @@ from pathlib import Path
 
 
 def main():
+    import argparse
+    import yaml
+    from pathlib import Path
+    from astropy.time import Time
+    import astropy.units as u
+
     parser = argparse.ArgumentParser(
-        description='Calculate Fermi satellite passes using TLE data.'
+        description='Calculate Fermi satellite passes over Rubin Observatory '
+                    'from TLE, FT2, or ASCII telemetry data.'
     )
     parser.add_argument(
-        '--config', type=str, help='Path to YAML configuration file'
+        '--config', type=str, required=True,
+        help='Path to YAML configuration file'
     )
     args = parser.parse_args()
 
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
+
     verbose = config.get('verbose', True)
 
-    # --- TLE-BASED DATA GENERATION ---
-    from skyfield.api import load
-    from astropy.time import Time
-    import numpy as np
+    # -------------------------------------------------------------------------
+    # SETUP
+    # -------------------------------------------------------------------------
+    source, mode = validate_config(config)
 
-    if verbose: print("--- Initializing Skyfield TLE Propagator ---")
-    load.verbose = False  # Set to True for more download details
-    ts = load.timescale()
+    calculator = FermiPassCalculator(ft2_file=config.get('ft2_file'))
 
-    TLE_URL = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=science&FORMAT=tle'
-    try:
-        satellites = load.tle_file(TLE_URL, reload=True)
-    except Exception as e:
-        print(f"FATAL ERROR: Could not download TLE data. Check internet. Details: {e}")
+    # -------------------------------------------------------------------------
+    # VISUALIZE MODE: load precomputed passes, skip all data loading/analysis
+    # -------------------------------------------------------------------------
+    if mode == 'visualize':
+        passes_file = config.get('passes_file')
+        if not passes_file:
+            raise ValueError("mode: visualize requires 'passes_file' in config.")
+        if verbose:
+            print(f"--- Visualize mode: loading passes from {passes_file} ---")
+        calculator.load_passes(passes_file)
+
+        output_dir = config.get('output_dir')
+        if output_dir:
+            calculator.visualize_passes(
+                output_dir,
+                filter_mode=config.get('viz_filter_mode', 'all'),
+                max_passes=config.get('viz_max_passes', 500)
+            )
+        else:
+            print("WARNING: No output_dir set; nothing to visualize to.")
+
+        print("\nVisualization complete.")
         return
 
-    FERMI_NORAD_ID = 33053
-    try:
-        fermi_satellite = {sat.model.satnum: sat for sat in satellites}[FERMI_NORAD_ID]
-    except KeyError:
-        raise RuntimeError(f"ERROR: Could not find Fermi (ID {FERMI_NORAD_ID}) in the TLE list.")
+    # -------------------------------------------------------------------------
+    # COMPUTE MODE: load data from the selected source
+    # -------------------------------------------------------------------------
+    if verbose:
+        print(f"--- Compute mode | source: {source} ---")
+
+    if source == 'tle':
+        if verbose:
+            print("WARNING: TLE propagation is for near-future prediction only.\n"
+                  "         For multi-month historical analysis use source: ascii.")
+        calculator.load_tle(
+            start_time=config['start_time'],
+            end_time=config['end_time'],
+            time_step_seconds=config.get('time_step_seconds', 30.0),
+            verbose=verbose
+        )
+
+    elif source == 'ft2':
+        if calculator.ft2_file is None:
+            raise ValueError("source: ft2 requires 'ft2_file' in config.")
+        # Optional time-range filtering for FT2 (commented out in old config,
+        # but supported by load_ft2's constructor-based masking).
+        if config.get('start_time'):
+            calculator.start_time = Time(config['start_time'])
+        if config.get('end_time'):
+            calculator.end_time = Time(config['end_time'])
+        calculator.load_ft2(downsample_sec=config.get('downsample_sec', 30))
+
+    elif source == 'ascii':
+        ascii_file = config.get('ascii_file')
+        if not ascii_file:
+            raise ValueError("source: ascii requires 'ascii_file' in config.")
+        calculator.load_ascii(ascii_file, verbose=verbose)
+
+    else:
+        raise ValueError(
+            f"Unknown source: {source!r}. Use 'tle', 'ft2', or 'ascii'."
+        )
+
+    # -------------------------------------------------------------------------
+    # ANALYSIS PIPELINE (identical for all sources)
+    # -------------------------------------------------------------------------
+    if verbose:
+        print("\n--- Starting Pass Analysis ---")
 
     if verbose:
-        print(f"Successfully loaded latest TLE data for: {fermi_satellite.name}")
-        print(f"TLE Epoch: {fermi_satellite.epoch.utc_strftime()}")
-
-    # --- Generate gap-free position data based on config file ---
-    start_utc = config['start_time']
-    end_utc = config['end_time']
-    time_step_seconds = config.get('time_step_seconds', 30.0)
-
-    start_time = Time(start_utc, scale='utc')
-    end_time = Time(end_utc, scale='utc')
-    num_steps = int((end_time - start_time).sec / time_step_seconds)
-    times_array = start_time + np.arange(num_steps) * time_step_seconds * u.s
-
-    if verbose: print(f"\nGenerating {len(times_array)} position points from {start_utc} to {end_utc}...")
-    t_skyfield = ts.from_astropy(times_array)
-    geocentric_position = fermi_satellite.at(t_skyfield)
-    positions_array = geocentric_position.position.m.T
-    if verbose: print("Position generation complete.")
-
-    # --- END TLE-BASED DATA GENERATION ---
-
-    # --- RUN THE VALIDATED ANALYSIS ENGINE ---
-    min_altitude = config.get('min_altitude', 20)
-    dec_range = config.get('dec_range', [-70, 10])
-    min_angular_velocity = config.get('min_angular_velocity', 0.1)
-    sun_alt_limit = config.get('sun_alt_limit', -18)
-
-    # 1. Initialize the calculator
-    calculator = FermiPassCalculator(ft2_file=None)  # No FT2 file needed
-
-    # 2. Feed the clean, gap-free data into the calculator
-    calculator.times = times_array
-    calculator.positions = positions_array
-
-    if verbose: print("\n--- Starting Pass Analysis ---")
-
-    # 3. Run the rest of the validated pipeline
-    if verbose: print("Computing topocentric coordinates...")
+        print("Computing topocentric coordinates...")
     calculator.compute_topocentric()
 
-    if verbose: print("Finding passes...")
+    if verbose:
+        print("Finding passes...")
+    dec_range = config.get('dec_range', [-70, 10])
     passes = calculator.find_survey_passes(
-        min_altitude=min_altitude * u.deg,
+        min_altitude=config.get('min_altitude', 20) * u.deg,
         dec_range=(dec_range[0] * u.deg, dec_range[1] * u.deg),
-        min_angular_velocity=min_angular_velocity
+        min_angular_velocity=config.get('min_angular_velocity', 0.1),
+        max_ra_jump=config.get('max_ra_jump', 50.0)
     )
 
-    if verbose: print("Computing pass parameters...")
+    if verbose:
+        print("Computing pass parameters...")
     calculator.compute_pass_parameters()
 
-    if verbose: print("Filtering for night-time passes...")
-    calculator.filter_night_passes(sun_alt_limit=sun_alt_limit * u.deg)
+    if verbose:
+        print("Filtering for night-time passes...")
+    calculator.filter_night_passes(
+        sun_alt_limit=config.get('sun_alt_limit', -18) * u.deg
+    )
 
-    # --- FINAL RESULTS ---
+    # -------------------------------------------------------------------------
+    # RESULTS SUMMARY
+    # -------------------------------------------------------------------------
     if verbose:
         print("\n" + "=" * 60)
         print("                 FINAL RESULTS")
@@ -1030,15 +1412,48 @@ def main():
         if all_filter_passes:
             print("\nFirst 10 passes meeting ALL filters:")
             for p in all_filter_passes[:10]:
-                print(
-                    f"  {p.start_time.iso}: duration={(p.end_time - p.start_time).sec:.0f}s, max_alt={p.alt.max():.1f}°")
+                print(f"  {p.start_time.iso}: "
+                      f"duration={(p.end_time - p.start_time).sec:.0f}s, "
+                      f"max_alt={p.alt.max():.1f}°")
 
-    # Save results if an output directory is specified
-    output_dir = config.get('output_dir', None)
+    # -------------------------------------------------------------------------
+    # OUTPUT & VISUALIZATION
+    # -------------------------------------------------------------------------
+    output_dir = config.get('output_dir')
     if output_dir:
         print(f"\nSaving results to {output_dir}...")
         calculator.save_passes(output_dir)
-        calculator.visualize_passes(output_dir, filter_mode='passes_all')
+        calculator.visualize_passes(
+            output_dir,
+            filter_mode=config.get('viz_filter_mode', 'all'),
+            max_passes=config.get('viz_max_passes', 500)
+        )
+
+        # Whole-file gap map (most meaningful for ft2)
+        if config.get('visualize_all_gaps', False):
+            calculator.visualize_all_gaps(
+                output_filename=str(Path(output_dir) / "all_gaps_visualization.html")
+            )
+
+        # Focused gap plot around a specific target time
+        if config.get('visualize_specific_gap', False):
+            target_str = config.get('gap_target_time')
+            if not target_str:
+                print("WARNING: visualize_specific_gap is true but "
+                      "'gap_target_time' is not set; skipping.")
+            else:
+                target = Time(target_str)
+                # Warn loudly if the target falls outside the loaded data span
+                if calculator.times is not None and len(calculator.times) > 0:
+                    t0, t1 = calculator.times[0], calculator.times[-1]
+                    if target < t0 or target > t1:
+                        print(f"WARNING: gap_target_time {target.iso} is outside "
+                              f"the loaded data range [{t0.iso} .. {t1.iso}]; "
+                              f"plot may be empty.")
+                calculator.visualize_gaps(
+                    target_time=target,
+                    output_filename=str(Path(output_dir) / "gap_visualization.html")
+                )
 
     print("\nAnalysis complete.")
 
