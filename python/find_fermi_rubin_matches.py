@@ -1007,7 +1007,8 @@ def query_and_cache_visits(butler, start_time, end_time, instrument, output_file
         visit_records = butler.query_dimension_records(
             "visit",
             where=where_clause,
-            bind=bind_params
+            bind=bind_params,
+            limit=150000
         )
 
         # Convert to list to get count
@@ -1131,6 +1132,46 @@ def load_cached_visits(cache_file):
     print(f"Loaded {len(visits)} visits from cache")
     return visits
 
+def print_visit_histogram(visits, label="cached visits"):
+    """Print a month-by-month histogram of visits and the largest time gaps."""
+    from collections import Counter
+
+    if len(visits) == 0:
+        print("No visits to histogram.")
+        return
+
+    times = Time([v['obs_time'] for v in visits])
+
+    print(f"\n{'=' * 60}")
+    print(f"VISIT TIME DISTRIBUTION ({label}: {len(visits)} visits)")
+    print(f"{'=' * 60}")
+    print(f"Span: {times.min().iso}  ->  {times.max().iso}\n")
+
+    # Bucket by calendar month via ISO 'YYYY-MM' prefix
+    months = [t.iso[:7] for t in times]
+    counts = Counter(months)
+    maxc = max(counts.values())
+
+    print(f"{'Month':<10} {'Visits':>8}   Histogram")
+    print("-" * 60)
+    for month in sorted(counts):
+        n = counts[month]
+        bar = '#' * int(40 * n / maxc)
+        print(f"{month:<10} {n:>8}   {bar}")
+    print("-" * 60)
+    print(f"{'TOTAL':<10} {len(visits):>8}")
+
+    # Largest gaps = observing-run boundaries
+    print("\nLargest gaps between consecutive visits (> 0.5 d):")
+    mjd_sorted = np.sort(times.mjd)
+    gaps = np.diff(mjd_sorted)
+    for i in np.argsort(gaps)[::-1][:10]:
+        if gaps[i] < 0.5:
+            continue
+        t0 = Time(mjd_sorted[i], format='mjd')
+        t1 = Time(mjd_sorted[i + 1], format='mjd')
+        print(f"  {gaps[i]:6.1f} d : {t0.iso[:16]}  ->  {t1.iso[:16]}")
+    print(f"{'=' * 60}\n")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1236,6 +1277,8 @@ def main():
 
         if len(cached_visits) == 0:
             return 1
+
+        print_visit_histogram(cached_visits, label=args.use_cache)
 
         overlaps = search_all_passes_with_cache(
             passes,
