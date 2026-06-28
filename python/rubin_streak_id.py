@@ -84,7 +84,7 @@ def getDetRaDecCorners(butler, visit):
     return cornersList, detectorsList
 
 
-def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, fov_radius=3):
+def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, fov_radius=8):
     """Create a Bokeh plot for a single visit."""
 
     print(f"\n{'=' * 60}")
@@ -396,7 +396,7 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
 
 
 # Main execution
-yaml_file = 'fermi_overlaps.yaml'
+yaml_file = 'fermi_closest.yaml'
 fermi_data = load_fermi_overlaps(yaml_file)
 
 # LSSTCam configuration
