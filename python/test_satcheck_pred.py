@@ -6,7 +6,7 @@ from astropy.time import Time
 #utc_time_str = "2025-11-26 07:47:54"
 #utc_time_str = "2024-08-21 13:51:54"
 #utc_time_str = "2025-03-15 21:03:12"
-utc_time_str = "2024-10-27 09:16:14"
+utc_time_str = "2026-02-20 07:18:00"
 
 utc_Time = Time(utc_time_str)
 jd = utc_Time.jd

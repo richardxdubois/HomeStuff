@@ -29,6 +29,57 @@ def load_fermi_overlaps(yaml_file):
     return data
 
 
+# ============================================================================
+# NEW (Option B): targeted SatChecker ephemeris for a specific NORAD object.
+# The FOV endpoint does NOT return Fermi; this per-catalog-number endpoint does.
+# ============================================================================
+
+def get_satchecker_ephemeris(satellite, start_jd, stop_jd, step_jd,
+                             latitude, longitude, elevation):
+    """
+    Query SatChecker's name-jdstep ephemeris endpoint for one satellite's
+    topocentric RA/Dec across a time range (single call).
+
+    Response is a dict with 'fields' (column names) and 'data' (list of rows).
+    Returns list of [ra_deg, dec_deg, jd]; empty list on failure.
+    """
+    url_string = (
+        f"https://satchecker.cps.iau.org/ephemeris/name-jdstep/"
+        f"?name={satellite}"
+        f"&elevation={elevation}"
+        f"&latitude={latitude}"
+        f"&longitude={longitude}"
+        f"&startjd={start_jd}"
+        f"&stopjd={stop_jd}"
+        f"&stepjd={step_jd}"
+        f"&min_altitude=-90"
+    )
+    positions = []
+    try:
+        resp = requests.get(url_string, timeout=60)
+        info = resp.json()
+
+        fields = info["fields"]
+        ra_index = fields.index("right_ascension_deg")
+        dec_index = fields.index("declination_deg")
+        # Julian-date column name varies; find it tolerantly.
+        jd_index = None
+        for cand in ("julian_date", "julian_date_jd", "jd", "mjd"):
+            if cand in fields:
+                jd_index = fields.index(cand)
+                break
+
+        for row in info["data"]:
+            ra = row[ra_index]
+            dec = row[dec_index]
+            jd = row[jd_index] if jd_index is not None else None
+            if ra is not None and dec is not None:
+                positions.append([float(ra), float(dec),
+                                  float(jd) if jd is not None else None])
+    except Exception as e:
+        print(f"  WARNING: ephemeris query failed for {satellite}: {e}")
+    return positions
+
 def getVisitSummaryForVisit(butler, visit, visitSummaryDatasetType=None):
     """Fetch visit summary for a visit, supporting legacy and newer names."""
     datasetTypes = (
@@ -84,7 +135,7 @@ def getDetRaDecCorners(butler, visit):
     return cornersList, detectorsList
 
 
-def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, fov_radius=8):
+def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, fov_radius=3):
     """Create a Bokeh plot for a single visit."""
 
     print(f"\n{'=' * 60}")
@@ -135,6 +186,8 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
     azimuth = cdb_visit_info["azimuth"][0] * u.deg
     exp_midpt = Time(cdb_visit_info["exp_midpt"][0])
 
+    print(f"  EXPOSURE: {exp_begin.iso} -> {exp_end.iso} (mid {exp_midpt.iso})")
+
     ra_center = cdb_visit_info["s_ra"][0]
     dec_center = cdb_visit_info["s_dec"][0]
 
@@ -145,7 +198,7 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
         cornersList = []
         detectorsList = []
 
-    # Make the SatChecker FOV API request
+    # Make the SatChecker FOV API request (catalog of debris/RBs/etc.; no Fermi)
     url_string = f"https://satchecker.cps.iau.org/fov/satellite-passes/?latitude={latitude}&longitude={longitude}&elevation={elevation}&start_time_jd={start_time_jd}&duration={duration}&ra={ra_center}&dec={dec_center}&fov_radius={fov_radius}&group_by=satellite&async=False"
 
     try:
@@ -168,6 +221,41 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
             ])
 
     print(f"Public catalog satellites: {len(satellites)} found")
+
+    # ------------------------------------------------------------------
+    # Targeted Fermi ephemeris (gold track) via name-jdstep (single call).
+    # ------------------------------------------------------------------
+    # Center the ephemeris window on the closest-approach time, not exp start,
+    # so the gold track actually sweeps past the field at closest approach.
+    from astropy.time import Time as _T
+    # Normalize fermi_overlaps to a list of overlap dicts
+    if isinstance(fermi_overlaps, dict):
+        # parsed as a mapping; wrap or extract
+        overlaps_list = [fermi_overlaps]
+    elif isinstance(fermi_overlaps, list):
+        overlaps_list = fermi_overlaps
+    else:
+        overlaps_list = []
+
+    t_close = exp_midpt.utc.jd  # default; use UTC!
+    if overlaps_list and isinstance(overlaps_list[0], dict) \
+            and 'closest_approach_time' in overlaps_list[0]:
+        t_close = Time(overlaps_list[0]['closest_approach_time']).utc.jd
+    else:
+        t_close = exp_midpt.jd
+    half_window_s = 120.0  # +/- 2 min around closest approach
+    start_jd = t_close - half_window_s / 86400.0
+    stop_jd = t_close + half_window_s / 86400.0
+    step_jd = (stop_jd - start_jd) / 30.0  # ~8 s sampling -> smooth streak
+    fermi_eph = get_satchecker_ephemeris(
+        "GLAST",  # <-- see note on the name below
+        start_time_jd, stop_jd, step_jd,
+        latitude, longitude, elevation)
+    if fermi_eph:
+        print(f"  SatChecker ephemeris: Fermi found, {len(fermi_eph)} positions")
+    else:
+        print(f"  SatChecker ephemeris: no Fermi positions "
+              f"(check satellite name / endpoint)")
 
     # VERIFY FERMI POSITION - Do this before plotting
     if fermi_overlaps:
@@ -198,63 +286,18 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
                 print(f"    Position: RA={closest_ra:.3f}°, Dec={closest_dec:.3f}°")
                 print(f"    Distance from field center: {distances[min_idx]:.3f}°")
 
-                # Time conversion check
-                closest_time_astropy = Time(closest_time)
-                query_jd = closest_time_astropy.jd
-
-                print(f"\n  Time conversion check:")
-                print(f"    Input time string: {closest_time}")
-                print(f"    Astropy Time object: {closest_time_astropy.iso}")
-                print(f"    Julian Date: {query_jd}")
-                print(f"    Visit exposure midpoint: {exp_midpt.iso}")
-                print(f"    Visit JD: {exp_midpt.jd}")
-                print(f"    Difference: {(closest_time_astropy.jd - exp_midpt.jd) * 86400:.1f} seconds")
-
-                # Check if a known satellite appears (for testing)
-                print(f"\n  Testing: Checking if SatChecker finds NOAA 16 DEB (42428)...")
-
-                test_found = False
-                for sat_name in satellites.keys():
-                    if '42428' in sat_name or 'NOAA 16 DEB' in sat_name.upper():
-                        test_found = True
-                        print(f"  ✓ TEST SATELLITE FOUND: {sat_name}")
-                        print(f"    (This confirms our checking logic works)")
-
-                if not test_found:
-                    print(f"  ✗ Hmm, test satellite not found either - something wrong with logic")
-
-                # Check if Fermi appears in the satellites already found
-                print(f"\n  Checking if SatChecker finds Fermi during visit exposure...")
-                print(f"  (Using same query as main FOV search)")
-
-                fermi_found = False
-                for sat_name in satellites.keys():
-                    if '33053' in sat_name or 'FERMI' in sat_name.upper() or 'GLAST' in sat_name.upper():
-                        fermi_found = True
-                        print(f"  ✓ FERMI FOUND in main query: {sat_name}")
-
-                        # Compare position
-                        fermi_positions = satellites[sat_name]
-                        if fermi_positions:
-                            # Find position closest to exposure midpoint
-                            mid_jd = exp_midpt.jd
-                            closest_pos_idx = min(range(len(fermi_positions)),
-                                                  key=lambda i: abs(fermi_positions[i][2] - mid_jd))
-
-                            satchecker_ra = fermi_positions[closest_pos_idx][0]
-                            satchecker_dec = fermi_positions[closest_pos_idx][1]
-                            satchecker_jd = fermi_positions[closest_pos_idx][2]
-
-                            print(f"  SatChecker position at JD {satchecker_jd}:")
-                            print(f"    RA={satchecker_ra:.3f}°, Dec={satchecker_dec:.3f}°")
-                            print(f"  Your matching code at closest approach:")
-                            print(f"    RA={closest_ra:.3f}°, Dec={closest_dec:.3f}°")
-
-                if not fermi_found:
-                    print(f"  ✗ Fermi NOT in the main SatChecker query results")
-                    print(f"  → Fermi (NORAD 33053) is likely not in SatChecker's database")
-                    print(f"  → SatChecker focuses on Starlink, OneWeb, and debris")
-                    print(f"  → NASA science missions may not be included")
+                # Compare against the gold SatChecker ephemeris, if we have it
+                if fermi_eph:
+                    mid_jd = exp_midpt.jd
+                    j = min(range(len(fermi_eph)),
+                            key=lambda k: abs(fermi_eph[k][2] - mid_jd))
+                    print(f"\n  SatChecker ephemeris nearest exp_midpt:")
+                    print(f"    RA={fermi_eph[j][0]:.3f}°, Dec={fermi_eph[j][1]:.3f}°")
+                    dra = (fermi_eph[j][0] - closest_ra) * np.cos(np.radians(closest_dec))
+                    ddec = fermi_eph[j][1] - closest_dec
+                    print(f"    Offset from your trajectory: "
+                          f"{np.sqrt(dra**2 + ddec**2):.3f}° "
+                          f"(should be small if both agree)")
 
     # Create Bokeh figure
     p = figure(
@@ -266,14 +309,14 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
         match_aspect=True
     )
 
-    # Query FOV circle
+    # Query FOV circle (this is the SatChecker SEARCH radius, not Rubin's FOV)
     center = SkyCoord(ra=ra_center * u.deg, dec=dec_center * u.deg, frame='icrs')
     position_angles = np.linspace(0, 360, 360) * u.deg
     circle_points = center.directional_offset_by(position_angles, fov_radius * u.deg)
 
     p.line(circle_points.ra.deg, circle_points.dec.deg,
            color='lightgray', line_dash='dashed', line_width=2,
-           legend_label='Query FOV', alpha=0.7)
+           legend_label='SatChecker search radius', alpha=0.7)
 
     # Satellite tracks
     colors = Category20_20
@@ -332,7 +375,32 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
         ys = [v[1] for v in vertices] + [vertices[0][1]]
         p.patch(xs, ys, color="#058B8C", alpha=0.2, line_color="#058B8C", line_width=1)
 
-    # Plot Fermi overlaps
+    # ------------------------------------------------------------------
+    # NEW (Option B): plot SatChecker Fermi ephemeris (gold) BEFORE the
+    # red pipeline trajectory, so the red track draws on top.
+    # ------------------------------------------------------------------
+    if fermi_eph:
+        eph_ra = [pp[0] for pp in fermi_eph]
+        eph_dec = [pp[1] for pp in fermi_eph]
+        eph_jd = [pp[2] for pp in fermi_eph]
+
+        gold = "#FFB300"
+        eph_line = p.line(eph_ra, eph_dec, color=gold, line_width=3,
+                          alpha=0.9, line_dash='dotted')
+        eph_src = ColumnDataSource(data=dict(ra=eph_ra, dec=eph_dec, jd=eph_jd))
+        eph_scatter = p.scatter('ra', 'dec', source=eph_src, color=gold,
+                                size=7, alpha=0.9, marker='diamond')
+        p.add_tools(HoverTool(
+            renderers=[eph_scatter],
+            tooltips=[("Type", "Fermi (SatChecker)"),
+                      ("RA", "@ra{0.000}"),
+                      ("Dec", "@dec{0.000}"),
+                      ("JD", "@jd{0.00000}")]
+        ))
+        legend_items.append(("Fermi — SatChecker (33053)",
+                             [eph_line, eph_scatter]))
+
+    # Plot Fermi overlaps (your pipeline trajectory, red)
     if fermi_overlaps:
         fermi_lines = []
         for i, overlap in enumerate(fermi_overlaps):
@@ -363,7 +431,7 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
                 p.add_tools(HoverTool(
                     renderers=[fermi_scatter_hover],
                     tooltips=[
-                        ("Type", "Fermi"),
+                        ("Type", "Fermi (pipeline)"),
                         ("RA", "@ra{0.3f}°"),
                         ("Dec", "@dec{0.3f}°"),
                         ("Time", "@time"),
@@ -376,7 +444,8 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
                           color='darkred', size=10, marker='triangle', alpha=1.0)
 
                 if i == 0:
-                    fermi_lines.append((f'Fermi ({len(ra_points)} pts)', [fermi_line, fermi_scatter]))
+                    fermi_lines.append((f'Fermi — pipeline ({len(ra_points)} pts)',
+                                        [fermi_line, fermi_scatter]))
 
         legend_items.extend(fermi_lines)
 
@@ -396,7 +465,7 @@ def create_visit_plot(obsinfo, fermi_overlaps, butler, collections, instrument, 
 
 
 # Main execution
-yaml_file = 'fermi_closest.yaml'
+yaml_file = 'fermi_overlaps.yaml'
 fermi_data = load_fermi_overlaps(yaml_file)
 
 # LSSTCam configuration
