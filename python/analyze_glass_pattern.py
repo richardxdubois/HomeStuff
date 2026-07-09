@@ -115,6 +115,7 @@ class PatternAnalyzer:
         self.pieces = []
         self.gaps = []
         self.binary = None
+        self._line_skeleton = None
         self.image_path = image_path
         self.zinc_channel_depth = zinc_channel_depth
         self.zinc_face_width = zinc_face_width
@@ -502,6 +503,65 @@ class PatternAnalyzer:
             max_width = max_dim
 
         return min_width, max_width
+
+    def _get_line_skeleton(self):
+        """Get single-pixel-wide centerlines of the lead line network.
+
+        Computed once and cached. The skeleton represents where came/foil
+        should be centered between adjacent glass pieces.
+
+        Returns:
+            Binary image: skeleton pixels = 255, background = 0
+        """
+        if hasattr(self, '_line_skeleton') and self._line_skeleton is not None:
+            return self._line_skeleton
+
+        if self.binary is None:
+            self.preprocess()
+
+        # Lines are black (0) in self.binary; invert so lines are foreground
+        lines_foreground = cv2.bitwise_not(self.binary)
+
+        # Skeletonize to find centerlines
+        self._line_skeleton = self._skeletonize(lines_foreground)
+
+        print(f"Line skeleton: {cv2.countNonZero(self._line_skeleton)} "
+              f"centerline pixels")
+
+        return self._line_skeleton
+
+    def _draw_centered_lines(self, canvas, line_width_px, color=(0, 0, 0)):
+        """Draw the lead line network centered at the specified width.
+
+        Uses the skeleton (centerline) of the original line network,
+        dilated to the desired came/foil width. This ensures lines are
+        correctly centered between adjacent glass edges regardless of
+        how wide the lines were originally drawn in the source image.
+
+        Args:
+            canvas: Image to draw on (modified in place)
+            line_width_px: Desired line width in pixels
+            color: BGR color tuple for the lines
+        """
+        skeleton = self._get_line_skeleton()
+
+        if line_width_px <= 1:
+            # Just paint skeleton pixels directly
+            if len(canvas.shape) == 3:
+                canvas[skeleton > 0] = color
+            else:
+                canvas[skeleton > 0] = 0
+        else:
+            # Dilate skeleton to desired width
+            kernel = cv2.getStructuringElement(
+                cv2.MORPH_ELLIPSE, (line_width_px, line_width_px)
+            )
+            thick_lines = cv2.dilate(skeleton, kernel, iterations=1)
+
+            if len(canvas.shape) == 3:
+                canvas[thick_lines > 0] = color
+            else:
+                canvas[thick_lines > 0] = 0
 
     def _skeletonize(self, binary_image):
         """Reduce a binary region to its single-pixel-wide skeleton.
@@ -1462,12 +1522,8 @@ class PatternAnalyzer:
         img_h, img_w = self.gray.shape
         template = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
 
-        # Draw each piece contour at the correct came width
-        for piece in self.pieces:
-            cv2.drawContours(
-                template, [piece.contour], -1,
-                (0, 0, 0), line_width_px, lineType=cv2.LINE_AA
-            )
+        # Draw lead lines centered at came width (skeleton-based)
+        self._draw_centered_lines(template, line_width_px, color=(0, 0, 0))
 
         # Draw outer border at zinc face width
         zinc_border_px = max(1, int(round(
@@ -1759,12 +1815,8 @@ class PatternAnalyzer:
         img_h, img_w = self.gray.shape
         full_pattern = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
 
-        # Draw pieces at came width
-        for piece in self.pieces:
-            cv2.drawContours(
-                full_pattern, [piece.contour], -1,
-                (0, 0, 0), line_width_px, lineType=cv2.LINE_AA
-            )
+        # Draw lead lines centered at came width (skeleton-based)
+        self._draw_centered_lines(full_pattern, line_width_px, color=(0, 0, 0))
 
         # Add piece numbers
         for piece in self.pieces:
@@ -2950,7 +3002,7 @@ class PatternAnalyzer:
         for piece in self.pieces:
             cv2.drawContours(
                 preview, [piece.contour], -1,
-                (40, 40, 40), 3, lineType=cv2.LINE_AA
+                (40, 40, 40), 1, lineType=cv2.LINE_AA
             )
 
         # Convert to RGBA uint32 for Bokeh
