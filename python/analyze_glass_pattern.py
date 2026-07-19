@@ -172,7 +172,11 @@ class PatternAnalyzer:
         if came_width:
             self.came_width = came_width
         elif technique == 'foil':
-            self.came_width = 0.0015  # 1.5 mil
+            # Full glass-to-glass gap for a foiled seam, filled by two foil
+            # layers (one wrapped on each piece edge). NOT the 1.5-mil single
+            # foil thickness: that is sub-pixel at any print DPI and silently
+            # collapsed template geometry, causing gaps to accumulate.
+            self.came_width = 1 / 32  # 0.03125"
         else:
             self.came_width = 1 / 16  # 0.0625"
 
@@ -377,7 +381,110 @@ class PatternAnalyzer:
               f"{rejected_large} too large, "
               f"{rejected_parent} container contours")
 
+        # Re-derive each piece's contour from the line-network SKELETON so
+        # that piece size is set by came_width, NOT by how thick the lines
+        # were drawn in the source image. Without this, contours come from
+        # the white region between drawn lines and are inset by half the
+        # SOURCE line width per edge -> gaps accumulate across the panel.
+        self._recenter_piece_contours()
+
         return self.pieces
+
+    def _recenter_piece_contours(self):
+        """Replace detection contours with skeleton-centered ones.
+
+        Builds a binary whose lines are exactly came_width wide (floored to
+        a physical minimum so 4-connected regions stay separated), centered
+        on the true boundary skeleton. Re-detects regions from that binary
+        and matches them back to existing pieces by mask-overlap (robust to
+        concave pieces and rings whose centroid lies outside the glass).
+
+        Result: each piece edge sits came_width/2 off the true centerline,
+        so the glass-to-glass gap == came_width regardless of source line
+        thickness. For foil, came_width is the FULL inter-glass gap (filled
+        by two foil layers, one per edge).
+        """
+        skeleton = self._get_line_skeleton()
+
+        # Desired came line width in px, floored to a physical minimum.
+        # The floor (~0.03") is what reliably separates adjacent 4-connected
+        # regions after dilation at typical print DPI; below it, regions leak
+        # together through the border and detection collapses.
+        min_gap_in = 1.0 / 32.0
+        came_px = int(round(self.came_width * self.scale_dpi))
+        floor_px = int(np.ceil(min_gap_in * self.scale_dpi))
+        line_px = max(came_px, floor_px, 3)
+        if came_px < floor_px:
+            print(f"  [recenter] came_width {self.came_width:.4g}\" is below "
+                  f"the {min_gap_in:.4g}\" raster/cut floor at "
+                  f"{self.scale_dpi:.0f} DPI; using {line_px}px "
+                  f"({line_px/self.scale_dpi:.4f}\") separation instead.")
+        else:
+            print(f"  [recenter] came line {line_px}px "
+                  f"({line_px/self.scale_dpi:.4f}\") centered on skeleton.")
+
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE, (line_px, line_px)
+        )
+        thick = cv2.dilate(skeleton, kernel, iterations=1)
+
+        rebuilt = np.full(self.binary.shape, 255, np.uint8)
+        rebuilt[thick > 0] = 0
+
+        new_contours, _ = cv2.findContours(
+            rebuilt, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
+        )
+        # keep only plausible glass regions (drop border/holes/noise)
+        total_area = self.binary.shape[0] * self.binary.shape[1]
+        cand = [c for c in new_contours
+                if 1 < cv2.contourArea(c) < 0.5 * total_area]
+
+        # Pre-rasterize each candidate as a filled mask once, for overlap
+        # matching. Overlap (IoU-style) works for concave pieces and rings
+        # whose centroid falls outside the glass, where a centroid-in-contour
+        # test fails.
+        H, W = self.binary.shape
+        cand_masks = []
+        for c in cand:
+            m = np.zeros((H, W), np.uint8)
+            cv2.drawContours(m, [c], -1, 255, -1)
+            cand_masks.append((c, m, cv2.contourArea(c)))
+
+        remapped = 0
+        for piece in self.pieces:
+            # rasterize the original piece and pick the candidate with the
+            # greatest area overlap (intersection / original-area)
+            om = np.zeros((H, W), np.uint8)
+            cv2.drawContours(om, [piece.contour], -1, 255, -1)
+            o_area = max(1, int(cv2.countNonZero(om)))
+
+            best = None
+            best_area = None
+            best_score = 0.0
+            for c, m, a in cand_masks:
+                inter = cv2.countNonZero(cv2.bitwise_and(om, m))
+                if inter == 0:
+                    continue
+                # normalize by the smaller region so a correct small piece
+                # isn't penalized against an enclosing region
+                score = inter / min(o_area, max(1, int(cv2.countNonZero(m))))
+                if score > best_score:
+                    best_score, best, best_area = score, c, a
+            if best is None or best_score < 0.35:
+                continue  # ambiguous -> keep original contour as fallback
+            piece.contour = best
+            piece.area = best_area
+            piece.area_sq_inches = best_area / (self.scale_dpi ** 2)
+            x, y, w, h = cv2.boundingRect(best)
+            piece.bounding_box = (x, y, w, h)
+            M = cv2.moments(best)
+            if M["m00"] != 0:
+                piece.centroid = (int(M["m10"] / M["m00"]),
+                                  int(M["m01"] / M["m00"]))
+            remapped += 1
+
+        print(f"  [recenter] remapped {remapped}/{len(self.pieces)} "
+              f"piece contours to skeleton-centered geometry")
 
     def _has_significant_children(self, contour_idx, contours, hierarchy,
                                   parent_area, min_area):
@@ -1813,86 +1920,46 @@ class PatternAnalyzer:
         print(f"  Technique: {self.technique}")
 
         img_h, img_w = self.gray.shape
+        full_pattern = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
 
-        # --- Anti-aliasing via supersampling ---
-        # The pattern lines come from _draw_centered_lines, which dilates a
-        # binary skeleton — hard edges with no AA, the main source of the
-        # aliasing in the tiled output. Rather than change the (useful)
-        # skeleton-centering logic, we render full_pattern at ss x resolution
-        # and downsample with INTER_AREA, which turns the hard binary edges
-        # into smooth grey ramps and cleans up the small piece-number and
-        # color-group labels at the same time. Downstream tiling slices
-        # full_pattern by dpi-derived pixel coords, so we downsample back to
-        # (img_h, img_w) here and everything below is untouched.
-        ss = getattr(self, 'tiled_supersample', 3)  # 3x is plenty at ~150 DPI
+        # Draw lead lines centered at came width (skeleton-based)
+        self._draw_centered_lines(full_pattern, line_width_px, color=(0, 0, 0))
 
-        hi_h, hi_w = img_h * ss, img_w * ss
-        full_hi = np.ones((hi_h, hi_w, 3), dtype=np.uint8) * 255
-
-        # Lines: dilate skeleton at ss scale so the downsampled stroke width
-        # still equals came width. _draw_centered_lines dilates by
-        # line_width_px, so scale that argument by ss.
-        skeleton = self._get_line_skeleton()
-        skeleton_hi = cv2.resize(
-            skeleton, (hi_w, hi_h), interpolation=cv2.INTER_NEAREST
-        )
-        line_width_hi = max(1, line_width_px * ss)
-        if line_width_hi <= 1:
-            full_hi[skeleton_hi > 0] = (0, 0, 0)
-        else:
-            kernel = cv2.getStructuringElement(
-                cv2.MORPH_ELLIPSE, (line_width_hi, line_width_hi)
-            )
-            thick = cv2.dilate(skeleton_hi, kernel, iterations=1)
-            full_hi[thick > 0] = (0, 0, 0)
-
-        # Labels drawn at ss scale: multiply font scale, thickness, position,
-        # and label-box padding by ss so proportions survive the downsample.
+        # Add piece numbers
         for piece in self.pieces:
             cx, cy = piece.centroid
-            cx_hi, cy_hi = cx * ss, cy * ss
             font_scale = max(
                 0.4, min(0.8, np.sqrt(piece.area_sq_inches) * 0.3)
-            ) * ss
-            thick = max(1, ss)
+            )
             text = str(piece.id)
             (tw, th), _ = cv2.getTextSize(
-                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thick
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
             )
-            pad = 2 * ss
             cv2.rectangle(
-                full_hi,
-                (cx_hi - tw // 2 - pad, cy_hi - th // 2 - pad),
-                (cx_hi + tw // 2 + pad, cy_hi + th // 2 + pad),
+                full_pattern,
+                (cx - tw // 2 - 2, cy - th // 2 - 2),
+                (cx + tw // 2 + 2, cy + th // 2 + 2),
                 (255, 255, 255), -1
             )
             cv2.putText(
-                full_hi, text,
-                (cx_hi - tw // 2, cy_hi + th // 2),
+                full_pattern, text,
+                (cx - tw // 2, cy + th // 2),
                 cv2.FONT_HERSHEY_SIMPLEX, font_scale,
-                (0, 0, 0), thick, lineType=cv2.LINE_AA
+                (0, 0, 0), 1
             )
 
             # Add color group name if available
             color_name = getattr(piece, 'color_group_name', None)
             if color_name:
-                cname_scale = 0.3 * ss
                 (cw, ch), _ = cv2.getTextSize(
-                    color_name, cv2.FONT_HERSHEY_SIMPLEX, cname_scale, thick
+                    color_name, cv2.FONT_HERSHEY_SIMPLEX, 0.3, 1
                 )
                 cv2.putText(
-                    full_hi, color_name,
-                    (cx_hi - cw // 2, cy_hi + th // 2 + ch + 5 * ss),
-                    cv2.FONT_HERSHEY_SIMPLEX, cname_scale,
-                    (120, 120, 120), thick, lineType=cv2.LINE_AA
+                    full_pattern, color_name,
+                    (cx - cw // 2, cy + th // 2 + ch + 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                    (120, 120, 120), 1
                 )
-
-        # Downsample to working resolution — INTER_AREA is the correct
-        # (area-averaging) filter for downscaling and produces the grey
-        # edge ramps that read as anti-aliased.
-        full_pattern = cv2.resize(
-            full_hi, (img_w, img_h), interpolation=cv2.INTER_AREA
-        )
 
         # Calculate tile grid
         # Each tile shows content_w x content_h of unique pattern
