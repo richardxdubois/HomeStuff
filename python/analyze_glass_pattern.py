@@ -1813,46 +1813,86 @@ class PatternAnalyzer:
         print(f"  Technique: {self.technique}")
 
         img_h, img_w = self.gray.shape
-        full_pattern = np.ones((img_h, img_w, 3), dtype=np.uint8) * 255
 
-        # Draw lead lines centered at came width (skeleton-based)
-        self._draw_centered_lines(full_pattern, line_width_px, color=(0, 0, 0))
+        # --- Anti-aliasing via supersampling ---
+        # The pattern lines come from _draw_centered_lines, which dilates a
+        # binary skeleton — hard edges with no AA, the main source of the
+        # aliasing in the tiled output. Rather than change the (useful)
+        # skeleton-centering logic, we render full_pattern at ss x resolution
+        # and downsample with INTER_AREA, which turns the hard binary edges
+        # into smooth grey ramps and cleans up the small piece-number and
+        # color-group labels at the same time. Downstream tiling slices
+        # full_pattern by dpi-derived pixel coords, so we downsample back to
+        # (img_h, img_w) here and everything below is untouched.
+        ss = getattr(self, 'tiled_supersample', 3)  # 3x is plenty at ~150 DPI
 
-        # Add piece numbers
+        hi_h, hi_w = img_h * ss, img_w * ss
+        full_hi = np.ones((hi_h, hi_w, 3), dtype=np.uint8) * 255
+
+        # Lines: dilate skeleton at ss scale so the downsampled stroke width
+        # still equals came width. _draw_centered_lines dilates by
+        # line_width_px, so scale that argument by ss.
+        skeleton = self._get_line_skeleton()
+        skeleton_hi = cv2.resize(
+            skeleton, (hi_w, hi_h), interpolation=cv2.INTER_NEAREST
+        )
+        line_width_hi = max(1, line_width_px * ss)
+        if line_width_hi <= 1:
+            full_hi[skeleton_hi > 0] = (0, 0, 0)
+        else:
+            kernel = cv2.getStructuringElement(
+                cv2.MORPH_ELLIPSE, (line_width_hi, line_width_hi)
+            )
+            thick = cv2.dilate(skeleton_hi, kernel, iterations=1)
+            full_hi[thick > 0] = (0, 0, 0)
+
+        # Labels drawn at ss scale: multiply font scale, thickness, position,
+        # and label-box padding by ss so proportions survive the downsample.
         for piece in self.pieces:
             cx, cy = piece.centroid
+            cx_hi, cy_hi = cx * ss, cy * ss
             font_scale = max(
                 0.4, min(0.8, np.sqrt(piece.area_sq_inches) * 0.3)
-            )
+            ) * ss
+            thick = max(1, ss)
             text = str(piece.id)
             (tw, th), _ = cv2.getTextSize(
-                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1
+                text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thick
             )
+            pad = 2 * ss
             cv2.rectangle(
-                full_pattern,
-                (cx - tw // 2 - 2, cy - th // 2 - 2),
-                (cx + tw // 2 + 2, cy + th // 2 + 2),
+                full_hi,
+                (cx_hi - tw // 2 - pad, cy_hi - th // 2 - pad),
+                (cx_hi + tw // 2 + pad, cy_hi + th // 2 + pad),
                 (255, 255, 255), -1
             )
             cv2.putText(
-                full_pattern, text,
-                (cx - tw // 2, cy + th // 2),
+                full_hi, text,
+                (cx_hi - tw // 2, cy_hi + th // 2),
                 cv2.FONT_HERSHEY_SIMPLEX, font_scale,
-                (0, 0, 0), 1
+                (0, 0, 0), thick, lineType=cv2.LINE_AA
             )
 
             # Add color group name if available
             color_name = getattr(piece, 'color_group_name', None)
             if color_name:
+                cname_scale = 0.3 * ss
                 (cw, ch), _ = cv2.getTextSize(
-                    color_name, cv2.FONT_HERSHEY_SIMPLEX, 0.3, 1
+                    color_name, cv2.FONT_HERSHEY_SIMPLEX, cname_scale, thick
                 )
                 cv2.putText(
-                    full_pattern, color_name,
-                    (cx - cw // 2, cy + th // 2 + ch + 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.3,
-                    (120, 120, 120), 1
+                    full_hi, color_name,
+                    (cx_hi - cw // 2, cy_hi + th // 2 + ch + 5 * ss),
+                    cv2.FONT_HERSHEY_SIMPLEX, cname_scale,
+                    (120, 120, 120), thick, lineType=cv2.LINE_AA
                 )
+
+        # Downsample to working resolution — INTER_AREA is the correct
+        # (area-averaging) filter for downscaling and produces the grey
+        # edge ramps that read as anti-aliased.
+        full_pattern = cv2.resize(
+            full_hi, (img_w, img_h), interpolation=cv2.INTER_AREA
+        )
 
         # Calculate tile grid
         # Each tile shows content_w x content_h of unique pattern
