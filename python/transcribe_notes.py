@@ -29,6 +29,14 @@ Then run the script once on any short test audio file so it downloads and
 caches the model (default: "small", a good speed/accuracy balance for a
 laptop CPU). After that first run it never touches the network again.
 
+INTEL MAC NOTE: faster-whisper's native backend (ctranslate2) can segfault
+on Intel Macs due to a duplicate-OpenMP conflict with PyTorch/numpy. If you
+hit "exit code 139 / SIGSEGV", first try:
+    KMP_DUPLICATE_LIB_OK=TRUE python transcribe_notes.py ...
+If it still crashes, force the pure-PyTorch backend instead:
+    pip install openai-whisper --break-system-packages
+    python transcribe_notes.py --engine whisper ...
+
 EXPORTING VOICE MEMOS FROM YOUR IPHONE
 ---------------------------------------
 Voice Memos app -> select a memo -> Share -> Save to Files -> a folder you
@@ -67,8 +75,35 @@ DATE_IN_NAME = re.compile(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})")
 
 # ---------------------------------------------------------------- itinerary
 
+# Spreadsheet apps love to silently reformat a "date" column the moment you
+# open and save the file (ISO "2026-08-16" becomes "8/16/26", etc). Rather
+# than requiring ISO format, try a handful of common ones and normalize to
+# ISO internally so the lookup still works no matter how Excel/Numbers/
+# Google Sheets last mangled it.
+CSV_DATE_FORMATS = [
+    "%Y-%m-%d",   # 2026-08-16
+    "%m/%d/%y",   # 8/16/26
+    "%m/%d/%Y",   # 8/16/2026
+    "%d/%m/%Y",   # 16/08/2026
+    "%d-%m-%Y",   # 16-08-2026
+    "%d %b %Y",   # 16 Aug 2026
+    "%B %d, %Y",  # August 16, 2026
+]
+
+
+def parse_csv_date(s):
+    s = s.strip()
+    for fmt in CSV_DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
 def load_itinerary(path):
-    """date string (YYYY-MM-DD) -> dict(country, location, camp, note)"""
+    """date (any common format) -> dict(country, location, camp, note),
+    keyed internally by ISO date string."""
     lookup = {}
     if not path:
         return lookup
@@ -78,7 +113,12 @@ def load_itinerary(path):
         return lookup
     with open(p, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            lookup[row["date"]] = row
+            raw = row.get("date", "")
+            d = parse_csv_date(raw)
+            if d is None:
+                print(f"  (couldn't parse itinerary date '{raw}', skipping that row)")
+                continue
+            lookup[d.isoformat()] = row
     return lookup
 
 
@@ -104,36 +144,55 @@ def recording_date(path: Path):
 
 # ------------------------------------------------------------- transcription
 
-def get_transcriber(model_size: str):
+def get_transcriber(model_size: str, engine: str = "auto"):
     """Returns a function(path) -> text, backed by whichever local Whisper
-    implementation is installed. Tries faster-whisper first (lighter, faster
-    on CPU), falls back to openai-whisper."""
-    try:
-        from faster_whisper import WhisperModel
+    implementation is installed.
 
-        model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    engine: "auto" tries faster-whisper first, then openai-whisper.
+            "faster-whisper" or "whisper" forces that one specifically --
+            useful on Intel Macs, where faster-whisper's native backend
+            (ctranslate2) sometimes segfaults due to a duplicate-OpenMP
+            conflict with PyTorch/numpy. If that happens, either set
+            KMP_DUPLICATE_LIB_OK=TRUE before running, or pass
+            --engine whisper to use the pure-PyTorch implementation instead.
+    """
+    if engine in ("auto", "faster-whisper"):
+        try:
+            from faster_whisper import WhisperModel
 
-        def transcribe(path):
-            segments, _ = model.transcribe(str(path))
-            return " ".join(seg.text.strip() for seg in segments)
+            model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
-        print(f"  using faster-whisper (model: {model_size})")
-        return transcribe
-    except ImportError:
-        pass
+            def transcribe(path):
+                segments, _ = model.transcribe(str(path))
+                return " ".join(seg.text.strip() for seg in segments)
 
-    try:
-        import whisper
+            print(f"  using faster-whisper (model: {model_size})")
+            return transcribe
+        except ImportError:
+            if engine == "faster-whisper":
+                sys.exit(
+                    "faster-whisper is not installed. Run:\n"
+                    "    pip install faster-whisper --break-system-packages"
+                )
 
-        model = whisper.load_model(model_size)
+    if engine in ("auto", "whisper"):
+        try:
+            import whisper
 
-        def transcribe(path):
-            return model.transcribe(str(path))["text"].strip()
+            model = whisper.load_model(model_size)
 
-        print(f"  using openai-whisper (model: {model_size})")
-        return transcribe
-    except ImportError:
-        pass
+            def transcribe(path):
+                return model.transcribe(str(path))["text"].strip()
+
+            print(f"  using openai-whisper (model: {model_size})")
+            return transcribe
+        except ImportError:
+            if engine == "whisper":
+                sys.exit(
+                    "openai-whisper is not installed. Run:\n"
+                    "    pip install openai-whisper --break-system-packages\n"
+                    "(also needs ffmpeg: brew install ffmpeg)"
+                )
 
     sys.exit(
         "No local Whisper install found. Run:\n"
@@ -229,6 +288,10 @@ def main():
     ap.add_argument("--out", default="notes", help="output folder for markdown")
     ap.add_argument("--model", default="small",
                      help="Whisper model size: tiny, base, small, medium, large (default: small)")
+    ap.add_argument("--engine", default="auto", choices=["auto", "faster-whisper", "whisper"],
+                     help="Whisper backend to use. Default 'auto' tries faster-whisper then "
+                          "openai-whisper. On Intel Mac, if faster-whisper segfaults, pass "
+                          "'whisper' to force the pure-PyTorch implementation.")
     args = ap.parse_args()
 
     memos_dir = Path(args.memos)
@@ -251,7 +314,7 @@ def main():
         sys.exit(f"No audio files found in {memos_dir}")
 
     print(f"Found {len(audio_files)} voice memo(s). Loading Whisper model...")
-    transcribe = get_transcriber(args.model)
+    transcribe = get_transcriber(args.model, args.engine)
 
     recordings_by_date = defaultdict(list)
     for f in audio_files:
