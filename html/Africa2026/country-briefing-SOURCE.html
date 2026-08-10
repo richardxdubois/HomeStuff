@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Four Countries</title>
+<style>
+  :root{
+    --ink:#2a2621;
+    --soft:#5c5347;
+    --terra:#2f6f5f;
+    --terra-d:#245448;
+    --green:#37493c;
+    --gold:#c98a3c;
+    --cream:#fbf7ef;
+    --panel:#f4ecdd;
+    --rule:#d8cbb3;
+  }
+
+  @page {
+    size: Letter;
+    margin: 24mm 20mm 20mm 20mm;
+    @top-right{
+      content: string(chaptitle);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#9a8f7c;
+    }
+    @top-left{
+      content: "Safari 2026";
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#c3b79f;
+    }
+    @bottom-left{
+      content: "Four Countries · Rev 1.1 · 6 August 2026";
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 7pt; letter-spacing:.06em; color:#bcb2a0;
+    }
+    @bottom-center{
+      content: counter(page);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 9pt; color:#9a8f7c;
+    }
+  }
+  @page cover { margin:0; @top-right{content:none} @top-left{content:none} @bottom-center{content:none} @bottom-left{content:none} }
+  @page :first { @top-right{content:none} @top-left{content:none} }
+
+  html{ font-family:"Lora","GFS Baskerville",Georgia,serif; color:var(--ink); }
+  body{ margin:0; font-size:10.8pt; line-height:1.58; }
+
+  p{ orphans:3; widows:3; margin:0 0 .7em 0; text-align:justify; -webkit-hyphens:auto; hyphens:auto; }
+  p.first{ text-indent:0; }
+  p.run{ text-indent:1.3em; margin-top:-.3em; }
+
+  h1.chapter{
+    string-set: chaptitle content(text);
+    break-before: page;
+    font-size:25pt; font-weight:700; line-height:1.08;
+    color:var(--green); margin:0 0 .1em 0; letter-spacing:-.01em;
+  }
+  .kicker{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8.5pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--terra); margin:0 0 .35em 0; font-weight:700;
+  }
+  .chaprule{ height:2.2px; background:var(--terra); width:64px; margin:.15em 0 1.1em 0; border:0;}
+  h2{
+    font-size:13.5pt; color:var(--terra-d); font-weight:700;
+    margin:1.4em 0 .25em 0; letter-spacing:-.01em;
+  }
+  h3{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:9pt; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:1.2em 0 .3em 0;
+  }
+
+  /* drop cap on chapter openers */
+  p.lead::first-letter{
+    font-size:3.05em; line-height:.82; float:left;
+    padding:.05em .09em 0 0; color:var(--terra);
+    font-weight:700;
+  }
+  p.lead{ text-indent:0; }
+
+  .panel{
+    background:var(--panel);
+    border-left:3px solid var(--gold);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    break-inside:avoid;
+    font-size:10.2pt;
+  }
+  .panel .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--terra-d); font-weight:700; margin:0 0 .3em 0;
+  }
+  .panel p{ text-align:left; }
+  .panel p:last-child{ margin-bottom:0; }
+
+  .watch{
+    background:#eef2ec;
+    border-left:3px solid var(--green);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    break-inside:avoid;
+    font-size:10.1pt;
+  }
+  .watch .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:0 0 .35em 0;
+  }
+  .watch p{ text-align:left; margin-bottom:.45em; }
+  .watch p:last-child{ margin-bottom:0; }
+  .watch .grp{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:8.2pt;
+     letter-spacing:.1em; text-transform:uppercase; color:var(--terra-d); font-weight:700; }
+  .star{ color:var(--terra); font-weight:700; }
+
+  .camp{ break-inside:avoid; margin:0 0 .95em 0; }
+  .camphead{
+    font-family:"Carlito","DejaVu Sans",sans-serif; font-size:10pt; font-weight:700;
+    color:var(--green); border-bottom:1.5px solid var(--terra);
+    padding-bottom:.18em; margin:0 0 .3em 0;
+  }
+  .camphead .meta{ float:right; color:var(--terra-d); font-weight:700; letter-spacing:.05em; font-size:8.2pt; }
+  .camp p{ font-size:10pt; text-align:left; margin:0 0 .35em 0; }
+  .camp p:last-child{ margin-bottom:0; }
+  .heads{ color:var(--terra-d); font-weight:700; }
+
+  .askblock{ break-inside:avoid; margin:0 0 1.05em 0; }
+  .askhead{
+    font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; font-weight:700;
+    color:var(--green); border-bottom:1.5px solid var(--terra);
+    padding-bottom:.2em; margin:0 0 .35em 0;
+  }
+  .askhead .when{ float:right; color:var(--terra-d); font-weight:700; letter-spacing:.06em; font-size:8.5pt; }
+  .askblock ul{ margin:.25em 0 .3em 0; padding-left:1.05em; list-style:none; }
+  .askblock li{ margin:.2em 0; text-indent:-1.05em; padding-left:1.05em; font-size:9.9pt; }
+  .askblock li::before{ content:"\25A1"; color:var(--gold); font-size:9pt; padding-right:.5em; }
+  .askblock .ctx{ font-size:9.2pt; color:var(--soft); font-style:italic; margin:.1em 0 .3em 0; }
+
+  em.term{ font-style:italic; color:var(--green); }
+  .small{ font-size:9.4pt; color:var(--soft); }
+
+  table.mv.wide{ font-size:8.1pt; }
+  table.mv.wide th{ font-size:6.9pt; letter-spacing:.04em; padding:.3em .22em; }
+  table.mv.wide td{ padding:.28em .22em; }
+  table.mv{ width:100%; border-collapse:collapse; font-size:9.4pt; margin:.6em 0 .3em 0; break-inside:avoid;
+            font-family:"Carlito","DejaVu Sans",sans-serif;}
+  table.mv th{ text-align:left; border-bottom:1.5px solid var(--terra);
+     padding:.35em .5em; color:var(--terra-d); text-transform:uppercase; letter-spacing:.08em; font-size:7.8pt;}
+  table.mv td{ padding:.35em .5em; border-bottom:.6px solid var(--rule); vertical-align:top; }
+  table.mv tr.heavy td{ background:#f6ede0; }
+  .flag{ color:var(--terra-d); font-weight:700; }
+
+  ul.tight{ margin:.2em 0 .7em 0; padding-left:1.1em; }
+  ul.tight li{ margin:.12em 0; }
+
+  .quietrule{ border:0; border-top:1px solid var(--rule); margin:1.4em 0; }
+
+  /* ---- COVER ---- */
+  .cover{ page:cover; height:100vh; box-sizing:border-box;
+     background:
+       linear-gradient(180deg, #6d4523 0%, #8a481f 42%, #a85a2c 70%, #c98a3c 100%);
+     color:#fbf3e6; position:relative; overflow:hidden; }
+  .cover .sky{ position:absolute; inset:0; top:0; left:0; width:100%; height:100%; }
+  .cover .sun{ position:absolute; right:16%; top:20%; width:150px; height:150px;
+     border-radius:50%; background:radial-gradient(circle,#ffe6b8 0%,#ffcf85 55%,rgba(255,207,133,0) 72%); }
+  .cover .content{ position:absolute; left:0; right:0; bottom:0; padding:0 22mm 26mm 22mm; }
+  .cover .eyebrow{ font-family:"Carlito","DejaVu Sans",sans-serif; letter-spacing:.34em;
+     text-transform:uppercase; font-size:10pt; color:#f6dcb6; margin-bottom:.7em;}
+  .cover h1{ font-size:41pt; line-height:1.02; margin:0 0 .18em 0; font-weight:700; letter-spacing:-.015em;}
+  .cover .sub{ font-size:15pt; font-style:italic; color:#fbe6cf; margin:0 0 1.1em 0;}
+  .cover .meta{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; letter-spacing:.06em;
+     color:#f3dcbb; border-top:1px solid rgba(251,243,230,.35); padding-top:.8em; max-width:150mm;}
+  .cover .route{ font-size:10.5pt; }
+  .toc-note{ font-style:italic; color:var(--soft); }
+</style>
+    <style>
+      .lbl{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:15px; font-weight:700; fill:#2a2621; }
+      .dsc{ font-family:"Lora",Georgia,serif; font-style:italic; font-size:12.5px; fill:#5c5347; }
+      .cty{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:10px; letter-spacing:.14em; fill:#9a8f7c; }
+      .leg{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:11px; fill:#5c5347; }
+    </style>
+
+
+<style>
+  .cover{ background: linear-gradient(180deg,#16332c 0%,#1e4a3e 45%,#2f6f5f 78%,#4c9280 100%); }
+  .cover .sun{ display:none; }
+  table.mv td{ border-bottom:.6px solid var(--rule); }
+  table.mv tbody tr td:first-child{ color:var(--terra-d); }
+  table.mv.wide{ font-size:8.1pt; }
+  table.mv.wide th{ font-size:6.9pt; letter-spacing:.04em; padding:.3em .22em; }
+  table.mv.wide td{ padding:.28em .22em; }
+  table.mv.wide td .small{ font-size:7.2pt; }
+  ul.tight{ break-inside:avoid; }
+</style>
+
+</head><body>
+<!-- ================= COVER ================= -->
+<section class="cover">
+  <svg class="sky" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="#1e3d34" stroke-width="1.1" fill="none" opacity="0.5">
+      <path d="M120 250 L250 200 L390 260 L500 210 L640 270"/>
+      <path d="M120 250 L200 380 L250 200"/>
+      <path d="M250 200 L330 400 L390 260"/>
+      <path d="M390 260 L470 420 L500 210"/>
+      <path d="M500 210 L580 400 L640 270"/>
+      <path d="M200 380 L330 400 L470 420 L580 400"/>
+      <path d="M200 380 L260 560 L330 400"/>
+      <path d="M330 400 L400 600 L470 420"/>
+      <path d="M470 420 L540 580 L580 400"/>
+      <path d="M260 560 L400 600 L540 580"/>
+    </g>
+    <g fill="#1e3d34" opacity="0.75">
+      <circle cx="120" cy="250" r="5"/><circle cx="250" cy="200" r="7"/><circle cx="390" cy="260" r="6"/>
+      <circle cx="500" cy="210" r="7"/><circle cx="640" cy="270" r="5"/><circle cx="200" cy="380" r="6"/>
+      <circle cx="330" cy="400" r="8"/><circle cx="470" cy="420" r="7"/><circle cx="580" cy="400" r="6"/>
+      <circle cx="260" cy="560" r="6"/><circle cx="400" cy="600" r="7"/><circle cx="540" cy="580" r="5"/>
+    </g>
+  </svg>
+  <div class="content">
+    <div class="eyebrow">A Companion Volume &nbsp;&middot;&nbsp; August 2026</div>
+    <h1>Four Countries</h1>
+    <div class="sub">History, government, power and sensitivities</div>
+    <div class="meta">
+      <div class="route">Tanzania &nbsp;&middot;&nbsp; Kenya &nbsp;&middot;&nbsp; Zimbabwe &nbsp;&middot;&nbsp; Botswana</div>
+      <div style="margin-top:.5em;">Current as of late July 2026</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= INTRO ================= -->
+<h1 class="chapter">Before You Read This</h1>
+<p class="kicker">How this volume differs from the other one</p>
+<hr class="chaprule">
+
+<p class="lead">The field companion is about landscape, wildlife and deep history &mdash; the things that have been true for a thousand years and will be true next year. This volume is about the present, which is a different kind of writing. Three of these four countries have had significant political change in the last twenty months, and one of them changed its constitution three weeks ago. So this is written to be honest rather than promotional, and it will go out of date faster than anything else you carry.</p>
+
+<p>A word on what that honesty involves. Two of these countries are, on the assessment of independent monitors, less free than they were five years ago, and one of them held an election last October that was followed by the worst state violence in its modern history. None of that is likely to touch you as a visitor in a safari camp. But you asked what you should be sensitive to, and the truthful answer in several cases is: <strong>quite a lot, and mostly on behalf of the people serving you rather than yourselves.</strong></p>
+
+<p>Where a claim is contested I have said who is making it. Where a government disputes a characterisation, I have noted that too. Figures are the most recent I could verify in late July 2026 &mdash; check anything that matters before you fly.</p>
+
+<div class="panel">
+  <div class="h">The one rule that covers most of it</div>
+  <p>In three of these four countries, a candid political conversation carries more risk for the local person having it than for the foreigner starting it. Guides, drivers and camp staff can lose work or worse for opinions overheard by the wrong colleague. So the etiquette is simple: <strong>let them raise politics, never you.</strong> If they do, listen and ask open questions rather than offering views. If they don't, assume there's a reason. This isn't squeamishness &mdash; it's the difference between a conversation and a liability.</p>
+</div>
+
+<!-- ================= TANZANIA ================= -->
+<h1 class="chapter">Tanzania</h1>
+<p class="kicker">14&ndash;19 August &middot; United Republic of Tanzania</p>
+<hr class="chaprule">
+
+<table class="mv">
+  <tbody>
+    <tr><td style="width:32%"><strong>Population</strong></td><td>~68 million</td></tr>
+    <tr><td><strong>Capital</strong></td><td>Dodoma (Dar es Salaam is the commercial capital)</td></tr>
+    <tr><td><strong>Languages</strong></td><td>Swahili and English official; ~120 local languages</td></tr>
+    <tr><td><strong>Independent</strong></td><td>1961 (Tanganyika); union with Zanzibar 1964</td></tr>
+    <tr><td><strong>Government</strong></td><td>Unitary presidential republic; Zanzibar semi-autonomous</td></tr>
+    <tr><td><strong>Ruling party</strong></td><td>CCM &mdash; continuously in power since independence</td></tr>
+    <tr><td><strong>Currency</strong></td><td>Tanzanian shilling; USD widely accepted on safari</td></tr>
+  </tbody>
+</table>
+
+<h2>The history, in more depth</h2>
+<p>The coast has been part of the Indian Ocean world for two thousand years &mdash; Persian, Arab, Indian and later Portuguese traders working the monsoon winds, which is why Swahili is a Bantu language carrying a heavy freight of Arabic loanwords and why Zanzibar became an Omani sultanate. Inland, the story is quite different and mostly recent.</p>
+<p>Germany claimed the mainland in the 1880s. Its rule was brief and brutal: the <em class="term">Maji Maji</em> rebellion of 1905&ndash;07, in which fighters were told that ritual water would turn German bullets to liquid, ended in a scorched-earth famine campaign whose death toll is usually estimated in the hundreds of thousands. Germany lost the territory after the First World War, and Britain administered Tanganyika under a League of Nations mandate until independence in 1961.</p>
+<p>Then came <em class="term">Julius Nyerere</em> &mdash; <em>Mwalimu</em>, the teacher &mdash; and the most sincere socialist experiment in Africa. The 1967 Arusha Declaration launched <em class="term">ujamaa</em>: nationalised banks and industry, and <em>villagisation</em>, which moved millions of people into planned collective villages, often by force. Economically it failed; by the early 1980s Tanzania was dependent on aid and accepting IMF structural adjustment. Politically it achieved something rarer. Swahili as a genuine national language, a deliberate refusal to build politics on ethnicity, and a state that held together where neighbours fractured. Nyerere also stepped down voluntarily in 1985, which almost nobody in the region did.</p>
+<p>Multiparty politics returned in 1992. But CCM &mdash; Nyerere's party, renamed &mdash; has never lost an election, and that continuity is the single most important fact about Tanzanian politics.</p>
+
+<h2>The people</h2>
+<p>Around 120 ethnic groups, and &mdash; this is the structural fact that explains Tanzanian politics &mdash; <strong>none of them is dominant.</strong> The largest, the Sukuma, is perhaps a sixth of the population. No group is big enough to rule alone, which made Nyerere's non-ethnic nationalism both possible and necessary, and it is why Tanzania's political fault lines do not run along ethnic ones. The country's real cleavages are mainland versus Zanzibar, and now young people versus the state.</p>
+<p>On your route you'll encounter the <em class="term">Chagga</em> of the Kilimanjaro slopes &mdash; coffee farmers, historically the best-schooled community in the country and heavily represented in business and guiding; the <em class="term">Iraqw</em> of the Mbulu and Karatu highlands, whom you'll drive through between Manyara and the crater; the <em class="term">Maasai</em>, Nilotic pastoralists, in the Ngorongoro highlands; the <em class="term">Datooga</em>; and near Lake Eyasi, just west of the crater, the <em class="term">Hadza</em>, one of the last hunter-gatherer peoples in East Africa.</p>
+
+<div class="panel">
+  <div class="h">A linguistic curiosity on your first drive</div>
+  <p>Northern Tanzania is one of the very few places on earth where all four of the language families Joseph Greenberg proposed for Africa in 1963 are spoken within a short distance of one another. <strong>Niger-Congo</strong> (the Bantu languages, including Swahili) covers most of the country. <strong>Nilo-Saharan</strong> gives you Maasai and Datooga. <strong>Afro-Asiatic</strong> arrives as a Cushitic outlier in Iraqw, spoken in the highlands you'll cross on the 15th. And the Hadza near Lake Eyasi and the Sandawe further south speak <strong>click languages</strong> conventionally filed under Khoisan.</p>
+  <p>That last label deserves an asterisk you may enjoy. "Khoisan" is a term of convenience rather than a demonstrated family, and Hadza and Sandawe have never been shown to be related either to each other or to the click languages of the Kalahari &mdash; both are now generally treated as <em>isolates</em>. Nilo-Saharan is itself contested enough that linguists have called it Greenberg's waste bin. So the honest version is better than the tidy one: within a morning's drive you pass through two well-established families, one disputed one, and two languages that appear to be related to nothing else alive.</p>
+</div>
+
+<h2>How it is governed</h2>
+<p>A directly elected president, a National Assembly, and an unusual constitutional wrinkle: <strong>Zanzibar has its own president, House of Representatives and government</strong>, with authority over most island matters. The union is genuinely a union, and Zanzibari politics has its own grievances about the mainland's dominance. Constitutional reform has been promised for over a decade and repeatedly shelved.</p>
+
+<h2>Who is running the country now</h2>
+<p><strong>President Samia Suluhu Hassan</strong>, of CCM. Born in Zanzibar, she became vice-president in 2015 and succeeded to the presidency in March 2021 on the sudden death of John Magufuli &mdash; the country's first female president. Her early tenure was widely read as reformist: she reversed Magufuli's COVID denialism, lifted a ban on political rallies, and opened dialogue with the opposition.</p>
+<p>That reading did not survive the 2025 election. Ahead of the vote, <strong>the two largest opposition parties were barred from competing</strong> &mdash; Chadema was disqualified in April 2025 over an unsigned code-of-conduct document, days after its chairman <em class="term">Tundu Lissu</em> was arrested and charged with treason for demanding electoral reform; ACT-Wazalendo's candidate was disqualified on procedural grounds. The platform X was blocked nationally from June 2025.</p>
+
+<div class="panel">
+  <div class="h">The October 2025 election and what followed</div>
+  <p>The vote was held on 29 October 2025. Official results gave President Hassan <strong>97.66% against sixteen minor candidates</strong>, winning every constituency. She was sworn in on 3 November at a military base in Dodoma, at a ceremony closed to the public.</p>
+  <p>Protests began on polling day and were met with a six-day security crackdown under a nationwide internet blackout that made independent verification nearly impossible. Reported death tolls vary widely and none is settled: multiple international outlets reported hundreds killed, while Chadema has claimed it verified between one and two thousand. Amnesty International has reported allegations of extrajudicial killings in Mbeya and Mwanza and of mass graves; the government rejects these characterisations. Hundreds of people have since been charged with treason. The <em>Journal of Democracy</em> assessed that mainland Tanzania had not seen brutality on this scale since the German colonial period, and in January 2026 the advocacy group Index on Censorship named President Hassan its "Tyrant of the Year" for 2025.</p>
+  <p>The government's own emphasis is on its record: infrastructure delivery, mass electrification, and macroeconomic stability. Both things are true at once, and the tension between them is the story of Tanzania right now.</p>
+</div>
+
+<p>The economy has in fact held up: growth of about 5.9% in 2025, inflation around 3.3% in early 2026, strong gold exports, and none of the debt distress that has hit some neighbours. Protest energy came overwhelmingly from Tanzanians under thirty.</p>
+
+<h2>Where the power comes from</h2>
+<p>This is the most dramatic energy story of your four countries. Installed generating capacity has roughly doubled in two years, to about <strong>4.6 GW</strong>, almost entirely because of one project.</p>
+<p>The <strong>Julius Nyerere Hydropower Plant</strong> on the Rufiji River carries <strong>2,115 MW</strong> across nine 235 MW turbines. First power came in February 2024; all nine units were synchronised to the grid in March 2025; full commercial operation was expected around mid-2026. It cost roughly US$2.9 billion, and it is the largest power station in East Africa and the fourth largest hydro plant in Africa. The dam is 134 m high and its reservoir runs 100 km.</p>
+<p>You may know the site by its older name: <strong>Stiegler's Gorge</strong>. It carries the name of a German engineer who surveyed it in 1901 and who was killed there by an elephant in 1907. Tanzania has been considering a dam on the spot since the 1960s; Norwegian engineers drew up detailed designs in the 1970s, and the World Bank declined to fund it.</p>
+<p>Natural gas remains the country's firm, dispatchable power &mdash; Tanzania holds around 57 trillion cubic feet of reserves, produced at Songo Songo, Mnazi Bay and Kiliwani North. The stated target is 75% renewables in the generation mix by 2030, which requires roughly 360 MW of new renewable capacity every year and is not currently on pace. Geothermal exploration has begun at Ngozi in the Mbeya region.</p>
+<p>One reality check worth carrying: for all the megawatts, <strong>biomass &mdash; firewood and charcoal &mdash; still accounts for over 90% of Tanzania's primary energy consumption</strong>, with associated deforestation of around 100,000 hectares a year. Grid electricity and household energy are two very different stories.</p>
+
+<h2>Sensitivities</h2>
+<p><strong>Politics is genuinely dangerous ground here, and not for you.</strong> Critics have been abducted and detained; hundreds face treason charges; NGOs are under review. Do not raise the election, Tundu Lissu, or the crackdown. If a guide raises it, let him set the limits of the conversation and don't press for detail he may regret giving.</p>
+
+<div class="panel">
+  <div class="h">Ngorongoro and the Maasai &mdash; you should know this before you arrive</div>
+  <p>The field companion notes, admiringly, that Maasai cattle still graze the Ngorongoro rim alongside wildlife. That is true, and it is being actively dismantled &mdash; with tourism given as the reason.</p>
+  <p>The Conservation Area was created in 1959 as a deliberate compromise. The Maasai had been moved out of the Serengeti, and the NCA was established as a <em>multiple land use area</em> &mdash; a permanent homeland where people and wildlife would coexist, with the founding instrument stating that where the interests of game and inhabitants conflicted, the inhabitants' interests should take precedence. About 100,000 Maasai live there.</p>
+  <p>Since 2022 the government has pursued what it calls a voluntary relocation programme, moving residents some 600 km to Msomera in Handeni District &mdash; a different climate, ecology and culture. Human Rights Watch, the Oakland Institute and UN human rights experts dispute the word "voluntary," documenting the systematic withdrawal of services as the mechanism: Endulen hospital, serving 60,000 people, downgraded to a clinic with emergency and ambulance services discontinued and government medical staff withdrawn; grazing restricted; crop growing banned. In Loliondo in June 2022, 1,500 km&sup2; of village land was demarcated as the Pololeti Game Reserve, and security forces used live ammunition, injuring around thirty people and displacing thousands.</p>
+  <p>In August 2024 more than 50,000 Maasai blockaded the Ngorongoro&ndash;Serengeti road for six days, which did force the restoration of delisted villages and voter registrations. Two presidential commissions were appointed in December 2025; <strong>they reported to the President on 12 March 2026 and endorsed the government's plans</strong>, recommending further restrictions extending toward Lake Natron. The reports have not been published. Maasai organisations, the Oakland Institute and Survival International rejected them; UN experts called for transparency in April 2026. The government's position is that relocation is voluntary and conservation-driven, and officials have linked the programme to a target of 1.2 million annual tourists.</p>
+  <p><strong>What this means practically.</strong> Your Maasai guides at the crater rim may have family directly affected, and people who speak publicly have faced intimidation. Ask about Maasai life, cattle, and the meaning of the crater by all means &mdash; but don't ask anyone to comment on the relocations, and don't volunteer your own verdict. You are a participant in the industry being cited as the justification. That is worth sitting with quietly rather than resolving out loud.</p>
+</div>
+
+<p><strong>Other practical sensitivities.</strong> Homosexuality is illegal, with severe penalties. Do not photograph police, military, government buildings or airports. Single-use plastic bags are banned &mdash; don't bring any. Internet restrictions and platform blocks have happened and could recur.</p>
+
+<!-- ================= KENYA ================= -->
+<h1 class="chapter">Kenya</h1>
+<p class="kicker">13, 19&ndash;24 August &middot; Republic of Kenya</p>
+<hr class="chaprule">
+
+<table class="mv">
+  <tbody>
+    <tr><td style="width:32%"><strong>Population</strong></td><td>~56 million</td></tr>
+    <tr><td><strong>Capital</strong></td><td>Nairobi</td></tr>
+    <tr><td><strong>Languages</strong></td><td>English and Swahili official; ~40 local languages</td></tr>
+    <tr><td><strong>Independent</strong></td><td>1963</td></tr>
+    <tr><td><strong>Government</strong></td><td>Presidential republic; 47 devolved counties; bicameral</td></tr>
+    <tr><td><strong>Next election</strong></td><td>2027</td></tr>
+    <tr><td><strong>Currency</strong></td><td>Kenyan shilling; USD widely accepted on safari</td></tr>
+  </tbody>
+</table>
+
+<h2>The history, in more depth</h2>
+<p>Kenya was the settler colony, and that distinction explains most of what followed. The railway from Mombasa to Lake Victoria &mdash; built largely with indentured Indian labour, which is why Kenya has a long-established South Asian community &mdash; opened the fertile highlands, and the colonial government alienated them for European farmers. Kikuyu and Maasai land was taken; Africans were confined to reserves and required to carry passes.</p>
+<p>The reckoning was the <em class="term">Mau Mau</em> uprising of the 1950s. Britain declared a State of Emergency in 1952 and ran a detention and "villagisation" system through which more than a million Kenyans passed; abuses in the camps were severe enough that in 2013 the British government expressed regret and paid compensation to surviving claimants. The insurgency was militarily defeated and politically decisive: independence came in 1963 under <em class="term">Jomo Kenyatta</em>.</p>
+<p>Then a long single-party period &mdash; KANU, with Daniel arap Moi ruling from 1978 to 2002 &mdash; multiparty politics restored under pressure in 1991, and Moi's peaceful exit in 2002. The darkest modern moment came after the disputed 2007 election: roughly 1,100 people killed and 600,000 displaced in ethnically organised violence, ended by internationally mediated power-sharing. That crisis produced the country's finest achievement, the <strong>2010 constitution</strong>, which devolved real money and power to 47 new counties, created a Senate, and strengthened the courts. Kenyan judges have since annulled a presidential election &mdash; in 2017, a first in Africa.</p>
+
+<h2>The people</h2>
+<p>Around forty ethnic groups &mdash; and unlike Tanzania, <strong>Kenyan politics is substantially organised around them.</strong> Approximate shares: <em class="term">Kikuyu</em> about a sixth, in the Mount Kenya highlands; <em class="term">Luhya</em> in the west; <em class="term">Kalenjin</em> in the Rift Valley; <em class="term">Luo</em> around the lake in Nyanza; <em class="term">Kamba</em> east of Nairobi; then Somali in the north-east, Kisii, the Mijikenda on the coast, and the Maasai at perhaps two percent.</p>
+<p>Knowing that makes the news legible. Ruto is Kalenjin, as Moi was. His impeached deputy Gachagua is Kikuyu, and losing him cost Ruto the Mount Kenya bloc that had supplied nearly half his 2022 vote &mdash; which is precisely why he brought Raila Odinga's ODM into government. Raila was Luo, which is why his death is felt most keenly in Nyanza. The 2007&ndash;08 violence was organised along these lines.</p>
+<p>And it is why the Gen Z protests unsettled the political class as much as they did: they were explicitly <em>cross</em>-ethnic, a grievance about class and corruption rather than about which community holds the presidency &mdash; a form of politics Kenya's machinery has no established way to absorb. Your guides in the Mara are Maasai.</p>
+
+<h2>Who is running the country now</h2>
+<p><strong>President William Ruto</strong>, of UDA, in office since September 2022. He campaigned as the "hustler" against "dynasties," which makes his current difficulties ironic.</p>
+<p><strong>Deputy President Kithure Kindiki</strong>, a former law professor and interior minister, since November 2024 &mdash; his predecessor <em>Rigathi Gachagua</em> was impeached in October 2024 and has since been organising opposition against Ruto.</p>
+<p>And the largest recent change: <strong>Raila Odinga died in October 2025.</strong> Five times a presidential candidate, detained for years under Moi, prime minister in the 2008 power-sharing government, and the central figure in Kenyan opposition politics for a generation. In March 2025 he had signed a ten-point memorandum bringing his ODM party into Ruto's "broad-based government" &mdash; a pact critics nicknamed the "bread-based government," and one that badly damaged his standing among the young protesters. His brother <em>Oburu Oginga</em> now leads ODM, which has been demanding the deputy presidency and set a mid-2026 deadline to decide whether to back Ruto in 2027 or field its own candidate. Kenyan politics between now and 2027 turns largely on how that splits.</p>
+
+<div class="panel">
+  <div class="h">The Gen Z protests</div>
+  <p>In June 2024, opposition to a finance bill became the largest youth-led protest movement in Kenya's history, culminating in demonstrators breaching Parliament. Protests recurred through mid-2025. The Kenya National Commission on Human Rights recorded 61 deaths; Amnesty International Kenya has documented at least 89 enforced disappearances; other tallies put deaths at around ninety over two years. Abductions of online critics were widely reported, and the government denies involvement.</p>
+  <p>What makes it unusual is the character of it: leaderless, organised online, explicitly cross-ethnic in a country where protest has historically followed ethnic lines, and aimed at a class grievance rather than a tribal one. The economy is not the obvious culprit &mdash; growth is above 5%, inflation under 4%, the shilling stable, default avoided. The complaint is that none of it reaches anyone. In 2026 Ruto launched a state framework to compensate victims of protest violence dating back to 2017.</p>
+</div>
+
+<h2>Where the power comes from</h2>
+<p>This is the good news story, and it connects directly to the landscape you're driving through. <strong>Kenya generates around 90% of its electricity from renewables, and the backbone is geothermal.</strong></p>
+<p>The <strong>Olkaria</strong> complex in the Rift Valley is among the largest geothermal developments in the world, drawing heat from about two kilometres down through wells spread over hundreds of square kilometres. The resource exists because Kenya sits on the same continental rift you'll be looking at from the Ngorongoro highlands and Lake Manyara &mdash; the East African Rift's geothermal potential is estimated at 20,000 MW overall, with about 7,000 MW in Kenya alone. The practical advantage is availability: Olkaria runs at roughly 95%, whereas Kenya's hydro plants have dropped below 60% as droughts have bitten. Hydro's share of the mix has fallen from 53% in 2004 to about 20% in 2024.</p>
+<p>Kenya also hosts <strong>Lake Turkana Wind Power</strong>, 310 MW and the largest wind farm on the African continent, in a natural wind corridor funnelling air off the Indian Ocean. Electricity access has risen from roughly 15% of the population in the early 2000s to over 76% in 2024, and Vision 2030 targets 100% renewable electricity.</p>
+<p><strong>So the thread is worth noticing:</strong> the rift that made the crater, the soda lakes and the flamingo chemistry is also what keeps the lights on in Nairobi.</p>
+
+<h2>Sensitivities</h2>
+<p><strong>Raila Odinga's death is recent and felt.</strong> For many Kenyans, particularly in Nyanza and among the Luo, it is a genuine bereavement of a man who spent years in detention for the constitution they now have. Treat it as you would any recent national loss.</p>
+<p><strong>Police conduct is the live grievance.</strong> Don't photograph police or security forces. Protests can flare quickly in central Nairobi &mdash; you'll be at airport hotels, so exposure is minimal, but don't go sightseeing into a demonstration.</p>
+<p><strong>Ethnicity.</strong> Kenyans discuss their own ethnic politics openly and unsentimentally. Visitors doing the same lands very differently. Ask, don't assert.</p>
+<p>Homosexuality is illegal. Don't photograph State House, military installations or the airport perimeter. Plastic bags are banned, with real penalties.</p>
+
+<!-- ================= ZIMBABWE ================= -->
+<h1 class="chapter">Zimbabwe</h1>
+<p class="kicker">24&ndash;26 August &middot; Republic of Zimbabwe</p>
+<hr class="chaprule">
+
+<table class="mv">
+  <tbody>
+    <tr><td style="width:32%"><strong>Population</strong></td><td>~16 million</td></tr>
+    <tr><td><strong>Capital</strong></td><td>Harare</td></tr>
+    <tr><td><strong>Languages</strong></td><td><strong>Sixteen</strong> official languages, incl. English, Shona, Ndebele</td></tr>
+    <tr><td><strong>Independent</strong></td><td>1980</td></tr>
+    <tr><td><strong>Government</strong></td><td>Presidential republic &mdash; substantially amended July 2026</td></tr>
+    <tr><td><strong>Ruling party</strong></td><td>ZANU-PF, continuously since 1980</td></tr>
+    <tr><td><strong>Currency</strong></td><td>ZiG (Zimbabwe Gold); <strong>USD in practice</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>The history, in more depth</h2>
+<p>Zimbabwe has the deepest pre-colonial monument of your four countries and the most contested modern history. <em class="term">Great Zimbabwe</em> &mdash; the mortarless granite city of the ancestral Shona, at its height between the 11th and 15th centuries, rich on cattle and on gold traded to the Swahili coast and beyond &mdash; gave the country its name. Colonial authorities spent decades insisting Africans could not have built it.</p>
+<p>Cecil Rhodes's British South Africa Company took the territory in the 1890s and named it after himself. White-minority Southern Rhodesia declared independence unilaterally in 1965 under Ian Smith rather than accept majority rule, triggering the liberation war &mdash; the <em class="term">Second Chimurenga</em> &mdash; fought by ZANU and ZAPU. The Lancaster House agreement ended it, and Zimbabwe became independent in April 1980 under <em class="term">Robert Mugabe</em>.</p>
+<p>Then, almost immediately, the episode that remains the most sensitive subject in the country. Between 1983 and 1987 the North Korean-trained Fifth Brigade conducted operations in Matabeleland and the Midlands against a supposed dissident threat. Known as <em class="term">Gukurahundi</em> &mdash; roughly, "the early rain that washes away the chaff" &mdash; the campaign killed an estimated 20,000 people, overwhelmingly Ndebele civilians. It has never been fully accounted for. Emmerson Mnangagwa was minister of state security at the time.</p>
+<p>The rest is better known: fast-track land reform from 2000, the collapse of agricultural output and of the economy, hyperinflation that by 2008 required hundred-trillion-dollar notes, and in November 2017 a military intervention that removed Mugabe after 37 years and installed Mnangagwa promising a "new dispensation" that was "open for business."</p>
+
+<h2>The people</h2>
+<p><em class="term">Shona</em> speakers are roughly four-fifths of the population, divided into regional groupings &mdash; Zezuru, Karanga, Manyika, Ndau, Korekore &mdash; that matter internally more than outsiders realise. <em class="term">Ndebele</em> are around a sixth, concentrated in Matabeleland around Bulawayo, and descend from Mzilikazi's followers, who broke away from Shaka's Zulu kingdom and migrated north in the 1830s. Then the Tonga along the Zambezi, and the Kalanga, Venda, Shangaan and Nambya. The 2013 constitution's recognition of <strong>sixteen official languages</strong> is a deliberate acknowledgement of all this.</p>
+<p><strong>This is what makes Gukurahundi legible.</strong> ZANU had drawn its support from Shona areas and ZAPU from Ndebele ones; when the Fifth Brigade was sent into Matabeleland in 1983, it was operating against a region and a people, not merely a rival faction. That is why the wound is ethnic as well as political, and why it has never closed. Mugabe was Zezuru; Mnangagwa is Karanga, and his rise was in part a Karanga ascendancy within the party.</p>
+<p>Victoria Falls sits in the north-west, historically Nambya and Tonga country, though as a tourism town its staff come from everywhere &mdash; and a good many Zimbabweans working in your Botswana camps are there because of the economy at home.</p>
+
+<h2>Who is running the country &mdash; and what just changed</h2>
+<p><strong>President Emmerson Mnangagwa</strong>, 83, of ZANU-PF, in power since November 2017, elected 2018 and re-elected in a disputed 2023 vote.</p>
+
+<div class="panel">
+  <div class="h">CAB3 &mdash; signed into law three weeks before you arrive</div>
+  <p>The <em>Constitution of Zimbabwe Amendment (No. 3) Bill</em>, universally called <strong>CAB3</strong>, passed both houses in June 2026 and <strong>was signed into law on 7 July 2026</strong>. It does two things of consequence. It extends presidential and parliamentary terms from five years to seven, deferring the next general election from 2028 to 2030 and extending Mnangagwa's tenure by two years. And it <strong>replaces direct popular election of the president with election by Parliament</strong>.</p>
+  <p>The immediate casualty is <strong>Vice-President Constantino Chiwenga</strong>, the retired general who led the 2017 intervention and who was widely understood &mdash; including within the security establishment &mdash; to be the agreed successor in 2028. He has moved from private dissent to open criticism. Mnangagwa has meanwhile reshuffled the security apparatus: the army chief was demoted to sports minister in March 2025, Chiwenga's wife was reassigned out of military intelligence in March 2026, the president's son Sean has been promoted, and a former defence forces commander was brought onto the ZANU-PF politburo in May 2026.</p>
+  <p>Liberation war veterans, historically ZANU-PF's base, have been among the fiercest opponents, casting the extension as a betrayal of the reasons they backed Mugabe's removal; a group of them has challenged CAB3 at the Constitutional Court. The International Crisis Group assesses the power struggle at the top of ZANU-PF as the biggest near-term threat to Zimbabwe's stability. Parliamentary public hearings on the bill were reported to be hostile and at times unsafe for critics.</p>
+  <p>None of this should touch Victoria Falls, which is a tourism enclave a long way from Harare. But it is the live subject in the country, and it is raw.</p>
+</div>
+
+<h2>Money, which you will notice</h2>
+<p>Inflation peaked around 243% in 2023 &mdash; among the highest rates in the world. In April 2024 the central bank introduced the <strong>ZiG</strong>, notionally gold-backed; it lost most of its value within eight months, and new banknotes were issued in April 2026 in another attempt to build confidence. In practice, <strong>the US dollar is the working currency</strong> for anything you'll do. Your booklet's warning is worth repeating: bills printed after 2016, in good condition, and no one-dollar notes. Carry small denominations for tips and crafts.</p>
+
+<h2>Where the power comes from</h2>
+<p>Two things, one of which you'll see. <strong>Kariba South supplies roughly 45% of Zimbabwe's annual electricity generation</strong> &mdash; the dam on the Zambezi, shared with Zambia and jointly managed through the Zambezi River Authority. It is the same river you'll cruise on and fly over. The remainder is largely coal, principally at Hwange.</p>
+<p>The vulnerability is obvious and was demonstrated brutally in 2024, when El Ni&ntilde;o drought dropped Kariba's water to the point that generation collapsed and load shedding became severe. Things have improved markedly since &mdash; the utility recently marked <strong>188 consecutive days without nationwide load shedding</strong>, and is developing up to 500 MW of solar across roughly ten 50 MW sites. But the grid remains fragile: on <strong>6 July 2026 a fault on a single 330 kV transmission line caused a nationwide blackout</strong>, the day before CAB3 was signed. Expect your hotel to have generators, and don't be surprised by a flicker.</p>
+
+<h2>Sensitivities</h2>
+<p><strong>Gukurahundi is the one subject to leave entirely alone.</strong> It is unresolved, it implicates the sitting president, and for Ndebele Zimbabweans it is a living wound rather than history. Do not raise it, even sympathetically.</p>
+<p><strong>Politics generally, and CAB3 particularly.</strong> Very raw, very current.</p>
+<p><strong>Photography rules are enforced more strictly here than elsewhere.</strong> No government buildings, no military or police, no State House. If a presidential motorcade passes, pull over and put the camera down &mdash; this is a legal requirement and people have been arrested for less.</p>
+<p>Economic hardship is acute and dignity around it matters; don't joke about the currency. Homosexuality is illegal. And note your booklet's point that re-entering Zimbabwe after a night in any country except Zambia needs a fresh visa &mdash; your Zambia day trip is fine.</p>
+
+<!-- ================= BOTSWANA ================= -->
+<h1 class="chapter">Botswana</h1>
+<p class="kicker">26 August &ndash; 3 September &middot; Republic of Botswana</p>
+<hr class="chaprule">
+
+<table class="mv">
+  <tbody>
+    <tr><td style="width:32%"><strong>Population</strong></td><td>~2.5 million, in a country the size of France</td></tr>
+    <tr><td><strong>Capital</strong></td><td>Gaborone</td></tr>
+    <tr><td><strong>Languages</strong></td><td>English official; Setswana national</td></tr>
+    <tr><td><strong>Independent</strong></td><td>1966</td></tr>
+    <tr><td><strong>Government</strong></td><td>Parliamentary republic &mdash; <strong>president elected by Parliament</strong></td></tr>
+    <tr><td><strong>In power</strong></td><td>UDC since November 2024 &mdash; the first change of party ever</td></tr>
+    <tr><td><strong>Currency</strong></td><td>Pula (the word means <em>rain</em>)</td></tr>
+  </tbody>
+</table>
+
+<h2>The history, in more depth</h2>
+<p>The founding act of Botswana was a diplomatic one. In 1895, three Tswana chiefs &mdash; Khama III, Bathoen and Sebele &mdash; travelled to London to petition against their territory being absorbed into Cecil Rhodes's British South Africa Company. They succeeded. The Bechuanaland Protectorate remained under direct British administration, which meant almost no investment but also no settler land seizure and no Rhodes. That distinction shaped everything.</p>
+<p>Independence came in 1966 to one of the poorest countries on earth: a few miles of paved road, a couple of dozen university graduates, and cattle. Diamonds were found at Orapa the following year. What happened next is genuinely unusual, and the reason Botswana is studied. Under <em class="term">Seretse Khama</em> &mdash; heir to the Ngwato chieftaincy, whose marriage to an Englishwoman, Ruth Williams, had caused an imperial scandal and years of enforced exile &mdash; the country negotiated hard with De Beers, banked the proceeds rather than spending them, invested in schools and clinics, kept the army small and the courts independent, and held an election every five years without interruption. It became for decades one of the fastest-growing economies in the world.</p>
+<p>The complication is that growth has been unequal. Botswana is prosperous and also among the world's most unequal countries, and the diamond wealth never generated many jobs.</p>
+
+<h2>The people</h2>
+<p>Tswana-speaking peoples are about four-fifths of the population, organised historically into <strong>eight principal <em>merafe</em></strong>, or chiefdoms: Bangwato, Bakwena, Bangwaketse, Bakgatla, Batawana, Bamalete, Barolong and Batlokwa. Seretse Khama was heir to the Bangwato. Then substantial minorities: the <em class="term">Bakalanga</em> of the north-east, perhaps a tenth of the country; the delta peoples &mdash; <em class="term">Bayei</em>, Hambukushu, Basubiya; the <em class="term">Baherero</em>, whose ancestors fled across the desert from the German genocide in South West Africa after 1904; and the <em class="term">San</em>, or Basarwa, the Kalahari's oldest inhabitants, at around three percent.</p>
+<p>For decades only the eight Tswana <em>merafe</em> held seats in the House of Chiefs, which minorities reasonably read as a hierarchy written into the constitution; that has since been partially reformed. It is the quiet qualification to Botswana's reputation for consensus.</p>
+<p>Two threads run straight into your itinerary. The <strong>Bayei</strong> you'll meet at Khumaga and through the delta are the river specialists &mdash; they came south from the Zambezi region and are generally credited with introducing the <em>mokoro</em> to the Okavango, which is why your poler's expertise is inherited rather than learned. And it was the <strong>Batawana</strong> who proclaimed Moremi in 1963, making it, as the field companion notes, arguably the first game reserve in Africa created by Africans rather than a colonial government.</p>
+
+<h2>How it is governed &mdash; a genuine contrast</h2>
+<p>Botswana is a <strong>parliamentary</strong> republic: voters elect the 61-member National Assembly, and <strong>the Assembly elects the president</strong>. There is no direct presidential ballot. Worth noting given the previous chapter &mdash; it is broadly the system Zimbabwe has just adopted, for entirely different reasons and with entirely different effect.</p>
+<p>Alongside it runs the <em class="term">kgotla</em>: the traditional assembly, held under a tree, presided over by the chief, in which anyone present may speak and be heard. It is a functioning institution, not folklore, and it is routinely credited as part of why Botswana's democracy held. The current government has been reviving consultative forms &mdash; a Budget <em>Pitso</em>, a restored All-Party Conference.</p>
+
+<h2>Who is running the country now</h2>
+<div class="panel">
+  <div class="h">The thing most visitors don't know</div>
+  <p>On 30 October 2024, Botswana did something it had never done: <strong>it voted out the party that had governed since independence.</strong> The Botswana Democratic Party, in power for 58 years, was reduced to <strong>four seats out of 61</strong>. The Umbrella for Democratic Change took 36; the Botswana Congress Party became the main opposition with 15.</p>
+  <p>President Mokgweetsi Masisi conceded within two days, pledged a smooth handover, and attended his successor's inauguration, where the crowd booed him and the incoming president asked them to "give him some love." Botswana thereby passed what political scientists call the two-turnover test &mdash; the point at which a democracy is considered consolidated. It is, quietly, one of the more impressive things to have happened in Africa this decade.</p>
+</div>
+
+<p><strong>President Duma Boko</strong>, sworn in on 1 November 2024. Born in 1969 in the village of Mahalapye, the son of a schoolteacher; read law at the University of Botswana and took a master's at Harvard; a human rights lawyer by profession and a social democrat by conviction. He has led the Botswana National Front since 2010 and built the UDC coalition in 2012, and he lost as its candidate in 2014 and 2019 before winning in 2024.</p>
+<p>He inherited a hard hand. Diamonds are still 80&ndash;90% of exports, and the market slumped: growth fell to about 1% in 2024 from 5.5% in 2022, unemployment sits near 28%, poverty near 38%, and foreign reserves and public investment funds were substantially depleted. In <strong>August 2025 he declared a nationwide public health emergency</strong> over shortages of medicines and supplies, attributed to budget shortfalls and reduced US aid. His programme &mdash; a minimum wage, a raised old-age pension, 450,000 jobs, universal health coverage, and diversification into solar, IT, and medicinal cannabis and hemp &mdash; is ambitious against that backdrop.</p>
+<p>Two details you may enjoy. Botswana launched its first satellite, <strong>BOTSAT-1</strong>, from SpaceX facilities in California in March 2025. And in 2024 a 2,492-carat diamond came out of the ground here &mdash; the largest found anywhere in over a century.</p>
+
+<h2>Where the power comes from</h2>
+<p>Coal, overwhelmingly, on top of some 212 billion tonnes of reserves &mdash; but the picture is changing fast enough that the numbers are worth having.</p>
+<p>Two stations at Palapye do the work: <strong>Morupule B (600 MW)</strong> and <strong>Morupule A (132 MW)</strong>. Morupule B, Chinese-built and commissioned in 2012&ndash;13, arrived with defects the utility itself describes as having rendered the plant not fit for purpose; remedial works began in 2019 and run to 2027. The consequence was chronic import dependence &mdash; at its worst, imports were over 90% of supply, and in 2024 Botswana spent more than 1.7 billion pula buying power, mostly from South Africa's Eskom.</p>
+<p>That is now turning. In the first quarter of 2026, domestic generation rose <strong>72.8% year on year</strong> while imports fell <strong>61.8%</strong>. Morupule supplied 90.8% of local generation &mdash; and <strong>solar supplied 9.1%</strong>, from plants at Bobonong, Phakalane, Mmadinare and <em>Shakawe</em>, which is up in the Okavango panhandle not far from where you'll be. Some 104 MW of grid-connected solar is now operating, with a 100 MW plant at Jwaneng due to begin commercial production this month.</p>
+<p>The resource is exceptional: over 3,200 hours of sunshine a year and direct normal irradiation around 3,000 kWh/m&sup2;. Botswana's emissions are about 0.02% of the global total, at 2.27 tonnes per person against a world average of 4.47.</p>
+
+<h2>Sensitivities</h2>
+<div class="panel">
+  <div class="h">Elephants &mdash; the easiest way to give offence</div>
+  <p>Botswana holds the largest elephant population on earth, on the order of 130,000, and what outsiders read as a triumph many rural Batswana experience as a crisis. Crop raiding can destroy a family's year in a night; people are killed. The previous government lifted a hunting ban in 2019, and in 2024 offered to send 20,000 elephants to Germany when Berlin floated restrictions on trophy imports &mdash; a piece of theatre with a serious argument underneath it about who bears the cost of conservation.</p>
+  <p>You will meet people on both sides, and the divide is not simply moral. Rural communities living with elephants often support culling or hunting revenue; urban and foreign opinion often doesn't. <strong>Ask what it's like to farm next to them before you say what you think about shooting them.</strong> This is the single subject on which a well-meaning visitor is most likely to cause real irritation.</p>
+</div>
+<p><strong>The San, or Basarwa,</strong> and their removal from the Central Kalahari Game Reserve remain contested and painful. Boko's government made an early gesture, allowing a Basarwa family to bury a relative in ancestral land inside the reserve after the previous administration refused.</p>
+<p><strong>HIV</strong> devastated Botswana &mdash; prevalence was among the world's highest &mdash; and the national response is one of the great public health achievements anywhere, Botswana being among the first African countries to hit the UNAIDS 95-95-95 targets. That is the frame if it comes up.</p>
+<p><strong>One welcome difference:</strong> Botswana decriminalised same-sex relations in 2019, upheld on appeal in 2021 &mdash; the only one of your four countries where this is so. As elsewhere, don't photograph government or military facilities; and don't be glib about diamonds, since the whole national project rests on them and the market is currently against them.</p>
+
+<!-- ================= WATER & CONNECTIVITY ================= -->
+<h1 class="chapter">Water and Connectivity</h1>
+<p class="kicker">Two measures that tell you a lot quickly</p>
+<hr class="chaprule">
+
+<p class="lead">Both of these turn out to be more revealing than GDP. Water access separates countries that have infrastructure from countries that have plans, and it exposes the urban&ndash;rural gap more brutally than any other statistic. Connectivity does something similar and adds a demographic dimension &mdash; and in one case here it has changed so fast in twelve months that the number would have been wrong a year ago.</p>
+
+<h2>Water: what the metric actually means</h2>
+<p>Be careful with headline figures, because there are three different tiers and they give wildly different answers. <strong>"Improved source"</strong> just means the water comes from a protected well, borehole or pipe. <strong>"At least basic"</strong> adds that collection takes under thirty minutes round trip. <strong>"Safely managed"</strong> is the strict one: on the premises, available when needed, and free from contamination. A country can look respectable on the first and dreadful on the third.</p>
+
+<table class="mv">
+  <thead><tr><th style="width:22%">Country</th><th style="width:20%">Safely managed</th><th style="width:58%">The texture behind the number</th></tr></thead>
+  <tbody>
+    <tr class="heavy"><td>Tanzania</td><td><strong>11.3%</strong></td><td>Around 58 million people without &mdash; among the five worst-served countries in the world. Water ranks second among problems Tanzanians want government to fix.</td></tr>
+    <tr><td>Zimbabwe</td><td><strong>26.5%</strong></td><td>A stark divide: about 97% of urban households reach an improved source against 68% rural; Harare 96.6%, Matabeleland South 64.8%. Only around a quarter of surveyed localities have piped water &mdash; among the lowest in Africa. Urban shortages are chronic.</td></tr>
+    <tr><td>Kenya</td><td>not verified</td><td>Better than both above &mdash; outside the world's worst twenty-five &mdash; but Nairobi rations, and the forest catchments are the worry (see below).</td></tr>
+    <tr><td>Botswana</td><td>not verified</td><td>Formal access is high &mdash; roughly 96% reach safe drinking water, up from 77% in 1996 &mdash; but supply is chronically interrupted, which is a different problem. See the panel.</td></tr>
+  </tbody>
+</table>
+<p class="small">Sub-Saharan Africa overall: about 68% have at least basic water service, but only 53% in rural areas. Across 38 African countries surveyed in 2026, <strong>57% of households had run short of clean water in the previous year</strong>, a quarter of them "many times or always."</p>
+
+<p><strong>Kenya's particular vulnerability is upstream.</strong> The Mau Forest Complex is the country's largest water tower and feeds catchments responsible for something like 41% of Kenya's hydropower; on current trends it could be severely depleted by the 2050s, and the Cherangany Hills possibly by the mid-2040s. Deforestation of the catchments is therefore not just an environmental story but the same story as the electricity supply &mdash; which is part of why the shift from hydro to geothermal has been so consequential.</p>
+
+<div class="panel">
+  <div class="h">Botswana's paradox &mdash; and a local sting in it</div>
+  <p>Botswana contains one of the largest and most celebrated wetlands on earth and is chronically short of water. The two facts are unrelated, which is the point. The Okavango is <em>endorheic</em>: 96&ndash;98% of its water evaporates or is transpired away, it has no outlet to anywhere useful, and it sits more than 900 km from the capital. As a national water resource it is worth almost nothing.</p>
+  <p>So Gaborone lives on dams and pipelines. Rainfall there runs about 416 mm a year against evaporation approaching 2,000 mm &mdash; nearly five times as much water leaves as arrives &mdash; which cripples both groundwater recharge and surface storage. Nine dams do not meet demand. The <em>North&ndash;South Carrier</em>, begun in the 1990s, pipes water roughly 360 km from Letsibogo and Dikgatlhong dams in the north-east down to the capital, and Botswana buys more from Molatedi Dam in South Africa. In the 2015&ndash;16 drought the Gaborone dam fell below 20% and the city rationed to alternate days; in early 2025 it stood at 36%, which counts as reassuring.</p>
+  <p><strong>And a detail that lands close to home for you.</strong> The <em>Boteti sub-district</em> &mdash; where Leroo La Tau sits and where Khumaga village is &mdash; is identified by the World Bank as a drought hotspot, and the reason is the geology you'll be admiring. High evaporation and salt-rich soils leave much of the local groundwater <strong>saline</strong>. The same vanished lake that makes the Makgadikgadi spectacular is what makes the water underneath it undrinkable, and villages at the end of the supply network can receive nothing at all. If the Khumaga visit prompts one question beyond the elephants, that's the one.</p>
+</div>
+
+<h2>What this means for your taps</h2>
+<p>Practically: <strong>don't drink the tap water anywhere on this trip.</strong> Camps and lodges provide filtered or bottled water and will refill your bottles; your booklet's advice to bring reusable ones is right, and single-use plastic is banned in Kenya and Tanzania anyway. Use bottled or filtered water for teeth-brushing in the cities, avoid ice you can't vouch for, and remember that "the hotel is fine" is usually true and occasionally not. The camps have a strong commercial interest in not making you ill; town restaurants are a slightly different proposition.</p>
+
+<h2>Connectivity</h2>
+<p>All figures below are for late 2025, from GSMA and Ookla data compiled by DataReportal. The last column is not a typo.</p>
+
+<table class="mv wide">
+  <thead><tr><th>Country</th><th>Internet users</th><th>Penetration</th><th>Median fixed download</th><th>12-month change</th><th>Mobile connections</th><th>Social media</th><th>Median age</th></tr></thead>
+  <tbody>
+    <tr><td>Tanzania</td><td>20.6 m</td><td>29.1%</td><td>19.5 Mbps</td><td>+5%</td><td>125% of pop.</td><td>11.2%</td><td><strong>17.5</strong></td></tr>
+    <tr><td>Kenya</td><td>23.4 m</td><td>40.5%</td><td>15.4 Mbps</td><td>+33%</td><td>134% of pop.</td><td>31.8%</td><td>20.0</td></tr>
+    <tr><td>Zimbabwe</td><td>6.5 m</td><td>38.4%</td><td>37.7 Mbps</td><td>+73%</td><td>95% of pop.</td><td>15.3%</td><td>18.1</td></tr>
+    <tr class="heavy"><td>Botswana</td><td>2.1 m</td><td><strong>81.4%</strong></td><td>33.7 Mbps</td><td><span class="flag">+295%</span></td><td>164% of pop.</td><td>54.4%</td><td>23.4</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Botswana is a different country on this measure.</strong> Eighty-one percent online against twenty-nine in Tanzania, more than one and a half mobile connections per person, and a fixed download speed that nearly quadrupled in a single year. That +295% is almost certainly satellite arriving at scale &mdash; which is the same story as the WiFi you'll find in the camps, and worth remembering when you're deep in the Delta with no cellular signal and fast internet at dinner.</p>
+
+<p><strong>Kenya has the slowest fixed broadband of the four, which sounds wrong for the region's technology capital.</strong> It isn't. Kenya's digital economy is <em>mobile</em>-first to an extreme degree &mdash; this is the country that invented M-Pesa in 2007 &mdash; so fixed lines were largely skipped. Its 31.8% social media penetration, double Zimbabwe's and triple Tanzania's, is the number that reflects actual digital life there.</p>
+
+<p><strong>Zimbabwe's 37.7 Mbps is the fastest here</strong>, and up 73% in a year, which sits oddly beside an economy in crisis. Part of it is the legacy of an education system that was once the region's best; part is satellite. High data costs remain the binding constraint on getting more people online.</p>
+
+<div class="panel">
+  <div class="h">Tanzania's real bottleneck &mdash; and the demographic column</div>
+  <p>Tanzania's regulator reported something clarifying in early 2026: <strong>4G now reaches 94.3% of the population, while smartphone ownership stands at 42.5%.</strong> Coverage has essentially been solved; the constraint has moved to devices, and handset affordability is a much harder problem for a regulator than tower-building. The same report noted 111.9 million mobile subscriptions, 5G reaching a third of the population, and &mdash; a genuinely striking figure &mdash; 81 million active mobile money accounts. Of Tanzania's 17,690 Gbps of international bandwidth capacity, only about 16% is in use.</p>
+  <p>Now look at the last column of the table again. <strong>Half of Tanzania is under 17.5 years old.</strong> Kenya's median is 20, Zimbabwe's 18. These are the youngest populations you will ever travel among, and it reframes the politics in this volume: the youth-led protest movements in Tanzania and Kenya are not a fringe demographic making noise. They are the median voter, arriving. Botswana's median of 23.4 &mdash; older, richer, better connected &mdash; is part of why its 2024 transfer of power went through the ballot box rather than the street.</p>
+</div>
+
+<!-- ================= SCHOOLING ================= -->
+<h1 class="chapter">Schooling and Literacy</h1>
+<p class="kicker">Where the four diverge most sharply</p>
+<hr class="chaprule">
+
+<p class="lead">On the headline numbers these four countries look almost identical &mdash; adult literacy clustered between 84 and 88 percent, all comfortably above the sub-Saharan average of roughly two-thirds and all below the global figure of around 88. Which is precisely why the percentages are the least interesting thing here. The real differences are structural, and in two cases something significant is happening right now.</p>
+
+<div class="panel">
+  <div class="h">Why you should distrust literacy rankings</div>
+  <p>Zimbabwe's claim to the highest literacy rate in Africa is a durable point of national pride and does not survive checking. UNESCO put it at 83.6% in 2011; the national statistics agency has claimed 97%, but that figure counted anyone who had attended school to Grade 3, which is not the same as being able to read; cabinet ministers have variously asserted 90% and 92%. Africa Check has examined the claim more than once and found it unsupported &mdash; several African countries score higher.</p>
+  <p>The problem is definitional. Does literacy mean reading a whole sentence, or part of one? Does having reached secondary school count as proof? The surveys differ, and so do their dates &mdash; the most-cited Botswana figure is from 2013, while its neighbours' are from 2022. One aggregator site I checked while compiling this listed Botswana at 36.75%, which is simply wrong by around fifty points. <strong>Treat the numbers as indicating a band, not a ranking.</strong></p>
+</div>
+
+<table class="mv wide">
+  <thead><tr><th>Country</th><th>Adult literacy</th><th>Structure</th><th>Terminal exam</th><th>Language of instruction</th></tr></thead>
+  <tbody>
+    <tr><td>Zimbabwe</td><td>88.2% <span class="small">(2022)</span></td><td>7 + 4 + 2</td><td>ZIMSEC O- and A-level</td><td>English throughout, plus a compulsory indigenous language</td></tr>
+    <tr><td>Botswana</td><td>86.1% <span class="small">(2013)</span></td><td>7 + 3 + 2</td><td>BGCSE (Cambridge-linked)</td><td>Setswana early, English thereafter</td></tr>
+    <tr><td>Kenya</td><td>85.6% <span class="small">(2022)</span></td><td><strong>2 + 6 + 3 + 3</strong> <span class="small">(new)</span></td><td>KJSEA, then KCSE</td><td>English, Kiswahili as a subject</td></tr>
+    <tr><td>Tanzania</td><td>84.3% <span class="small">(2022)</span></td><td><strong>1 + 6 + 4 + 2/3</strong> <span class="small">(new)</span></td><td>NECTA O- and A-level</td><td><span class="flag">Swahili, then English &mdash; abruptly</span></td></tr>
+  </tbody>
+</table>
+
+<h2>Tanzania: the language cliff</h2>
+<p>This is the single most consequential education fact of the four, and it explains a great deal about the country. <strong>Primary school is taught in Swahili. Secondary school switches to English.</strong> The policy dates from 1984 and the transition happens at Form 1, around age fourteen, more or less overnight.</p>
+<p>For many children it is the <em>second</em> such cliff. With around 126 languages in the country, a great many pupils arrive at Standard 1 speaking neither Swahili nor English at home, learn in Swahili for seven years, then are expected to study mathematics and science in a language they have only ever had as a school subject. Human Rights Watch has photographed "Speak English" signs in secondary schools and documented pupils being punished for using Swahili in class; research on university students recalling the policy found reports of stigmatised mother tongues, corporal punishment, and learning "little English &mdash; or any other subject."</p>
+<p>The learning data is sobering even before the switch. A 2023 survey of 285 schools across ten regions found <strong>only four in ten pupils aged 10&ndash;14 could read and understand a simple sentence in Swahili</strong>, with more than half unable to read individual words &mdash; and teachers systematically unaware of the gap, Grade 2 teachers estimating 53% of their pupils were at grade level against an actual 20%. The same study found a third of observed classrooms had pupils present and no teacher. Fee-free basic education, introduced in 2015, pushed enrolment above 93% of primary-age children; rural classes of 100 or more are the consequence.</p>
+<p>A new Education and Training Policy began phasing in from January 2024, restructuring to <strong>1+6+4+2/3</strong> with a vocational stream from Form 1 and dual certification; full implementation is expected by 2027. Notably, Tanzanian history and ethics are to be taught in Swahili "to foster patriotic and responsible citizens."</p>
+
+<h2>Kenya: the largest transition since independence, happening now</h2>
+<p>Kenya has just replaced the exam-driven <strong>8-4-4</strong> system that every adult Kenyan grew up under with a <strong>Competency-Based Curriculum</strong> on a <strong>2-6-3-3-3</strong> structure &mdash; two years pre-primary, six primary, three junior secondary, three senior secondary, three-plus tertiary. It was launched in 2017 with that year's Grade 1 intake, and <strong>in January 2026 the pioneer cohort reached Grade 10 &mdash; over 1.2 million learners moving into senior secondary at once, described as the largest education transition in Kenya's post-independence history.</strong> It is happening as you travel.</p>
+<p>The design is a deliberate turn away from rote learning: continuous portfolio assessment rather than one decisive exam, seven named core competencies, and three senior pathways &mdash; STEM, Social Sciences, and Arts and Sports Science, the last giving musical and athletic talent a formal academic route it never had. It also aligns Kenya with its neighbours; it had been the only East African Community country with eight years of primary.</p>
+<p>The strain is in delivery rather than design: teacher retraining, textbook supply, portfolio paperwork for classes of fifty to eighty, and a lab-building programme racing the cohort. Parents who navigated 8-4-4 are widely bewildered. The government has rebranded it Competency-Based <em>Education</em> to signal that curriculum alone was never the whole job.</p>
+
+<h2>Zimbabwe: built the best system on the continent, then lost the teachers</h2>
+<p>In 1980 Mugabe declared education a basic human right, and the expansion that followed was genuine and fast &mdash; UNICEF has described the result as once the most developed education system in Africa, with primary completion around 85%. Thirteen years of schooling, a Cambridge-derived structure under ZIMSEC, and until 2002 O- and A-levels were set jointly with Cambridge itself.</p>
+<p>Then the economy took it apart. GDP fell about 40% between 2000 and 2008 and social spending more than halved. <strong>UNICEF reported that 94% of rural schools closed in 2009 and attendance collapsed from over 80% to 20%.</strong> More than 35,000 teachers had left the country by that year, mostly for Botswana, South Africa and the United Kingdom, and the outflow never stopped &mdash; the teachers' union reports hundreds leaving monthly on salaries of US$200&ndash;350, against a reported shortfall of 50,000 teachers. Some of the Zimbabweans working in your Botswana camps will be qualified teachers.</p>
+<p>And yet the residue of that early investment is visible in a way you'll notice: <strong>Zimbabwean English is exceptional.</strong> American universities routinely waive the TOEFL requirement for Zimbabwean applicants holding a decent O-level English grade. A <em>Heritage-Based Curriculum</em>, launched in 2024, is an explicit attempt to decolonise content &mdash; part of a wider southern African movement that Botswana, Lesotho and Namibia are also pursuing. Meanwhile a two-tier system persists: elite private schools sit Cambridge exams paid for in foreign currency; everyone else sits ZIMSEC.</p>
+
+<h2>Botswana: diamonds into schools</h2>
+<p>Botswana's education story is the same story as its politics &mdash; mineral revenue converted, deliberately and unusually, into public goods. For decades it devoted among the highest shares of national income to education of any country in the world, building from a base in 1966 of a few dozen university graduates. The structure runs seven years of primary, three of junior secondary and two of senior, ending in the <strong>BGCSE</strong>, which retains a Cambridge lineage &mdash; and which is why the guide-training courses mentioned earlier ask for a Form 5 certificate as their entry requirement.</p>
+<p>The results show in the surrounding numbers rather than the literacy rate: it is not a coincidence that Botswana is also the country in this volume with 81% internet penetration, the oldest median age, and the first peaceful transfer of power. The pressure now is fiscal. With diamond revenue down sharply and reserves depleted, the sector that was funded out of abundance has to be defended out of scarcity, and school fees &mdash; abolished at independence, reintroduced in 2006 &mdash; remain contested.</p>
+
+<!-- ================= COURTESIES ================= -->
+<h1 class="chapter">Courtesies That Travel</h1>
+<p class="kicker">Things that work in all four</p>
+<hr class="chaprule">
+
+<p class="lead">Almost everything that will make a difference to how you're received is small, and most of it is about greeting people properly. Southern and East African social life front-loads the greeting in a way that Anglo-American life does not, and skipping it to get to the question is the most common unforced error visitors make.</p>
+
+<h2>Greeting</h2>
+<p><strong>Greet before you ask.</strong> Always, even of a stranger you need directions from, even in a shop. Launching straight into a request reads as brusque at best.</p>
+<p>In Swahili &mdash; Tanzania and Kenya: <em>jambo</em> or the more adult <em>habari?</em> ("news?"), answered <em>nzuri</em> ("good"). <em>Asante sana</em> for thank you. <em>Karibu</em> for welcome. To an elder, <em>shikamoo</em>, answered <em>marahaba</em> &mdash; using it will delight people.</p>
+<p>In Setswana &mdash; Botswana: <em>dumela mma</em> to a woman, <em>dumela rra</em> to a man, then <em>o tsogile jang?</em> ("how did you wake?"), answered <em>ke tsogile sentle</em>. <em>Ke a leboga</em> for thank you.</p>
+<p>In Shona &mdash; Zimbabwe: <em>mangwanani</em> (morning), <em>masikati</em> (afternoon), <em>manheru</em> (evening); <em>maita basa</em> for thank you.</p>
+<p><strong>The handshake matters too.</strong> Across southern Africa, supporting your right forearm with your left hand as you shake is a mark of respect, and there is often a three-part grip &mdash; palm, thumb-lock, palm. Follow the other person's lead; the exchange is unhurried. Use the right hand for giving and receiving.</p>
+
+<h2>Photography</h2>
+<p>Ask before photographing any person, every time, and accept no gracefully. Never photograph police, soldiers, government buildings, airports, border posts or presidential motorcades in any of the four. Turn off geotagging when photographing rhino &mdash; poaching networks have mined location metadata, and rhino coordinates are treated as sensitive by conservation bodies.</p>
+
+<h2>Money and giving</h2>
+<p>Hard bargaining is normal in tourist markets in Arusha or Victoria Falls; it is not appropriate when buying directly from the woman who wove the basket in a village. Don't hand sweets, pens or cash to children &mdash; it encourages begging and pulls them out of school. Give to a school or clinic through the camp instead.</p>
+
+<h2>Ethnicity</h2>
+<p>The sections in this volume on who lives where are there so that what you read and hear makes sense &mdash; not as a taxonomy for sorting the people you meet. Two rules follow from that.</p>
+<p><strong>Never guess, and don't ask outright.</strong> Kenyans and Zimbabweans use the word "tribe" freely about themselves, but a visitor deploying it lands differently, and "so which tribe are you?" is a poor opening. "Where are you from?" gets you the same information when someone wants to give it, and people very often do &mdash; guides will tell you what they are and what that means within the first hour if they feel like it.</p>
+<p><strong>And never generalise from the person in front of you to their community, or the reverse.</strong> Especially not about politics. In Kenya that reads as taking sides in an argument you have no stake in; in Zimbabwe it can be genuinely unsafe.</p>
+
+<h2>Conversation</h2>
+<p>Safe and welcome: family, cattle, football, wildlife, food, where you're from, what you do. Guides are generally delighted by specific curiosity about their own expertise.</p>
+<p>Leave alone unless they raise it: politics anywhere; the 2025 election in Tanzania; Gukurahundi in Zimbabwe; the Ngorongoro relocations; ethnic politics in Kenya; elephant culling in Botswana until you've heard them out. Homosexuality is illegal in three of the four, which is a reason for discretion about the subject in public rather than a reason to endorse the laws.</p>
+
+<hr class="quietrule">
+<p class="small">Compiled late July 2026 from current reporting. Political situations in three of these four countries are actively moving; verify anything time-sensitive before departure. Where accounts are contested I have named the source rather than adjudicating.</p>
+
+
+<!-- ============ COLOPHON ============ -->
+<h1 class="chapter">Colophon</h1>
+<p class="kicker">Revision, date, and what changed</p>
+<hr class="chaprule">
+
+<div class="panel">
+  <div class="h">This copy</div>
+  <p><strong>Four Countries</strong> &mdash; history, government, power and sensitivities<br>
+  <strong>Revision 1.1</strong> &middot; 6 August 2026</p>
+  <p class="small">The revision and date also run along the foot of every page, so a printed
+  copy can be identified without opening it.</p>
+</div>
+
+<h2>What changed in this revision</h2>
+<ul class="tight"><li><strong>Cover artwork now renders.</strong> A CSS sizing bug meant the node diagram had never appeared in any previous copy.</li><li>No changes to the country entries.</li></ul>
+
+<h2>Earlier revisions</h2>
+<p class="small">Not recorded. This log begins at Revision 1.1.</p>
+
+<div style="break-inside:avoid;">
+<h2>The set</h2>
+<p>Four volumes, meant to be carried together and to be of the same generation. If the
+revisions below don't match the ones on the volumes in your hand, something is out of date.</p>
+<table class="mv"><thead><tr><th style="width:44%">Volume</th><th style="width:31%">Covers</th><th style="width:25%">This generation</th></tr></thead><tbody><tr><td>The Rift &amp; the Delta</td><td>field companion</td><td><strong>Rev 6</strong></td></tr><tr><td>Who&rsquo;s Who</td><td>species</td><td><strong>Rev 1.1</strong></td></tr><tr><td>Four Countries</td><td>country briefing</td><td><strong>Rev 1.1</strong></td></tr><tr><td>Photography Notes</td><td>kit</td><td><strong>Rev 2</strong></td></tr></tbody></table>
+</div>
+
+<h2>Shelf life</h2>
+<p>This is the most perishable volume in the set. The political material is current as of late July 2026 &mdash; successions, coalitions and protest movements move faster than the rest of the briefing does. Treat anything about who holds office, or what happens next, as needing a check before departure.</p>
+
+</body></html>

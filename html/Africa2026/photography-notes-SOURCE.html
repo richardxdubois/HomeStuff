@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Photography Notes — Kit, Settings, Technique and Workflow</title>
+<style>
+  :root{
+    --ink:#2a2621;
+    --soft:#5c5347;
+    --terra:#a85a2c;
+    --terra-d:#8a481f;
+    --green:#37493c;
+    --gold:#c98a3c;
+    --cream:#fbf7ef;
+    --panel:#f4ecdd;
+    --rule:#d8cbb3;
+  }
+
+  @page {
+    size: Letter;
+    margin: 24mm 20mm 20mm 20mm;
+    @top-right{
+      content: string(chaptitle);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#9a8f7c;
+    }
+    @top-left{
+      content: "Photography Notes";
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#c3b79f;
+    }
+    @bottom-left{
+      content: "Photography Notes · Rev 2 · 6 August 2026";
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 7pt; letter-spacing:.06em; color:#bcb2a0;
+    }
+    @bottom-center{
+      content: counter(page);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 9pt; color:#9a8f7c;
+    }
+  }
+  @page cover { margin:0; @top-right{content:none} @top-left{content:none} @bottom-center{content:none} @bottom-left{content:none} }
+  @page :first { @top-right{content:none} @top-left{content:none} }
+
+  html{ font-family:"Lora","GFS Baskerville",Georgia,serif; color:var(--ink); }
+  body{ margin:0; font-size:10.8pt; line-height:1.58; }
+
+  p{ orphans:3; widows:3; margin:0 0 .7em 0; text-align:justify; -webkit-hyphens:auto; hyphens:auto; }
+  p.first{ text-indent:0; }
+  p.run{ text-indent:1.3em; margin-top:-.3em; }
+
+  h1.chapter{
+    string-set: chaptitle content(text);
+    break-before: page;
+    font-size:25pt; font-weight:700; line-height:1.08;
+    color:var(--green); margin:0 0 .1em 0; letter-spacing:-.01em;
+  }
+  .kicker{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8.5pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--terra); margin:0 0 .35em 0; font-weight:700;
+  }
+  .chaprule{ height:2.2px; background:var(--terra); width:64px; margin:.15em 0 1.1em 0; border:0;}
+  h2{
+    font-size:13.5pt; color:var(--terra-d); font-weight:700;
+    margin:1.4em 0 .25em 0; letter-spacing:-.01em;
+  }
+  h3{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:9pt; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:1.2em 0 .3em 0;
+  }
+
+  /* drop cap on chapter openers */
+  p.lead::first-letter{
+    font-size:3.05em; line-height:.82; float:left;
+    padding:.05em .09em 0 0; color:var(--terra);
+    font-weight:700;
+  }
+  p.lead{ text-indent:0; }
+
+  .panel{
+    background:var(--panel);
+    border-left:3px solid var(--gold);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    break-inside:avoid;
+    font-size:10.2pt;
+  }
+  .panel .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--terra-d); font-weight:700; margin:0 0 .3em 0;
+  }
+  .panel p{ text-align:left; }
+  .panel p:last-child{ margin-bottom:0; }
+
+  .watch{
+    background:#eef2ec;
+    border-left:3px solid var(--green);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    break-inside:avoid;
+    font-size:10.1pt;
+  }
+  .watch .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:0 0 .35em 0;
+  }
+  .watch p{ text-align:left; margin-bottom:.45em; }
+  .watch p:last-child{ margin-bottom:0; }
+  .watch .grp{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:8.2pt;
+     letter-spacing:.1em; text-transform:uppercase; color:var(--terra-d); font-weight:700; }
+  .star{ color:var(--terra); font-weight:700; }
+
+  .reflex{ break-inside:avoid; margin:.8em 0 1.2em 0; padding:1em 1.1em;
+     background:#faf4e8; border:1.5px solid var(--gold); border-radius:3px; }
+  .reflex .h{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:8.5pt; letter-spacing:.18em;
+     text-transform:uppercase; color:var(--terra-d); font-weight:700; margin:0 0 .6em 0; }
+  .reflex p{ font-size:11.2pt; line-height:1.75; margin:0 0 .32em 0; text-align:left; }
+  .reflex p:last-child{ margin-bottom:0; }
+  .reflex .k{ color:var(--terra-d); font-weight:700; }
+  .camp{ break-inside:avoid; margin:0 0 .95em 0; }
+  .camphead{
+    font-family:"Carlito","DejaVu Sans",sans-serif; font-size:10pt; font-weight:700;
+    color:var(--green); border-bottom:1.5px solid var(--terra);
+    padding-bottom:.18em; margin:0 0 .3em 0;
+  }
+  .camphead .meta{ float:right; color:var(--terra-d); font-weight:700; letter-spacing:.05em; font-size:8.2pt; }
+  .camp p{ font-size:10pt; text-align:left; margin:0 0 .35em 0; }
+  .camp p:last-child{ margin-bottom:0; }
+  .heads{ color:var(--terra-d); font-weight:700; }
+
+  .askblock{ break-inside:avoid; margin:0 0 1.05em 0; }
+  .askhead{
+    font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; font-weight:700;
+    color:var(--green); border-bottom:1.5px solid var(--terra);
+    padding-bottom:.2em; margin:0 0 .35em 0;
+  }
+  .askhead .when{ float:right; color:var(--terra-d); font-weight:700; letter-spacing:.06em; font-size:8.5pt; }
+  .askblock ul{ margin:.25em 0 .3em 0; padding-left:1.05em; list-style:none; }
+  .askblock li{ margin:.2em 0; text-indent:-1.05em; padding-left:1.05em; font-size:9.9pt; }
+  .askblock li::before{ content:"\25A1"; color:var(--gold); font-size:9pt; padding-right:.5em; }
+  .askblock .ctx{ font-size:9.2pt; color:var(--soft); font-style:italic; margin:.1em 0 .3em 0; }
+
+  em.term{ font-style:italic; color:var(--green); }
+  .small{ font-size:9.4pt; color:var(--soft); }
+
+  table.mv.wide{ font-size:8.1pt; }
+  table.mv.wide th{ font-size:6.9pt; letter-spacing:.04em; padding:.3em .22em; }
+  table.mv.wide td{ padding:.28em .22em; }
+  table.mv{ width:100%; border-collapse:collapse; font-size:9.4pt; margin:.6em 0 .3em 0; break-inside:avoid;
+            font-family:"Carlito","DejaVu Sans",sans-serif;}
+  table.mv th{ text-align:left; border-bottom:1.5px solid var(--terra);
+     padding:.35em .5em; color:var(--terra-d); text-transform:uppercase; letter-spacing:.08em; font-size:7.8pt;}
+  table.mv td{ padding:.35em .5em; border-bottom:.6px solid var(--rule); vertical-align:top; }
+  table.mv tr.heavy td{ background:#f6ede0; }
+  .flag{ color:var(--terra-d); font-weight:700; }
+
+  ul.tight{ margin:.2em 0 .7em 0; padding-left:1.1em; break-inside:avoid; }
+  ul.tight li{ margin:.12em 0; }
+
+  .quietrule{ border:0; border-top:1px solid var(--rule); margin:1.4em 0; }
+
+  /* ---- COVER ---- */
+  .cover{ page:cover; height:100vh; box-sizing:border-box;
+     background:
+       linear-gradient(180deg, #6d4523 0%, #8a481f 42%, #a85a2c 70%, #c98a3c 100%);
+     color:#fbf3e6; position:relative; overflow:hidden; }
+  .cover .sky{ position:absolute; inset:0; top:0; left:0; width:100%; height:100%; }
+  .cover .sun{ position:absolute; right:16%; top:20%; width:150px; height:150px;
+     border-radius:50%; background:radial-gradient(circle,#ffe6b8 0%,#ffcf85 55%,rgba(255,207,133,0) 72%); }
+  .cover .content{ position:absolute; left:0; right:0; bottom:0; padding:0 22mm 26mm 22mm; }
+  .cover .eyebrow{ font-family:"Carlito","DejaVu Sans",sans-serif; letter-spacing:.34em;
+     text-transform:uppercase; font-size:10pt; color:#f6dcb6; margin-bottom:.7em;}
+  .cover h1{ font-size:41pt; line-height:1.02; margin:0 0 .18em 0; font-weight:700; letter-spacing:-.015em;}
+  .cover .sub{ font-size:15pt; font-style:italic; color:#fbe6cf; margin:0 0 1.1em 0;}
+  .cover .meta{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; letter-spacing:.06em;
+     color:#f3dcbb; border-top:1px solid rgba(251,243,230,.35); padding-top:.8em; max-width:150mm;}
+  .cover .route{ font-size:10.5pt; }
+  .toc-note{ font-style:italic; color:var(--soft); }
+
+  /* ---- volume-specific: the dusk cover ---- */
+  .cover{ background: linear-gradient(180deg,#12172b 0%,#232c4c 44%,#3f4d70 74%,#6d7b9b 100%); }
+  .cover .sun{ right:14%; top:16%; width:118px; height:118px;
+     background:radial-gradient(circle,#f4e6c4 0%,#d9c48f 50%,rgba(217,196,143,0) 72%); }
+
+  /* ---- inline literals: album and folder names ---- */
+  code{ font-family:"DejaVu Sans Mono",monospace; font-size:.86em;
+     background:#f2ede4; padding:.08em .32em; border-radius:2px; color:#4a3b2a; }
+
+  /* ---- model-specific blocks: revise these when the kit changes ---- */
+  .spec{ background:#eef1f6; border-left:3px solid #4f5f80;
+     padding:.85em 1em .6em 1em; margin:1.1em 0; border-radius:2px;
+     break-inside:avoid; font-size:10.2pt; }
+  .spec .h{ font-family:"Carlito","DejaVu Sans",sans-serif;
+     font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+     color:#3b4a68; font-weight:700; margin:0 0 .3em 0; }
+  .spec p{ text-align:left; }
+  .spec p:last-child{ margin-bottom:0; }
+  .spec .h .tag{ float:right; letter-spacing:.08em; color:#7a8398; font-weight:700; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <svg class="sky" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <!-- stars: dense high, thinning toward the horizon -->
+    <g fill="#eef3fb">
+      <circle cx="78" cy="64" r="1.7" opacity=".9"/><circle cx="164" cy="118" r="1.1" opacity=".6"/>
+      <circle cx="236" cy="52" r="2.1" opacity=".95"/><circle cx="318" cy="104" r="1.3" opacity=".7"/>
+      <circle cx="404" cy="58" r="1.7" opacity=".85"/><circle cx="126" cy="176" r="1.5" opacity=".75"/>
+      <circle cx="286" cy="188" r="1.2" opacity=".6"/><circle cx="462" cy="140" r="1.9" opacity=".9"/>
+      <circle cx="548" cy="76" r="1.4" opacity=".7"/><circle cx="612" cy="128" r="1.1" opacity=".55"/>
+      <circle cx="700" cy="58" r="1.8" opacity=".85"/><circle cx="758" cy="126" r="1.3" opacity=".65"/>
+      <circle cx="52" cy="238" r="1.3" opacity=".6"/><circle cx="196" cy="262" r="1.6" opacity=".7"/>
+      <circle cx="352" cy="242" r="1.1" opacity=".5"/><circle cx="496" cy="276" r="1.4" opacity=".6"/>
+      <circle cx="646" cy="252" r="1.2" opacity=".5"/><circle cx="762" cy="298" r="1.5" opacity=".6"/>
+      <circle cx="108" cy="330" r="1.2" opacity=".45"/><circle cx="268" cy="352" r="1.0" opacity=".4"/>
+      <circle cx="428" cy="322" r="1.3" opacity=".5"/><circle cx="590" cy="366" r="1.0" opacity=".38"/>
+      <circle cx="716" cy="340" r="1.2" opacity=".45"/><circle cx="176" cy="424" r="1.0" opacity=".3"/>
+      <circle cx="380" cy="438" r="1.1" opacity=".32"/><circle cx="556" cy="452" r="0.9" opacity=".26"/>
+    </g>
+    <!-- the same acacia as the field companion, moved clear of the title -->
+    <g fill="#0a0d18" opacity="0.95" transform="translate(370,-115)">
+      <path d="M32 640 C 58 636, 80 632, 96 628 C 110 617, 130 610, 152 608 C 178 605, 202 610, 220 619 C 244 623, 268 630, 290 639 C 266 636, 242 635, 220 637 C 204 641, 182 644, 158 644 C 136 644, 116 641, 100 638 C 78 638, 54 638, 32 640 Z"/>
+      <path d="M150 690 C 138 668, 118 646, 94 628 C 108 650, 126 672, 144 694 Z"/>
+      <path d="M166 690 C 180 667, 202 645, 228 628 C 210 650, 190 672, 172 694 Z"/>
+      <path d="M144 772 C 147 730, 150 700, 152 672 C 153 660, 156 650, 158 634 C 160 650, 163 660, 164 672 C 166 700, 169 732, 172 772 Z"/>
+    </g>
+    <!-- a tripod, aimed at the sky -->
+    <g stroke="#0a0d18" stroke-width="4.5" fill="none" opacity="0.95" stroke-linecap="round">
+      <path d="M702 572 L680 648"/><path d="M702 572 L724 648"/><path d="M702 572 L702 652"/>
+    </g>
+    <g fill="#0a0d18" opacity="0.95">
+      <rect x="690" y="540" width="24" height="36" rx="3"/>
+    </g>
+    <!-- ground -->
+    <path d="M0 636 Q400 604 800 648 L800 1000 L0 1000 Z" fill="#070911" opacity="0.55"/>
+  </svg>
+  <div class="sun"></div>
+  <div class="content">
+    <div class="eyebrow">The Kit Volume &nbsp;&middot;&nbsp; First written August 2026</div>
+    <h1>Photography Notes</h1>
+    <div class="sub">Kit, settings, technique and workflow</div>
+    <div class="meta">
+      <div class="route">Canon SX70 HS &nbsp;&middot;&nbsp; Canon SX740 HS &nbsp;&middot;&nbsp; iPhone 14 Pro &nbsp;&middot;&nbsp; Apple Watch &nbsp;&middot;&nbsp; two iPads</div>
+      <div style="margin-top:.5em;">Written for a safari &mdash; built to outlast it</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW TO USE THIS ============ -->
+<h1 class="chapter">How to Use This</h1>
+<p class="kicker">And what lives in the other volume</p>
+<hr class="chaprule">
+
+<p class="lead">This is the half of the photography material that does not change when the destination does. Your cameras, their particular vices, the habits that get the best out of them, and the workflow that gets the files home &mdash; none of that cares whether you are in the Ngorongoro Crater or the Pantanal. So it lives here, on its own, and the next trip inherits it.</p>
+
+<p>What stayed behind in the field companion is the dated half: <em>balloon on the 21st, doors-off helicopter on the 29th, the night sky on the 15th from the crater rim.</em> That volume tells you what to do and when. This one tells you why, and is the place to look when something specific comes up.</p>
+
+<p><strong>The two volumes deliberately overlap.</strong> A cross-reference is useless in a Caravan at eight thousand feet with the other book in your bag, so the dated entries repeat whatever you need in the moment &mdash; press the lens close to the glass, shroud the gap, autofocus not manual &mdash; without the reasoning. The reasoning is here. The eight-line reflexes card is in both, identically, because it is the only page either volume really needs you to have read.</p>
+
+<h2>Why it is split in two parts</h2>
+
+<p>Some of what follows survives any camera. <em>Light beats reach. Expose for the sky. Find it with binoculars, then shoot it. Proximity is the master technique through glass.</em> Those are true of a phone, a bridge camera, or a body worth ten times either, and they are Part One.</p>
+
+<p>The rest is arithmetic about specific hardware: f/8, ISO 3200, 255 frames, the T/W button, the three states of Night mode. That is Part Two, and it is marked out in blue-grey panels throughout. <strong>When a camera is replaced, Part Two is what needs rewriting</strong> &mdash; and Part One should not need a word changed. If you ever find yourself editing a principle because you bought a new body, the principle was really a specification and belongs in the other part.</p>
+
+<p>Parts Three and Four &mdash; the evening routine and the rules about publishing coordinates &mdash; sit between the two. The workflow depends on Photos and on there being cards to rotate, so it will drift slowly. The publishing rules are the most durable thing in the document; they are ethics with some arithmetic attached.</p>
+
+<div class="reflex">
+  <div class="h">The reflexes &mdash; all three cameras, if you remember nothing else</div>
+  <p><span class="k">Wide &rarr; phone. Far &rarr; SX70.</span> Video, night sky, spray and dust &rarr; phone. The moon &rarr; SX70.</p>
+  <p><span class="k">The SX70 lives in Tv.</span> Never Av &mdash; aperture has nothing to give you on this sensor.</p>
+  <p><span class="k">Light beats reach.</span> Zoom out before you raise ISO.</p>
+  <p><span class="k">Shutter:</span> 1/500 still, 1/1000 moving, 1/1600 flying.</p>
+  <p><span class="k">Backlit?</span> Expose for the sky. &minus;1 to &minus;2 EV, spot metering.</p>
+  <p><span class="k">Phone: tap 1x or 2x.</span> Never pinch. Never 3x from the air.</p>
+  <p><span class="k">Night mode:</span> Auto by default. <strong>Off</strong> for sunsets and dusk. <strong>Maximum</strong> only for the stars &mdash; then put it back.</p>
+  <p><span class="k">One frame first, adjust second.</span> Whatever it is set to, wide, before you touch anything.</p>
+  <p><span class="k">Binoculars find it. The camera shoots it.</span> In that order, every time.</p>
+</div>
+
+<p class="small">The card is the whole document compressed. Everything after it exists to justify a line of it, or to be consulted when a situation arrives that the card does not cover. The aim throughout has been rules short enough not to think about &mdash; you are there to see things, and a decision made in advance is a decision not made while a leopard moves.</p>
+
+<!-- ============ PART ONE ============ -->
+<h1 class="chapter">Part One: Principles</h1>
+<p class="kicker">These survive a change of camera</p>
+<hr class="chaprule">
+
+<h2>Light beats reach</h2>
+
+<p class="lead">Reach is the specification people buy a superzoom for, and it is the one that disappoints them. The reason is not the lens quality but the exposure arithmetic: on a small sensor, the long end of the zoom is also the dark end of the lens, so every millimetre of extra reach is bought with light you did not have to spare. Push to the limit in poor light and you get a large, soft, noisy picture of something far away. Zoom out one-third and you get a clean picture of something slightly smaller, which crops.</p>
+
+<p>So the habit is: <strong>when the frame looks marginal, back off the zoom before you touch the ISO.</strong> A clean frame at half the focal length beats a mushy one at the limit every time, and cropping afterwards is free while photons are not.</p>
+
+<p>The same logic decides the shape of a day. The two hours after sunrise and the hour before sunset are not merely prettier &mdash; they are the only hours in which the long end of the lens is usable at all. Midday flattens everything and, at altitude, builds haze that scales with focal length. Treating the first two hours as the day's real shooting window is a photographic decision, not a lifestyle one.</p>
+
+<h2>Backlight, silhouettes and the golden hour</h2>
+
+<p>This is a governing problem rather than a situation, and on safari it recurs daily: sundowners, dawn departures, balloon flights at sunrise, an east-facing river, and the shot everyone wants &mdash; an animal against a burning sky.</p>
+
+<p><strong>No small-sensor camera can hold the sky and the subject at once.</strong> The sensor lacks the dynamic range; a phone has more of it but spends it trying to expose everything correctly. So you must choose &mdash; and in golden light the answer is nearly always <em>the sky</em>. A properly lit animal against a blown white sky is a snapshot. A black animal against a burning one is the photograph.</p>
+
+<p><strong>Two adjustments, whatever the body.</strong> Dial in negative exposure compensation &mdash; between one-half and two stops, depending on how graphic you want it &mdash; and switch metering from evaluative or matrix to <strong>spot</strong>, with the spot on the sky rather than the animal. Evaluative averaging hands back the very brightening you are fighting; it is doing its job and its job is wrong here.</p>
+
+<p><strong>And one habit.</strong> Shoot it three times: your chosen compensation, one stop darker, one lighter. The histogram lies in the field, on a screen you are squinting at in bright light, and this is the one situation where bracketing reliably earns the frames.</p>
+
+<div class="panel">
+  <div class="h">The composition matters more than the settings &mdash; any camera</div>
+  <p>The classic lion-at-sunset is perhaps four-fifths vehicle positioning. The animal has to be <em>against sky</em>, not against ground &mdash; which means getting the vehicle low and round so the sun sits behind the subject. From ordinary eye level a lion on flat ground has grass behind it, and no exposure setting will rescue that.</p>
+  <p>So it is a request to your guide rather than a camera adjustment: <em>can we come round so the sun is behind it?</em> Good guides are already manoeuvring; the ones who are not will do it gladly if asked, and it is worth far more than twenty metres closer.</p>
+  <p>Consider the <strong>rim-lit</strong> variant rather than the pure silhouette: back off the negative exposure a little and a mane, or the fur along a back, catches a line of gold while the body stays dark. Often the better picture, and it needs the same positioning.</p>
+</div>
+
+<h2>The shutter ladder, and the three ways vibration gets in</h2>
+
+<p>Long focal lengths punish everything, and stabilisation is a partial remedy that people treat as a complete one. The floor to work from:</p>
+
+<table class="mv">
+  <thead><tr><th style="width:34%">Subject</th><th style="width:20%">Shutter</th><th style="width:46%">Why</th></tr></thead>
+  <tbody>
+    <tr><td>Still animal, braced, long end</td><td><strong>1/500</strong></td><td>Not for the subject &mdash; for you and the vehicle</td></tr>
+    <tr><td>Walking, feeding, turning</td><td><strong>1/1000</strong></td><td>A head turn at 1000&nbsp;mm is a blur at 1/500</td></tr>
+    <tr class="heavy"><td><strong>Birds in flight, anything from the air</strong></td><td><strong>1/1600</strong></td><td>Rotor or propeller vibration, and closing speed</td></tr>
+    <tr><td>From a boat, even a still one</td><td>1/500 minimum</td><td>A boat is never actually still</td></tr>
+  </tbody>
+</table>
+
+<p>Let the ISO go wherever it must to hold those speeds. Noise is recoverable and motion blur is not, and a noisy sharp frame is a photograph while a clean soft one is nothing.</p>
+
+<p><strong>The three sources, in the order they cost you frames.</strong> First, <em>the engine.</em> Idle vibration at the long end of a zoom is visible in the file &mdash; ask for the engine cut at sightings, every time; it is also the difference between hearing the bush and not. Second, <em>bracing against the machine.</em> The instinct in a helicopter or a light aircraft is to steady the camera against the door frame or the window surround, which couples airframe vibration straight into the sensor. Hold it in your hands instead and let your body damp it; you are a better shock absorber than the aluminium is. Third, <em>a stabiliser fighting a fixed support.</em> On a beanbag or a tripod, a running stabiliser hunts against itself and softens the frame. Some bodies detect the support and disable it; where you cannot confirm that, switch it off yourself.</p>
+
+<h2>Through glass: proximity is the master technique</h2>
+
+<p>Aircraft windows, vehicle windows, hide slits, hotel glass. The single technique that matters is <strong>getting the front element as close to the glass as you can without touching it.</strong></p>
+
+<p>The reason is worth knowing, because it tells you what else to do. A gap between lens and glass lets cabin light bounce back and forth in that space, which is what a reflection is. Close the gap and the glass stops behaving like a mirror and starts behaving like a filter. Near-contact also throws scratches and pitting on the outer surface much further out of focus, which is why a badly scratched window can still yield a clean frame.</p>
+
+<p><strong>Never actually touch.</strong> Vibration goes straight into the camera, and on a zoom whose barrel extends you will also be jamming the mechanism &mdash; so <em>set the focal length first, then approach.</em></p>
+
+<p><strong>Kill the rest of the reflection by shrouding the gap.</strong> Cup your free hand around the lens, or drape a dark cloth over camera and hands. Aviation photographers wear black for this; on safari, don't &mdash; dark blue and black attract tsetse, and a draped cloth works better than dark clothing anyway. Carry one <strong>dark microfibre cloth</strong> for this purpose, which doubles as your lens cloth, and keep a separate neutral buff for dust and sun.</p>
+
+<p>Beyond that: shoot perpendicular to the glass where the composition allows, sit on the shaded side, and clean the <em>inside</em> of the window before you need it &mdash; the outside is the scratched side and proximity is your only answer to it.</p>
+
+<p><strong>Never a polariser on an aircraft window.</strong> Stressed acrylic is birefringent and renders as rainbow blotches across the frame. This is the one filter mistake that cannot be fixed afterwards.</p>
+
+<p><strong>Focus through glass depends on focal length,</strong> and the answer is counter-intuitive. At <em>wide</em> angle the glass is nearly in the plane of focus, so autofocus can grab a smear of dirt instead of the landscape; manual focus at infinity is the fix. Zoomed <em>long</em>, the glass is hopelessly defocused, offers nothing for autofocus to catch, and manual infinity becomes actively wrong &mdash; because at long focal lengths the nearest sharp point at infinity focus is a very long way off indeed. So: <strong>wide through glass, manual infinity; long through glass, autofocus.</strong> And doors off, or through an open hatch, always autofocus &mdash; there is no glass to fool it and you are usually inside the infinity limit anyway.</p>
+
+<h2>From the air, which is the most underused opportunity you get</h2>
+
+<p>Balloons, light aircraft transfers, scenic helicopters. Almost nobody shoots them properly, and the transfers in particular are treated as travel rather than as thirty to sixty minutes low and slow over country you cannot otherwise see.</p>
+
+<ul class="tight">
+  <li><strong>Ask for a seat forward of the wing strut.</strong> High-wing aircraft &mdash; which is most bush aircraft &mdash; put a diagonal bar through every frame taken from behind it. Windows are rarely the constraint; the strut is.</li>
+  <li><strong>Go wide, not long.</strong> The thing only an aircraft gives you is <em>pattern</em>: braided channels, the shape of a herd, a thousand animals as texture. Individuals are too far and too small, and haze scales with focal length so the long end is the hazy end.</li>
+  <li><strong>Morning if you have any choice.</strong> Low sun rakes texture across the ground and gives you shadows to read the terrain by. Midday flattens the same scene to grey dots, and afternoon adds haze and thermals &mdash; and thermals are turbulence, which is shutter speed you have to find from somewhere.</li>
+  <li><strong>Be ready before you lift.</strong> A twelve-minute flight with two orbits gives perhaps four genuine chances. Settings dialled, lens at the focal length you want, straps sorted &mdash; on the ground.</li>
+  <li><strong>Everything strapped or stowed, hands inside.</strong> A loose strap near a rotor is a real hazard, and anything you drop from an open door is gone.</li>
+</ul>
+
+<h2>When the subject is motion, shoot video</h2>
+
+<p>The distinction is not "video for variety." It is that some subjects <em>are</em> movement, and a still frame of movement is a frame of texture. A massed herd running is about flow; a thousand zebra in a still photograph are a grey stipple. Water pouring, a bird's display, dust rising behind a column of animals, a poler's stroke &mdash; all of them lose their subject in a still.</p>
+
+<p>Two practical consequences. <strong>Video cannot escape vibration the way stills can</strong>, since there is no fast shutter available to freeze it out &mdash; so stabilisation, not shutter speed, is what makes shaky footage usable, and that argues for whichever of your devices stabilises best rather than whichever has the best sensor. And <strong>shoot short.</strong> Two or three clips of ten to twenty seconds are watchable; a four-minute pan is not, and it is the clip nobody ever trims.</p>
+
+<h2>Staging, and what to do when you can't stage</h2>
+
+<p>Given a spare seat, you don't wear your gear, you stage it. <strong>Binoculars on the chest, camera resting in front of you</strong> &mdash; on a beanbag, a stuffed dry bag or a rolled fleece &mdash; with a cloth over it. Binoculars get used ten times as often as the camera, and the camera is always used <em>second</em>: you find the animal with glass, decide whether it is worth photographing, and only then pick up the body. Reversing that order means hunting for a small animal through a narrow long-lens field of view, which is how sightings get missed rather than photographed.</p>
+
+<p><strong>Nothing on the vehicle floor.</strong> Dust lives there, and things slide when you move.</p>
+
+<p><span class="heads">A full vehicle removes the spare seat, and with it the whole method.</span> This is worth planning for rather than discovering, because shared game drives are the normal case and a private vehicle is the exception. When every seat is taken, nothing gets put down: you wear it or you hold it.</p>
+
+<p><strong>Put the binoculars on a chest harness rather than a neck strap.</strong> This is the fix, and it is cheap. An elastic X-harness holds them flat against the sternum &mdash; no swing over rough ground, no ache after an hour, and no reason ever to take them off. Which is the actual point: <em>a neck strap is what makes you put binoculars down, and putting them down is what creates the problem of where to put things.</em> Your own chest is the one location on a full vehicle that nobody else can occupy.</p>
+
+<p><strong>Then the camera goes on a cross-body sling</strong>, over the shoulder opposite your shooting hand, riding behind the elbow at hip height so it comes up to the eye in one motion. Harness on first, sling over the top, so the camera lifts clear of the binoculars. Whether this is tolerable for a whole day is a question of mass rather than preference: a light bridge body you can wear from dawn to lunch and forget about, where a heavy body and a long lens has to go somewhere and there is nowhere for it to go. If your kit is the heavy sort, the honest answer is to pay for the exclusive vehicle on the days that matter.</p>
+
+<p>After that there are only three states. <em>Between sightings</em>, camera in your lap under a cloth &mdash; off the shoulder, out of the dust, one motion from ready. <em>Standing at a sighting</em>, both on you: binoculars up and the camera hangs; camera up and the binoculars sit flat. <em>Shooting</em>, a beanbag on the window ledge or roof rail beside you &mdash; in a crowded vehicle the bag stops being a shelf and becomes purely a rest, which is the more valuable of its two jobs anyway.</p>
+
+<p>And two social rules, which matter more than the equipment ones. <strong>Take the back row</strong> where you get the choice: nobody stands in front of you and you have a clear side. <strong>Agree sides with whoever is beside you</strong> before the first sighting rather than after &mdash; a long lens swung across someone's face sours a vehicle for the rest of the trip, and you cannot change vehicles.</p>
+
+<h2>Two people, two cameras: one long, one wide</h2>
+
+<p>With two of you the temptation is redundancy &mdash; both cameras pointed at the same animal at similar focal lengths. The better arrangement is a standing division: <strong>one body stays long, one stays wide</strong>, so that when something happens nobody is racking through a zoom range at the decisive moment. Swap which of you is on which by the day rather than by the sighting.</p>
+
+<p>Run the same division with the binoculars: one primary spotter, one primary shooter, rotating daily. And bring one pair of binoculars each without exception &mdash; the moment you hand your pair over is the moment the leopard moves.</p>
+
+<p><strong>A note on the lesser camera.</strong> Whichever of your bodies is the compromise one, do not treat it as insurance. Its advantages &mdash; quick, pocketable, already wide, nothing to configure &mdash; are precisely why the best frame from a sighting is so often taken by whoever was carrying it. Hand it over as a job, not as second place.</p>
+
+<h2>Photographing people</h2>
+
+<p>Ask before every photograph of a person, and accept refusal gracefully &mdash; which means without visible disappointment, since visible disappointment is a second ask. Never photograph children without a parent's clear consent.</p>
+
+<p>Where a guide or host is mediating, <strong>ask through them rather than directly.</strong> It is easier for everyone to decline that way, and a declined request that never had to be said out loud costs nobody anything. In workshops and craft centres where photography is generally welcome, still ask the individual artisan; institutional permission is not personal permission.</p>
+
+<p>And there is a category that is not about courtesy at all: <strong>no police, soldiers, government buildings, airports or border posts</strong>, anywhere, ever. This is a detention risk rather than an etiquette question, and it applies to the phone in your hand while you wait in a queue.</p>
+
+<h2>What the kit is allowed to weigh</h2>
+
+<p>Bush aircraft are weight-limited in a way scheduled flights are not, and the limit is usually quoted <em>including</em> hand luggage &mdash; which is the clause people miss, because it means a camera bag is not exempt from it by being carried. Soft bags only is a common additional condition: no frames, no wheels.</p>
+
+<p>Two consequences worth thinking about before you shop rather than at the airstrip. <strong>A second body is heavier than it looks</strong> once you add its own battery type, its own charger and its own spare cells, so the honest question is whether it earns its weight against one body and a phone. And <strong>a beanbag can be filled at the destination</strong> &mdash; take the empty bag and put rice, beans or sand in it there, which turns two or three pounds of luggage into none.</p>
+
+<p>Everything else on the list is small: a blower, cloths, a card case, a pocket tripod. The weight is bodies, batteries and chargers, and that is where the decisions are.</p>
+
+<h2>Dust, damp, and the direction of condensation</h2>
+
+<ul class="tight">
+  <li><strong>Blower before cloth, always.</strong> Wiping dusty glass grinds grit into the coating. Carry a blower and three or four microfibre cloths &mdash; they get filthy faster than you would believe.</li>
+  <li><strong>Cover it between sightings</strong> &mdash; a buff, or a dry bag rolled down as an open pouch, over the whole camera on corrugated stretches.</li>
+  <li><strong>Cards in a hard case</strong>, never loose in a pocket with grit.</li>
+  <li><strong>A wet front element is the commonest cause of a ruined photograph</strong> anywhere there is spray. Cloth in hand, camera covered between shots, and use the weather-sealed device if you have one.</li>
+  <li><strong>Condensation has a direction.</strong> A cold camera meeting warm humid air fogs internally, which no cloth reaches. So coming out of air conditioning into humid heat, leave the camera sealed in a bag until it reaches ambient temperature. The reverse &mdash; warm camera into cold air &mdash; is harmless.</li>
+  <li><strong>Dew is the same problem outdoors.</strong> A lens tilted at the sky on a cold night collects it; check and wipe between frames, because a fogged element looks exactly like a soft exposure and you will not diagnose it on the rear screen.</li>
+</ul>
+
+<!-- ============ PART TWO ============ -->
+<h1 class="chapter">Part Two: The Cameras</h1>
+<p class="kicker">Revise this part when the kit changes</p>
+<hr class="chaprule">
+
+<p class="lead">Everything here is arithmetic about three specific devices, and all of it expires when one of them is replaced. Nothing in Part One depends on any of it. The blue-grey panels are the parts that are true of this hardware and no other.</p>
+
+<h2>Which device does what</h2>
+
+<table class="mv">
+  <thead><tr><th style="width:52%">Subject</th><th style="width:20%">Tool</th><th style="width:28%">Why</th></tr></thead>
+  <tbody>
+    <tr><td>Distant animals, birds, anything at range</td><td><strong>SX70</strong></td><td>1365 mm; the SX740 reaches 960</td></tr>
+    <tr class="heavy"><td><strong>All video</strong></td><td><strong>iPhone</strong></td><td>Not close &mdash; see below</td></tr>
+    <tr><td>Landscapes, ultra-wide, panoramas</td><td>iPhone</td><td>13 mm beats the SX70's 21 mm</td></tr>
+    <tr><td>Camps, people, food, documentation</td><td>iPhone</td><td>Always in your pocket</td></tr>
+    <tr><td>Spray, and the worst dust</td><td>iPhone</td><td>IP68; the SX70 has <em>no</em> weather sealing</td></tr>
+    <tr><td>Night sky</td><td>iPhone</td><td>Night mode; the SX70 can't</td></tr>
+    <tr><td>The moon</td><td>SX70</td><td>A bright, distant, sunlit rock</td></tr>
+  </tbody>
+</table>
+
+<h3>The SX70 &mdash; two facts that govern everything</h3>
+
+<div class="spec">
+  <div class="h">The lens is slow, and gets slow early <span class="tag">SX70 HS</span></div>
+  <p>f/3.4 at the wide end, but f/5.6 arrives about a third of the way up the zoom and stays until it closes to f/6.5. So most of your wildlife range is <strong>f/5.6&ndash;6.5</strong>, and <strong>ISO stops at 3200</strong>. Reviewers are blunt that long focal lengths in poor light look "very soft indeed" &mdash; five stops of stabilisation cannot manufacture photons.</p>
+  <p>Which is the hardware reason behind the first principle: on this body, <strong>light is your currency, not reach.</strong> A clean frame at 600 mm beats a mushy one at 1365.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Aperture is not a control you have &mdash; hence Tv, never Av <span class="tag">SX70 HS</span></div>
+  <p>Adjustment runs out at f/8, because on a sensor this small diffraction destroys resolution early. The diffraction limit sits around f/1.9 and the lens only opens to f/3.4, so the camera is diffraction-limited at <em>every</em> aperture it possesses. Stopping down never sharpens; it only softens.</p>
+  <p>And with a 5.6&times; crop factor, f/6.5 here behaves like f/36 on full frame &mdash; you already have more depth of field than you can use. Across most of the zoom your entire choice is f/5.6 to f/8: two-thirds of a stop, one end of which is worse. There is nothing for aperture-priority to prioritise. <strong>Tv with auto ISO is the default the camera should live in.</strong></p>
+  <p><em>Two consolations:</em> the sealed lens means no sensor dust, a real advantage anywhere dry. And there is no weather sealing at all, which is why the dust discipline in Part One matters more on this body than the reasoning there suggests.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Where infinity stops working &mdash; the near limits <span class="tag">SX70 HS</span></div>
+  <p>Focused at infinity, the nearest point still acceptably sharp:</p>
+  <table class="mv" style="margin-top:.35em;">
+    <thead><tr><th style="width:50%">Focal length (equivalent)</th><th style="width:50%">Nearest sharp point</th></tr></thead>
+    <tbody>
+      <tr><td>280 mm</td><td>about 45 m</td></tr>
+      <tr><td>560 mm</td><td>about 179 m</td></tr>
+      <tr><td>730 mm</td><td>about 305 m &mdash; a thousand feet</td></tr>
+      <tr class="heavy"><td><strong>1365 mm (full zoom)</strong></td><td><strong>about 918 m</strong></td></tr>
+    </tbody>
+  </table>
+  <p>Read it as the rule for manual-infinity work: from a light aircraft at a thousand feet, infinity focus is correct only out to around 730 mm equivalent. From a helicopter at five hundred feet, only to about 400 mm. Past that you are inside the limit and must autofocus.</p>
+</div>
+
+<div class="spec">
+  <div class="h">C1 and C2 &mdash; and how little C1 matters <span class="tag">SX70 HS</span></div>
+  <p>The custom dial positions store a whole configuration. <strong>C2 is the one you will use:</strong> low light for hides and night drives &mdash; Tv, slower shutter, raised ISO ceiling, single-point AF, flash and AF-assist off.</p>
+  <p><strong>C1 holds manual focus at infinity, and is insurance rather than workflow.</strong> Its purpose is shooting wide through glass. But manual-infinity only helps where autofocus might grab dirt on the window, which happens only at wide angle; zoomed long the glass is too defocused to catch anything, so autofocus is fine. And wide-through-glass is really the phone's job, since its lens presses within a millimetre of the window where a protruding barrel cannot. So C1 exists mainly to <em>quarantine</em> a setting that would ruin a day if it were left engaged by accident: correctly configured, one click away, rarely needed.</p>
+  <p><strong>Setting it:</strong> MF Peaking on; <strong>Safety MF off</strong>, or a half-press hands focus back to autofocus; digital zoom off, because it disables the magnified display that otherwise appears automatically as you adjust. Run the scale out, fine-tune until the peaking is densest, and stop <em>there</em> rather than at the mechanical stop. Then <em>Recall zoom/MF settings</em> so it returns. The <strong>T/W button function</strong> setting can reassign the barrel rocker to <em>Set MF dist</em> if you want focus under your thumb &mdash; at the cost of the smooth side zoom.</p>
+  <p><em>Tested on the camera:</em> C1 <strong>does</strong> hold the focal distance. AF-assist and MF-point zoom are <strong>camera-wide</strong>, not per-position. And focus mode <em>is</em> per-position, so P and Tv return to autofocus &mdash; the quarantine works.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Batteries, and the charging trap <span class="tag">SX70 HS</span></div>
+  <p><strong>255 shots through the viewfinder</strong>, 325 on the LCD, 405 in Eco &mdash; and no percentage readout, only a coarse three-state icon, so you have to count frames rather than read a number.</p>
+  <p><span class="heads">The trap: the SX70 cannot charge in-camera.</span> It needs the LC-E12 mains charger, which means a vehicle's 12V socket is no use for camera batteries and a camp that charges only in a communal mess tent is a real constraint. A <strong>USB dual LP-E12 charger</strong> removes the problem entirely and is the single best small purchase for this body; failing that, three cells plus overnight room-charging is sufficient.</p>
+  <p><strong>Eco Mode</strong> dims and sleeps the screen and buys you 150 frames. Keep it in reserve for rationing rather than running it routinely, since a sleeping screen costs you sightings.</p>
+</div>
+
+<h3>The SX740 &mdash; not a lesser SX70 but a different job</h3>
+
+<div class="spec">
+  <div class="h">What it gives up, and what it uniquely offers <span class="tag">SX740 HS</span></div>
+  <p>Same 20.3MP sensor and DIGIC 8 processor, so at matched focal lengths the image quality is closely comparable. It gives up <strong>960 mm rather than 1365</strong>, 3.5 stops of stabilisation rather than 5, <strong>JPEG only</strong>, and <strong>no viewfinder.</strong></p>
+  <p>The missing finder is what bites, and not only for visibility &mdash; a three-inch LCD in equatorial midday is genuinely hard to read, but the deeper problem is mechanical. A camera pressed to your eye braces against your skull with your elbows at your ribs; one held at arm's length sits on a wobbling lever. At 960 mm from a moving vehicle that is decisive. And with no RAW there is no rescuing a backlit exposure afterwards, so exposure compensation matters <em>more</em> on this body, not less.</p>
+  <p>The battery situation inverts what you would expect. Different cell (NB-13L, 265 shots, 370 in Eco), so nothing is shared with the LP-E12s &mdash; but <strong>the SX740 charges in-camera over USB, which the SX70 cannot.</strong> The little camera is the one you can top up from a vehicle socket or a power bank, which on a long transfer day makes it the more available body.</p>
+  <p><strong>Set-up specifics:</strong> beep off, and confirm the <strong>pop-up flash will not fire automatically</strong> in low light. A flash at a leopard after dark is a far worse offence than a beep.</p>
+</div>
+
+<h3>The iPhone &mdash; three things worth knowing precisely</h3>
+
+<div class="spec">
+  <div class="h">Why it wins on video, and what Action Mode costs <span class="tag">iPhone 14 Pro</span></div>
+  <p>Three mechanisms stack. The <em>sensor itself</em> shifts, and being far lighter than a lens group it repositions many more times per second. The camera <em>overscans</em>, recording beyond the final frame edge and continuously moving which part of the sensor forms the image, with active roll correction. And <strong>Action Mode</strong> crops 4K down to 2.8K, spending the spare pixels on stabilisation headroom. Computational warping guided by gyro data absorbs vibration far above the frequency any mechanical element can track, and roll correction attacks the rubbery wobble a small sensor with slow readout produces.</p>
+  <p><strong>Using it:</strong> video mode, then the running-figure icon; yellow means on. It is intended for the ultra-wide, caps at <strong>2.8K with no 4K</strong>, and needs generous light &mdash; there is a low-light toggle but stabilisation weakens with it on.</p>
+  <p><strong>Skip ProRes</strong>, roughly 6 GB a minute. Ordinary 4K runs about 190 MB/min at 30fps, 400 at 60. Lock focus and exposure before recording by pressing and holding. And watch the heat: the 14 Pro throttles and will stop recording outright, a real risk anywhere above about 35&deg;C in sun.</p>
+</div>
+
+<div class="spec">
+  <div class="h">2x is a sensor crop, not a digital one <span class="tag">iPhone 14 Pro</span></div>
+  <p>The 2x setting reads the middle twelve megapixels of the 48MP main sensor one-to-one &mdash; same lens, same f/1.78, no interpolation. So <strong>shooting 2x beats cropping a 1x frame afterwards by four times the pixels</strong>, and it costs nothing in aperture. Use it freely.</p>
+  <p><strong>Tap the 1x or 2x button; never pinch.</strong> Pinching walks you into interpolated digital zoom between the fixed positions, which is the one thing on this phone that genuinely degrades a file. And <strong>avoid 3x from the air</strong> &mdash; it is a separate, smaller sensor at f/2.8, and haze scales with focal length, so it is the worst combination available for a hazy distant subject.</p>
+  <p><strong>ProRAW</strong> lives in the capture indicator at the <em>upper left</em>, reading HEIC or RAW with a megapixel count. Note that Night mode runs at 12MP, so you cannot have Night mode and 48MP together.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Night mode has three states, and the middle one is not the default you want <span class="tag">iPhone 14 Pro</span></div>
+  <p><strong>Off &rarr; Auto &rarr; Maximum</strong>, reached by tapping the Night Mode control repeatedly in the six-dot tray &mdash; it is a cycling button, not a slider, and it is easy to give up after one tap. The icon at the top of the screen is only an on/off toggle, not the control. <em>There is no Night mode icon at all in a lit room</em>, so this cannot be rehearsed except somewhere dim.</p>
+  <p><strong>Auto</strong> is right for almost everything. <strong>Off</strong> is what you want at dusk and for sunsets, because Night mode brightens precisely what you are trying to keep dark &mdash; it will quietly ruin every silhouette you attempt. <strong>Maximum</strong> is for stars only.</p>
+  <p><em>Tested:</em> Maximum <strong>persists across app openings</strong>, which is convenient at midnight and a menace the next morning &mdash; and the reason not to set it days in advance &mdash; left as it is you spend the following day taking three-second exposures of your lunch. <strong>Put it back to Auto when you come in.</strong> Also tested: Maximum is a <em>preference</em>, not a duration, so setting it in a dim room still yields the full thirty seconds under a dark sky. And <strong>Live Photos or flash switches Night mode off entirely.</strong></p>
+  <p>Handheld you get one to three seconds and no more. Cradle the phone and <em>let go first</em>, watch the number climb as it detects stability, <em>then</em> set Maximum.</p>
+</div>
+
+<div class="spec">
+  <div class="h">The Watch as a remote &mdash; the only silent, lightless trigger you have <span class="tag">Apple Watch + iPhone</span></div>
+  <p><strong>Turn the timer off.</strong> With it disabled you get an immediate single frame, no countdown and no LED. Left on, the LED blinks through three seconds, which destroys dark adaptation and lights the foreground. You can also <strong>set the focus point from the Watch</strong>, which makes the sequence contactless from the moment you let go of the phone.</p>
+  <p>Avoid the AirPods volume-button remote for this: its countdown cannot be defeated. <em>Tested:</em> in Night mode the Watch timer produces one frame, not the usual burst of ten.</p>
+  <p><strong>Mind the Watch screen itself.</strong> Startlingly bright in real darkness &mdash; minimum brightness, Theater Mode, shielded with your sleeve. Twenty minutes of dark adaptation is undone by one glance at a lit display.</p>
+</div>
+
+<h2>The night sky, which is entirely the phone's job</h2>
+
+<p>The SX70 is the wrong camera for this and the reasons are structural: it caps at fifteen seconds, opens only to f/3.4, restricts ISO below one-second shutters, and triples the time of every frame with dark-frame subtraction. The phone in Night mode will genuinely record the Milky Way, at ISO in five figures &mdash; documented iPhone frames sit near 10,000&ndash;12,500 &mdash; and it will do it while you stand there with your hands in your pockets.</p>
+
+<div class="spec">
+  <div class="h">Stability unlocks the exposure &mdash; it does not merely sharpen it <span class="tag">iPhone 14 Pro</span></div>
+  <p>This is the fact that makes the whole procedure make sense. Night mode offers its longest captures <em>only</em> when it detects that the phone is stationary, and slow drift silently returns you to shorter ones with no warning on screen. So a rigid support does not just reduce blur; it doubles or triples the light you collect.</p>
+  <p><strong>Rigid beats improvised.</strong> A phone pressed into a beanbag settles for thirty seconds and never stops settling. Use the pocket tripod, and on sand seat the legs rather than resting them.</p>
+  <p><strong>And do not zoom.</strong> Tolerable exposure falls sharply as focal length rises &mdash; roughly 38 seconds at 0.5x, 21 at 1x, but only 6 at 3x, while Night mode wants ten to thirty. 1x is the setting.</p>
+</div>
+
+<p><strong>The order, which is the part that matters in the cold.</strong> The trick is running the equipment work and your dark adaptation in parallel rather than in sequence, so arrive half an hour before you want to shoot.</p>
+
+<p><strong>1.</strong> Set the tripod and aim with <em>GoSkyWatch</em> in red mode &mdash; it shows live azimuth and altitude, so you can confirm you are on the galactic core rather than a gap in the canopy before committing thirty seconds. At 1x the field is about 70&deg; wide, so rough aiming takes in a lot of sky.<br>
+<strong>2.</strong> One short test frame, checked at minimum screen brightness &mdash; confirm open sky and that focus took. <em>This is the only lit screen of the night; get it over with first.</em><br>
+<strong>3.</strong> Mount, let go, and <strong>wait ten or fifteen seconds</strong> for the stability detection to settle. Repositioning resets it.<br>
+<strong>4.</strong> Set focus from the Watch, on a bright star. Autofocus hunts uselessly in the dark.<br>
+<strong>5.</strong> Fire from the Watch, and <strong>shoot two or three before you look</strong> &mdash; picking the phone up resets the stability detection and you wait again.</p>
+
+<p>Then leave it working while your eyes finish adapting. Enable <strong>ProRAW</strong> for the latitude, and <strong>include a foreground edge</strong> &mdash; a tree line, a ridge, a tent &mdash; because a frame of pure sky has no scale and reads as a screensaver.</p>
+
+<h2>Setting up before you fly</h2>
+
+<p>The tick-list version is the appendix; this is why each item is on it.</p>
+
+<div class="spec">
+  <div class="h">The one menu change that cannot be fixed afterwards <span class="tag">SX70 HS &amp; SX740 HS</span></div>
+  <p><strong>File Numbering &rarr; Continuous.</strong> The default may be Auto Reset, which starts card two at IMG_0001 so both cards collide in the library. And with four cards across two bodies, <strong>label them</strong> physically: SX70-A, SX70-B, 740-A, 740-B.</p>
+  <p>Note the limit of the setting: Continuous only makes numbering continuous <em>within</em> one camera. The two bodies each start at IMG_0001 independently, so their ranges overlap regardless. That is harmless in Photos, which is a database rather than a filesystem and keeps the original filename as metadata; it matters only at home, where the <strong>Model</strong> EXIF tag separates them unambiguously in a few lines of Python.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Geotagging, and why the clock is the thing that fails <span class="tag">SX70 HS + iPhone</span></div>
+  <p>There is no internal GPS. Pair in Camera Connect, tap Functions &rarr; Location Information, then Menu &rarr; GPS Device Settings &rarr; GPS device = Smartphone.</p>
+  <p><strong>Set the camera clock at every border crossing.</strong> Timestamp matching is the fallback when Bluetooth drops, and it fails <em>silently</em> when the clock is wrong &mdash; you get coordinates, they are simply the coordinates of somewhere you were an hour later. This is the single most common way a geotagged trip comes home mislabelled.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Silence and darkness <span class="tag">SX70 HS</span></div>
+  <p><strong>Beep off</strong> &mdash; two separate settings, <em>Adjusting Beeping</em> and <em>Adjusting the Volume</em>, so silence both. <strong>AF-assist beam off</strong>, and note that it is camera-wide rather than per-mode: it fires at dawn before the sun is up and again at dusk, not only after dark, and is useless past a few metres regardless. <strong>Continuous AF off</strong> &mdash; a separate setting from Servo, and it hunts focus whenever the camera is powered, which costs battery and makes noise.</p>
+  <p><strong>RAW + JPEG</strong> for the latitude a small sensor needs.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Two settings that reset themselves <span class="tag">iPhone 14 Pro</span></div>
+  <p><strong>Settings &rarr; Camera &rarr; Preserve Settings:</strong> switch on <em>Exposure Adjustment</em> and <em>Night Mode</em>, or both reset every time the app closes &mdash; which is the reason a carefully dialled compensation vanishes between two frames of the same sunset. Turn on <strong>Lens Cleaning Hints</strong> while you are in there.</p>
+  <p>And use the <em>Exposure</em> control in the six-dot tray rather than the sun slider: <strong>the tray value persists across shots; the slider resets when you reframe.</strong> Press and hold on the bright part of the scene for AE/AF Lock.</p>
+</div>
+
+<div class="spec">
+  <div class="h">Any new card <span class="tag">All bodies</span></div>
+  <p>Format it in-camera &mdash; one low-level format on a new card exercises every block &mdash; then shoot fifty frames and a 4K clip and read them back at home. A card that is going to fail usually fails early, and you would rather discover it on your desk than on the second morning.</p>
+</div>
+
+<!-- ============ PART THREE ============ -->
+<h1 class="chapter">Part Three: The Evening Routine</h1>
+<p class="kicker">Where files go, and how they stay findable</p>
+<hr class="chaprule">
+
+<p class="lead">Two principles, and they pull in opposite directions. The redundancy is <em>physical</em> &mdash; cards, two iPads, the computer at home &mdash; and none of it is recoverable later, because a card that was never copied is simply gone. The organisation, by contrast, is <em>automated</em>, which means the thing to maintain each evening is not the filing but the check that the filing happened.</p>
+
+<h2>The shape of it</h2>
+
+<p>One <strong>folder</strong> per trip in Photos, named so that it sorts &mdash; <code>2026-08 Africa</code> &mdash; holding two albums:</p>
+
+<ul class="tight">
+  <li><strong>Safari26</strong> &mdash; everything, from every device.</li>
+  <li><strong>Safari26 Selected</strong> &mdash; the frames you edit and publish.</li>
+</ul>
+
+<p>That is the whole structure, and its virtue is that only the second album requires a judgement. The first is mechanical, so it can be handed to a machine; the second is the curation, and a year from now it is the one you will actually open.</p>
+
+<p>The date-prefixed folder name is the durable half of the convention. <code>YYYY-MM Place</code> sorts chronologically for as long as you keep taking trips, and the folder means the trip's albums collapse into one row rather than accumulating in a flat list until Photos becomes unusable.</p>
+
+<h2>The shortcut, and why AirDrop makes it necessary</h2>
+
+<p>The problem it solves is specific: <strong>AirDropped photos arrive in the library belonging to no album at all.</strong> They are in the library, correctly dated, and invisible to anything organised by album &mdash; so a trip album maintained by hand silently omits every frame that came over from a phone. Card imports have the same gap, differently arrived at.</p>
+
+<p>So the shortcut sweeps the library and adds anything not already in <strong>Safari26</strong> to it, then reports how many it moved. Because the condition is <em>not already there</em>, the operation is <strong>idempotent</strong> &mdash; running it twice does nothing the second time. Which means there is no reason to save it for bedtime: run it after each AirDrop and each card import, and again at the end of the evening. On the home screen it costs one tap.</p>
+
+<div class="panel">
+  <div class="h">Read the number &mdash; it is an instrument, not a confirmation</div>
+  <p>The count is the only evidence you get that the day's files are actually where you think they are, so it is worth two seconds of arithmetic rather than a reflexive dismissal of the alert.</p>
+  <p><strong>Zero after a day of shooting means something failed</strong> &mdash; either nothing imported, or you already ran it and have forgotten, in which case the previous run's number should account for the day.</p>
+  <p><strong>A number far larger than the day's shooting</strong> means either a day was missed, or something imported twice, or the sweep has reached beyond the trip. All three are worth catching on the evening rather than at home.</p>
+  <p>And a number that looks about right <em>is</em> the confirmation. That is the point of having it report at all.</p>
+</div>
+
+<p><span class="heads">Name it for the job, not for the trip.</span> Editing the shortcut's actions is safe &mdash; the home screen entry launches it by identity, so re-pointing it at next year's album leaves the icon working. <strong>Renaming the shortcut is what can orphan the icon</strong>, since the home screen entry is a web clip whose label and glyph are fixed when you create it. So call it something like <em>Sweep to Trip Album</em> once and never rename it; the album target inside becomes the only thing that changes from trip to trip. Deleting and rebuilding the shortcut, rather than editing it, breaks the entry outright.</p>
+
+<p><span class="heads">One thing worth checking about scope.</span> The condition is a predicate over the whole library rather than over a date range, so anything in the library that is not in <strong>Safari26</strong> gets swept in &mdash; screenshots, a photograph of a passport page, the receipt you snapped at the airport, and on the very first run, every pre-trip photograph the iPad happened to be holding. If the library is trip-only that is exactly the behaviour you want. If it is not, the shortcut wants a date condition alongside the album one, and the first run is the one to watch the number on.</p>
+
+<h2>What the automation replaced, and what it did not</h2>
+
+<p>The older version of this routine kept an album per camera and demanded that each import be albumed before the next one started &mdash; because once two cards are in unlabelled, separating them means picking frames by eye. <strong>That discipline is now unnecessary, and dropping it is a gain rather than a compromise.</strong></p>
+
+<p>The reason is that camera identity was never really lost: it is in the file. The <strong>Model</strong> EXIF tag separates the two bodies unambiguously, and the phones, at home, in a few lines of Python &mdash; so segregating by camera in the field was hand-maintaining a database column that the files already carried. Deriving it later is free; forgetting to maintain it nightly was not.</p>
+
+<p>What automation cannot do is decide what is good. <strong>Safari26 Selected is the only manual step left</strong>, and it is the one worth the attention that used to go on filing.</p>
+
+<div class="panel">
+  <div class="h">Where edits live, which is not where you think</div>
+  <p>Editing in Photos is non-destructive &mdash; the original is kept and Revert is always available. But the home archive comes off the <strong>cards</strong>, and the cards hold the untouched originals, so <strong>every edit lives only on the iPad unless you export it deliberately.</strong></p>
+  <p>Which lands squarely on <em>Safari26 Selected</em>, because that album <em>is</em> the edited set &mdash; the frames you spent twenty minutes on are precisely the ones the card archive does not represent. So <strong>export Selected as finished files</strong>, alongside the card copies, and treat that export as part of getting home rather than part of posting.</p>
+  <p>It is also the natural batch for the publishing rules in Part Four: Selected is what goes online, so Selected is what gets its coordinates rounded.</p>
+  <p><span class="heads">No cloud tier, by design.</span> Nothing syncs anywhere, so the iPad copies are local originals and no upload competes for camp bandwidth. Where the connection is intermittent satellite, that is the more dependable arrangement rather than the lesser one &mdash; but it does mean the shortcut's count is the only thing watching, since there is no sync status to reassure you.</p>
+</div>
+
+<p class="small"><strong>The deletion asymmetry</strong>, because it is easy to get wrong when you are tired: <em>Remove from Album</em> takes a frame out of the album and leaves it in the library &mdash; where the shortcut will put it straight back. <em>Delete</em> removes it from the library entirely. To drop something from Safari26 and have it stay dropped, it has to leave the library.</p>
+
+<h2>Look at a few frames at full size</h2>
+
+<p>Not to cull. To check whether you are actually nailing focus at the long end.</p>
+
+<p>That feedback loop is the real purpose of the evening routine. If frame after frame is soft at full zoom, you will know it on the second day &mdash; while you can still raise the shutter speed, brace differently, or simply stop using the top third of the zoom. Nobody discovers that from a rear screen, and everybody discovers it at home, where it is a story about the trip they can't retake.</p>
+
+<h2>Cards</h2>
+
+<ul class="tight">
+  <li><strong>Rotate at leg boundaries</strong> &mdash; a new country, a new camp, a new aircraft. It gives you a natural filing scheme and limits what any single failure costs.</li>
+  <li><strong>Flip the write-protect tab</strong> on the card that comes out, immediately, before it goes anywhere.</li>
+  <li><strong>Keep retired cards in a different bag from the camera.</strong> The point of two copies is not defeated by theft or loss only if they are physically apart.</li>
+  <li><strong>Never delete or reformat mid-trip.</strong> Not to save space, not to tidy up, not ever. Buy another card instead; they cost less than one frame you wanted.</li>
+</ul>
+
+<!-- ============ PART FOUR ============ -->
+<h1 class="chapter">Part Four: What to Publish</h1>
+<p class="kicker">Coordinates, tracks, captions and the clock</p>
+<hr class="chaprule">
+
+<p class="lead">This part is the most durable thing in the document and the least likely to be thought about. Geotagged wildlife photographs are a genuine, documented poaching risk, and the honest position is that the risk is small per photograph and real in aggregate &mdash; which is exactly the shape of problem that a standing rule solves and case-by-case judgement does not.</p>
+
+<h2>What is actually sensitive</h2>
+
+<p><strong>Rhino above all</strong>, and this is the case everyone knows. The others are less obvious and matter just as much:</p>
+
+<ul class="tight">
+  <li><strong>Vultures</strong>, because poachers poison carcasses specifically to kill the birds whose circling alerts rangers. A vulture roost location is operational intelligence.</li>
+  <li><strong>Rare raptor nests</strong>, where egg and chick collection is a live trade.</li>
+  <li><strong>Pel's fishing owl and other reliable roost trees</strong>, where the harm is not poaching but a procession of boats and vehicles under one tree until the bird abandons it.</li>
+  <li><strong>Pangolin</strong>, the most trafficked mammal on earth.</li>
+  <li><strong>Any collared animal</strong> &mdash; a collar means it is being studied, which means somebody has already decided its position is sensitive.</li>
+  <li>And, separately from wildlife, <strong>identifiable people</strong>. Publishing villagers with coordinates attached to their houses is a privacy question in its own right, and one they were never asked about.</li>
+</ul>
+
+<div class="panel">
+  <div class="h">The rule that removes the judgement: round the coordinates, don't strip them</div>
+  <p>Degrade precision rather than deleting it. Three decimals of latitude is about 110 m; <strong>two is about 1.1 km</strong>; one is 11 km. Two decimals is ample for "taken in the Ngorongoro Crater" and useless for "the rhino is in that thicket."</p>
+  <p>Your own photo map is arguably better for it &mdash; four hundred pins at two decimals spread out and become readable, where at full precision they stack into a blob.</p>
+  <p>The reason not to strip entirely is that stripping is all-or-nothing and you will eventually skip it, whereas rounding is a single batch operation you can apply to everything without thinking about which frames deserve it. A rule you apply to every file beats a judgement you apply to some of them.</p>
+</div>
+
+<h2>The trap: publishing your tracks defeats all of it</h2>
+
+<p>A GPX track plus a photograph timestamp reconstructs position exactly, no matter how carefully the EXIF was rounded. And tracks leak on their own, without any photograph attached: <strong>forty stationary minutes beside a thicket <em>is</em> a sighting</strong>, legible to anyone who knows the ground.</p>
+
+<p>So treat tracks and photographs under the same rule, or simply don't publish the days with sensitive sightings on them. The flight tracks are the interesting ones anyway, and nothing sensitive lives in a balloon path.</p>
+
+<h2>The channels that leak are the private ones</h2>
+
+<p>This is backwards from most people's intuition and worth memorising. <strong>Facebook, Instagram and X strip GPS</strong> from anything others can download. <strong>iMessage, email, AirDrop, cloud links and WhatsApp's <em>document</em> mode all preserve everything.</strong></p>
+
+<p>Which means texting a photograph home sends exact coordinates while posting the same frame publicly does not. If you are going to be careless anywhere, be careless in public.</p>
+
+<h2>And on social media the exposure is what you type</h2>
+
+<p>The platform handles the file; it cannot handle you. A check-in beside a rhino photograph announces precisely what stripping EXIF was meant to prevent, and a caption naming a particular forest is more actionable than coordinates ever were &mdash; coordinates need a map, a place name needs nothing.</p>
+
+<ul class="tight">
+  <li><strong>Post after you have left the area</strong>, not from camp. Same photograph, no live information.</li>
+  <li><strong>Keep captions at the level of the region</strong>, not the feature.</li>
+  <li><strong>Skip the location tag</strong> on sensitive frames entirely.</li>
+  <li>For your own site, round to two decimals. For social, watch the tag, the caption and the clock.</li>
+</ul>
+
+<!-- ============ APPENDIX ============ -->
+<h1 class="chapter">Appendix: The Pre-Flight List</h1>
+<p class="kicker">Everything to do before the bags are closed</p>
+<hr class="chaprule">
+
+<p class="lead">Nothing here needs to be repeated in the field, and everything here is unpleasant to discover you have not done. The reasoning for each item is in Part Two; this page is for ticking.</p>
+
+<div class="askblock">
+  <div class="askhead">The SX70 <span class="when">MENU</span></div>
+  <ul>
+    <li>File Numbering &rarr; <strong>Continuous</strong></li>
+    <li><strong>RAW + JPEG</strong></li>
+    <li><strong>Tv</strong> with auto ISO as the resting mode</li>
+    <li>Beeping off <em>and</em> volume off &mdash; two separate settings</li>
+    <li>AF-assist beam off</li>
+    <li>Continuous AF off</li>
+    <li>C2 configured: low light, slower shutter, raised ISO ceiling, single-point AF, flash and AF-assist off</li>
+    <li>C1 configured: MF at infinity, peaking on, Safety MF off, digital zoom off, <em>Recall zoom/MF settings</em> on</li>
+    <li>Geotagging paired: Camera Connect &rarr; Functions &rarr; Location Information; Menu &rarr; GPS Device Settings &rarr; Smartphone</li>
+    <li>Clock set &mdash; and a note in your pocket to reset it at every border</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">The SX740 <span class="when">MENU</span></div>
+  <ul>
+    <li>File Numbering &rarr; Continuous</li>
+    <li>Beep off</li>
+    <li>Pop-up flash confirmed <strong>not</strong> to fire automatically in low light</li>
+    <li>Clock set</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">The iPhone <span class="when">SETTINGS &middot; CAMERA</span></div>
+  <ul>
+    <li>Preserve Settings &rarr; <strong>Exposure Adjustment</strong> on</li>
+    <li>Preserve Settings &rarr; <strong>Night Mode</strong> on</li>
+    <li>Lens Cleaning Hints on</li>
+    <li>ProRAW on; know that the indicator is upper left</li>
+    <li>Live Photos <strong>off</strong></li>
+    <li>GoSkyWatch installed, opened once, red night mode found</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">Rehearse in a dark room <span class="when">TEN MINUTES</span></div>
+  <ul>
+    <li>Find Night Mode in the six-dot tray &mdash; tap through <strong>Off &rarr; Auto &rarr; Maximum</strong> and confirm you can reach Maximum</li>
+    <li>Confirm Maximum survives closing and reopening the app &mdash; then <strong>set it back to Auto</strong>. Leaving it on Maximum from today spoils every dusk between now and the first dark night</li>
+    <li>Repeat the ten-second version somewhere dim the night before you actually want the stars</li>
+    <li>Watch Camera Remote: <strong>timer off</strong>; take one frame and confirm no LED</li>
+    <li>Set the focus point from the Watch, on any small bright thing</li>
+    <li>Watch brightness to minimum; Theater Mode found</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">Cards and power <span class="when">DO EARLY</span></div>
+  <ul>
+    <li>Every new card low-level formatted in the camera that will use it</li>
+    <li>Fifty frames and a 4K clip off each new card, read back at home</li>
+    <li>Cards labelled: SX70-A, SX70-B, 740-A, 740-B</li>
+    <li>Three LP-E12 cells, all charged</li>
+    <li><strong>USB dual LP-E12 charger</strong> packed &mdash; the SX70 cannot charge in-camera</li>
+    <li>Hard card case; blower; three or four microfibre cloths</li>
+    <li>One <strong>dark</strong> microfibre for shrouding reflections through glass</li>
+    <li>Pocket tripod; beanbag or a bag that can be stuffed to serve as one</li>
+    <li>Dry bag large enough to swallow a camera</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">Weigh it, before the airstrip does <span class="when">CHECK THE LIMITS</span></div>
+  <p class="ctx">Bush-flight allowances are quoted including hand luggage, so the camera bag counts. Soft bags only is common &mdash; no frames, no wheels.</p>
+  <ul>
+    <li>Look up <strong>this trip's actual limits</strong> and write them down &mdash; they vary by operator and country, and the East African bush allowance is usually the tighter one</li>
+    <li>Put the whole photographic kit on a kitchen scale as a single number</li>
+    <li>Decide the second body on that number, not on sentiment</li>
+    <li><strong>Beanbag empty</strong> &mdash; fill it with rice or sand at the first camp</li>
+    <li>Chargers audited: one per battery type, no duplicates, no mains bricks you won't use</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">On the iPads, before you leave <span class="when">PHOTOS</span></div>
+  <ul>
+    <li>Folder created, named to sort: <code>YYYY-MM Place</code></li>
+    <li>Two albums inside it, empty: <strong>&lt;trip&gt;</strong> and <strong>&lt;trip&gt; Selected</strong></li>
+    <li>Sweep shortcut built, pointed at the new album, <strong>on the home screen</strong></li>
+    <li><strong>Shortcut named trip-independently</strong> &mdash; "Sweep to Trip Album", nothing with the trip name in it</li>
+    <li>Shortcut run once on a nearly-empty library &mdash; confirm the count reported matches what you put there</li>
+    <li>Scope confirmed: does it need a date condition, or is the library trip-only?</li>
+    <li>Card reader tested with the actual cards, on both iPads</li>
+    <li>No cloud sync enabled &mdash; confirm, don't assume</li>
+  </ul>
+</div>
+
+
+<!-- ============ COLOPHON ============ -->
+<h1 class="chapter">Colophon</h1>
+<p class="kicker">Revision, date, and what changed</p>
+<hr class="chaprule">
+
+<div class="panel">
+  <div class="h">This copy</div>
+  <p><strong>Photography Notes</strong> &mdash; kit, settings, technique and workflow<br>
+  <strong>Revision 2</strong> &middot; 6 August 2026</p>
+  <p class="small">The revision and date also run along the foot of every page, so a printed
+  copy can be identified without opening it.</p>
+</div>
+
+<h2>What changed in this revision</h2>
+<p class="small"><strong>Revision 2</strong> &mdash; <em>Staging, not carrying</em> broadened to cover the full vehicle, where there is no spare seat: the chest harness, the sling, and why mass decides whether wearing your kit all day is viable.</p>
+<p class="small"><strong>Revision 1</strong> &mdash; first issue:</p>
+<ul class="tight"><li><strong>New volume.</strong> Holds the durable half of the photography material, so that the next trip inherits it rather than re-deriving it.</li><li>Part One is principles that survive a change of camera. Part Two is this specific hardware, boxed in blue-grey panels so a new body means revising one part.</li><li>Part Three is the evening routine; Part Four the rules on publishing coordinates; the appendix is a pre-flight tick list.</li></ul>
+
+<h2>Earlier revisions</h2>
+<p class="small">Revision 1 was the first issue, 6 August 2026.</p>
+
+<div style="break-inside:avoid;">
+<h2>The set</h2>
+<p>Four volumes, meant to be carried together and to be of the same generation. If the
+revisions below don't match the ones on the volumes in your hand, something is out of date.</p>
+<table class="mv"><thead><tr><th style="width:44%">Volume</th><th style="width:31%">Covers</th><th style="width:25%">This generation</th></tr></thead><tbody><tr><td>The Rift &amp; the Delta</td><td>field companion</td><td><strong>Rev 6</strong></td></tr><tr><td>Who&rsquo;s Who</td><td>species</td><td><strong>Rev 1.1</strong></td></tr><tr><td>Four Countries</td><td>country briefing</td><td><strong>Rev 1.1</strong></td></tr><tr><td>Photography Notes</td><td>kit</td><td><strong>Rev 2</strong></td></tr></tbody></table>
+</div>
+
+<h2>A note for the next trip</h2>
+<p>Part One, Part Three, Part Four and the appendix are destination-free and should carry forward untouched. Part Two expires with the hardware. If a principle in Part One ever needs editing because a camera changed, it was a specification wearing a principle&rsquo;s clothes and belongs in Part Two.</p>
+
+</body>
+</html>
