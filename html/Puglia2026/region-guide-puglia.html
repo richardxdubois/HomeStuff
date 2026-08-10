@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terra d'Otranto — A Companion Volume on Puglia and the Salento</title>
+<style>
+  :root{
+    --ink:#26262a;
+    --soft:#5a5750;
+    --terra:#a8762c;
+    --terra-d:#8a5d1c;
+    --green:#1c4c56;
+    --gold:#c9a227;
+    --cream:#fbf7ef;
+    --panel:#f5eddd;
+    --rule:#dbcfb6;
+  }
+
+  @page {
+    size: Letter;
+    margin: 24mm 20mm 20mm 20mm;
+    @top-right{
+      content: string(chaptitle);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#9a8f7c;
+    }
+    @top-left{
+      content: "Puglia 2026";
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#c3b79f;
+    }
+    @bottom-center{
+      content: counter(page);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 9pt; color:#9a8f7c;
+    }
+  }
+  @page cover { margin:0; @top-right{content:none} @top-left{content:none} @bottom-center{content:none} }
+  @page :first { @top-right{content:none} @top-left{content:none} }
+
+  html{ font-family:"Lora","GFS Baskerville",Georgia,serif; color:var(--ink); }
+  body{ margin:0; font-size:10.8pt; line-height:1.58; }
+
+  p{ orphans:3; widows:3; margin:0 0 .7em 0; text-align:justify; -webkit-hyphens:auto; hyphens:auto; }
+
+  h1.chapter{
+    string-set: chaptitle content(text);
+    break-before: page;
+    font-size:25pt; font-weight:700; line-height:1.08;
+    color:var(--green); margin:0 0 .1em 0; letter-spacing:-.01em;
+  }
+  .kicker{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8.5pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--terra); margin:0 0 .35em 0; font-weight:700;
+  }
+  .chaprule{ height:2.2px; background:var(--terra); width:64px; margin:.15em 0 1.1em 0; border:0;}
+  h2{
+    font-size:13.5pt; color:var(--terra-d); font-weight:700;
+    margin:1.4em 0 .25em 0; letter-spacing:-.01em;
+  }
+  h3{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:9pt; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:1.2em 0 .3em 0;
+  }
+
+  p.lead{ text-indent:0; }
+  p.lead .dc{
+    font-size:3.05em; line-height:.76; float:left;
+    margin:.04em .08em -.02em 0; color:var(--terra);
+    font-weight:700;
+  }
+  .cover .scrim{ position:absolute; left:0; right:0; bottom:0; height:52%;
+     background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.18) 35%, rgba(0,0,0,.42) 100%); }
+
+  .panel{
+    background:var(--panel);
+    border-left:3px solid var(--gold);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    orphans:3; widows:3;
+    font-size:10.2pt;
+  }
+  .panel .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--terra-d); font-weight:700; margin:0 0 .3em 0;
+  }
+  .panel p{ text-align:left; }
+  .panel p:last-child{ margin-bottom:0; }
+
+  .watch{
+    background:#e9f1f2;
+    border-left:3px solid var(--green);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    orphans:3; widows:3;
+    font-size:10.1pt;
+  }
+  .watch .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:0 0 .35em 0;
+  }
+  .watch p{ text-align:left; margin-bottom:.45em; }
+  .watch p:last-child{ margin-bottom:0; }
+
+  em.term{ font-style:italic; color:var(--green); }
+  .small{ font-size:9.4pt; color:var(--soft); }
+  .flag{ color:var(--terra-d); font-weight:700; }
+
+  table.mv{ width:100%; border-collapse:collapse; font-size:9.4pt; margin:.6em 0 .3em 0; break-inside:avoid;
+            font-family:"Carlito","DejaVu Sans",sans-serif;}
+  table.mv th{ text-align:left; border-bottom:1.5px solid var(--terra);
+     padding:.35em .5em; color:var(--terra-d); text-transform:uppercase; letter-spacing:.08em; font-size:7.8pt;}
+  table.mv td{ padding:.35em .5em; border-bottom:.6px solid var(--rule); vertical-align:top; }
+  table.mv tbody tr td:first-child{ color:var(--terra-d); }
+  table.mv tr.heavy td{ background:#f6ede0; }
+
+  ul.tight{ margin:.2em 0 .7em 0; padding-left:1.1em; break-inside:avoid; }
+  ul.tight li{ margin:.12em 0; }
+  .quietrule{ border:0; border-top:1px solid var(--rule); margin:1.4em 0; }
+
+  /* ---- COVER ---- */
+  .cover{ page:cover; height:100vh; box-sizing:border-box;
+     background: linear-gradient(180deg,#2b2110 0%,#634c16 45%,#9c7b25 76%,#cdb15a 100%);
+     color:#fdf6e6; position:relative; overflow:hidden; }
+  .cover .sky{ position:absolute; inset:0; top:0; left:0; width:100%; height:100%; }
+  .cover .content{ position:absolute; left:0; right:0; bottom:0; padding:0 22mm 26mm 22mm; }
+  .cover .eyebrow{ font-family:"Carlito","DejaVu Sans",sans-serif; letter-spacing:.34em;
+     text-transform:uppercase; font-size:10pt; color:#f2dfae; margin-bottom:.7em;}
+  .cover h1{ font-size:41pt; line-height:1.02; margin:0 0 .18em 0; font-weight:700; letter-spacing:-.015em;}
+  .cover .sub{ font-size:15pt; font-style:italic; color:#f8e9c8; margin:0 0 1.1em 0;}
+  .cover .meta{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; letter-spacing:.06em;
+     color:#efdcaf; border-top:1px solid rgba(253,246,230,.35); padding-top:.8em; max-width:150mm;}
+  .cover .route{ font-size:10.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <svg class="sky" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <!-- sun disc -->
+    <circle cx="600" cy="212" r="80" fill="#f6d98f" opacity="0.24"/>
+    <!-- birds -->
+    <g stroke="#241b0c" stroke-width="3" fill="none" opacity="0.38">
+      <path d="M212 186 q13 -12 26 0 q13 -12 26 0"/>
+      <path d="M282 222 q10 -10 20 0 q10 -10 20 0"/>
+      <path d="M168 240 q10 -10 20 0 q10 -10 20 0"/>
+    </g>
+    <!-- ground -->
+    <path d="M0 548 Q200 540 400 548 Q600 556 800 544 L800 600 L0 600 Z" fill="#241b0c" opacity="0.5"/>
+    <!-- dry stone wall: solid band with joints drawn on it -->
+    <g>
+      <rect x="0" y="508" width="800" height="44" fill="#251c0c" opacity="0.66"/>
+      <g stroke="#7a5f1c" stroke-width="1.5" opacity="0.42">
+        <path d="M0 522 H800"/><path d="M0 537 H800"/>
+        <path d="M46 508 V522"/><path d="M112 508 V522"/><path d="M164 508 V522"/>
+        <path d="M228 508 V522"/><path d="M286 508 V522"/><path d="M336 508 V522"/>
+        <path d="M402 508 V522"/><path d="M456 508 V522"/><path d="M512 508 V522"/>
+        <path d="M572 508 V522"/><path d="M628 508 V522"/><path d="M690 508 V522"/>
+        <path d="M746 508 V522"/>
+        <path d="M22 522 V537"/><path d="M82 522 V537"/><path d="M138 522 V537"/>
+        <path d="M196 522 V537"/><path d="M256 522 V537"/><path d="M312 522 V537"/>
+        <path d="M370 522 V537"/><path d="M430 522 V537"/><path d="M486 522 V537"/>
+        <path d="M544 522 V537"/><path d="M600 522 V537"/><path d="M660 522 V537"/>
+        <path d="M718 522 V537"/><path d="M772 522 V537"/>
+        <path d="M54 537 V552"/><path d="M118 537 V552"/><path d="M176 537 V552"/>
+        <path d="M236 537 V552"/><path d="M296 537 V552"/><path d="M352 537 V552"/>
+        <path d="M414 537 V552"/><path d="M470 537 V552"/><path d="M528 537 V552"/>
+        <path d="M588 537 V552"/><path d="M644 537 V552"/><path d="M706 537 V552"/>
+        <path d="M762 537 V552"/>
+      </g>
+    </g>
+    <!-- olive trees: thick forked trunks, lumpy open canopies -->
+    <g fill="#241b0c" opacity="0.92">
+      <!-- left tree -->
+      <path d="M100 552 L122 486 L102 462 L124 460 L140 428 L156 460 L180 458 L158 486 L182 552 Z"/>
+      <path d="M52 418 C 44 388, 68 362, 100 364 C 112 342, 148 338, 168 358
+               C 204 350, 230 376, 220 404 C 238 422, 228 452, 198 456
+               C 178 472, 140 470, 124 454 C 92 460, 58 446, 52 418 Z"/>
+      <!-- right-of-centre tree, a little smaller -->
+      <path d="M394 548 L410 496 L394 476 L412 474 L424 450 L436 474 L456 472 L438 496 L456 548 Z"/>
+      <path d="M356 448 C 350 424, 368 404, 394 406 C 404 388, 432 384, 448 400
+               C 476 394, 496 414, 488 436 C 502 450, 494 474, 470 478
+               C 454 490, 424 488, 412 476 C 386 480, 360 470, 356 448 Z"/>
+    </g>
+    <!-- trulli on the right, standing on the ground -->
+    <g fill="#241b0c" opacity="0.94">
+      <rect x="616" y="486" width="76" height="62"/>
+      <path d="M602 488 Q654 356 706 488 Z"/>
+      <rect x="651" y="404" width="6" height="18"/>
+      <circle cx="654" cy="400" r="8"/>
+      <rect x="700" y="504" width="58" height="44"/>
+      <path d="M688 506 Q729 404 770 506 Z"/>
+      <rect x="726.5" y="440" width="5" height="15"/>
+      <circle cx="729" cy="436" r="6"/>
+    </g>
+  </svg>
+  <div class="scrim"></div>
+  <div class="content">
+    <div class="eyebrow">A Companion Volume &nbsp;&middot;&nbsp; 27 September &ndash; 3 October 2026</div>
+    <h1>Terra d'Otranto</h1>
+    <div class="sub">The layers, the language, the olives and the water</div>
+    <div class="meta">
+      <div class="route">Messapians &middot; Greeks &middot; Rome &middot; Byzantium &middot; Normans &middot; Spain &middot; the Baroque &middot; and now</div>
+      <div style="margin-top:.5em;">Compiled to be honest rather than promotional</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INTRO ============ -->
+<h1 class="chapter">Before You Read This</h1>
+<p class="kicker">How this volume differs from the other one</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">T</span>he field companion is about landscape, geology and wildlife — the things that have been true for a hundred thousand years and will be true next year. This volume is about the layers of people on top of it, and about the present, which is a different kind of writing. Puglia is having a decade of enormous attention and enormous trouble at the same time: it is one of the most fashionable destinations in Europe, and it has just lost an entire agricultural landscape to a bacterium. Both things are true at once, and the tension between them is the story of the region right now.</p>
+
+<p>So this is written to be candid rather than promotional. There is a great deal here about a dead forest of olive trees, about a water supply borrowed from another region, about a steelworks that has poisoned a city and employs it, and about the emptiness of inland villages. None of that will spoil a week of sea kayaking. But you will be driving through several hundred kilometres of it, and some of what you see out of the window is unintelligible or simply shocking unless somebody tells you what it is.</p>
+
+<p>Where a claim is contested I have said who is contesting it. Where a figure is likely to have moved, I have said so rather than rounding it into confidence. The four items that date fastest in a volume like this — the <em>Xylella</em> zone boundaries, the state of the water, the fate of the Taranto steelworks, and who holds regional office — were all checked against current sources as this was compiled, and each is reported with its date attached so you can see how old it is. Everything historical, linguistic and structural is on firmer ground still. Where a number is disputed, or where a process was still running when I wrote, the text says so.</p>
+
+<div class="panel">
+  <div class="h">The one thread that ties the whole volume together</div>
+  <p>Puglia's history is unusually legible because it is a <strong>corridor rather than a destination</strong>. It is the closest part of Italy to Greece and the Balkans — seventy-two kilometres at the Strait of Otranto — and it is flat, fertile and lined with harbours. So everything crossing between the eastern and western Mediterranean came through here: Bronze Age Aegean traders, Spartan colonists, Roman legions bound for Greece, Byzantine administrators, Norman adventurers, Crusader fleets, Ottoman raiders, and in 1991 twenty thousand Albanians on a single freighter.</p>
+  <p>Nothing in this region is native and unmixed, and its people know it. The Salento speaks a Romance dialect with a Greek substrate, in villages that were still speaking Greek within living memory, above tombs inscribed in a Balkan language nobody can fully read, under a Baroque imported from Spain. <strong>The heel of Italy is a threshold, and it has been standing in the doorway for four thousand years.</strong></p>
+</div>
+
+<!-- ============ AT A GLANCE ============ -->
+<h1 class="chapter">Puglia at a Glance</h1>
+<p class="kicker">Orientation, and where you actually are</p>
+<hr class="chaprule">
+
+<table class="mv">
+  <tbody>
+    <tr><td style="width:32%"><strong>Region</strong></td><td>Puglia (Apulia), one of Italy's twenty regions; capital <strong>Bari</strong></td></tr>
+    <tr><td><strong>Population</strong></td><td>Roughly 3.9 million and slowly falling; Lecce province about 770,000</td></tr>
+    <tr><td><strong>Provinces on your route</strong></td><td><strong>Lecce</strong> (all of Salento), <strong>Brindisi</strong> (Ostuni, Torre Guaceto), <strong>Bari</strong> (Monopoli, Alberobello, Fasano, the Valle d'Itria)</td></tr>
+    <tr><td><strong>The old name</strong></td><td><em>Terra d'Otranto</em> &mdash; the province covering the whole Salento with Lecce as its capital, which survived until <strong>1927</strong>, when Brindisi and Taranto were carved out of it</td></tr>
+    <tr><td><strong>Languages</strong></td><td>Italian; <em>Salentino</em>, a distinct Romance dialect, in daily use; <strong>Griko</strong>, an endangered Greek variety, in nine inland villages; Arb&euml;resh (Albanian) in a few northern villages</td></tr>
+    <tr><td><strong>Landscape</strong></td><td>Karst limestone with essentially no rivers. The <em>Tavoliere</em> plain in the north, the <em>Murge</em> uplands in the centre, the flat <em>Salento</em> peninsula in the south</td></tr>
+    <tr><td><strong>Olive trees</strong></td><td>Commonly cited at 50 to 60 million, producing something like half of Italy's olive oil in a normal year &mdash; a figure that swings violently with the harvest</td></tr>
+    <tr><td><strong>Airports</strong></td><td>Bari (BRI) and Brindisi (BDS), both served by low-cost carriers, which is a large part of why the last fifteen years happened</td></tr>
+    <tr><td><strong>Energy</strong></td><td>Italy's leading wind region and among its top two for solar; a substantial net exporter of electricity</td></tr>
+    <tr><td><strong>UNESCO sites</strong></td><td>The trulli of <strong>Alberobello</strong> (1996), <strong>Castel del Monte</strong> (1996), the Gargano's beech forests, and the <em>art of dry-stone walling</em> as intangible heritage</td></tr>
+  </tbody>
+</table>
+
+<h2>Three regions inside one</h2>
+<p>Puglia is nearly four hundred kilometres long and its parts have little in common. The <strong>Tavoliere</strong>, the great cereal plain behind Foggia, is the only part with real rivers; it is the second-largest plain in Italy and it grows durum wheat. The <strong>Murge</strong>, a limestone plateau, rise behind the Adriatic coast in a series of low steps — this is where the trulli are, where the <em>gravine</em> canyons are cut, and where the wind farms stand. And the <strong>Salento</strong>, the flat peninsula of the heel, is the driest and the strangest: no relief, no water, no vipers, a Greek-speaking pocket, and until three years ago the densest olive landscape in Europe.</p>
+<p>You will be in the Salento for four days and on the Murge for two. Nothing you see belongs to the Tavoliere, and it is worth knowing that the Puglia of the postcards — Castel del Monte, the flamingo salt pans, the Gargano's forests, the lesser kestrel colonies of Gravina — is largely north of where you are going.</p>
+
+<div class="panel">
+  <div class="h">Why the name of this book is the old name</div>
+  <p><em>Terra d'Otranto</em> was a real administrative unit for something like eight hundred years, a province of the Kingdom of Naples that covered the entire heel and took its name from the small port on the eastern point rather than from Lecce, which governed it. It was abolished in 1927.</p>
+  <p>The name records something the modern map hides: for most of its history this peninsula faced <em>east</em>. Otranto, not Bari or Naples, was the point of the region — the place where the crossing to Greece began, and therefore where the wealth, the administration, the religion and the invasions came from. Puglia has been reoriented toward Rome only recently, and by railway. Sitting on the cliff at Punta Palascìa looking at Albania, you are looking at the direction this region used to point.</p>
+</div>
+
+<!-- ============ HISTORY ============ -->
+<h1 class="chapter">The Layers</h1>
+<p class="kicker">Four thousand years in the doorway</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">E</span>very stop on your itinerary is a stratigraphy, and the layers are unusually easy to separate here because each one arrived across the same seventy-two kilometres of water. What follows is the sequence, with the places you will actually stand in marked as they come.</p>
+
+<h2>The Messapians, and a language nobody can read</h2>
+<p><em class="term">Iapygian</em> is the ancient umbrella term for the pre-Roman peoples of the heel: Daunians in the north, Peucetians around Bari, and in the Salento the <strong>Messapians</strong>. They were neither Greek nor Italic, which is the first surprising thing about them.</p>
+<p>Their language, <strong>Messapic</strong>, is an extinct Paleo-Balkanic tongue preserved in about <strong>six hundred inscriptions</strong> written in an alphabet borrowed from Western Greek, dating from the mid-sixth century BC to at least the second. You will see it twice this week: in the sanctuary caves at Roca Vecchia and at Punta Ristola. It is only partly understood.</p>
+<p>Where did they come from? The traditional answer is a migration from Illyria, across the Adriatic. <strong>This is contested, not settled</strong>, and the distinction matters because the "Illyrian" label has been put to nationalist use in both Albanian and Italian popular writing. Archaeologically there is real support: substantial trans-Adriatic contact in the second millennium BC. Linguistically the argument is weak, for the awkward reason that <em>Illyrian itself is barely attested</em> — there is no consensus that Messapic inscriptions should be counted as Illyrian at all. Eric Hamp grouped them as "Messapo-Illyrian" and further, with Albanian, under an "Adriatic Indo-European"; others prefer a looser "Western Paleo-Balkan." The honest version is that these people came from somewhere across that water and spoke something related to what was spoken on the far side, and that the details are open.</p>
+<p>Their cities are worth knowing by name because several are within reach. <strong>Rudiae</strong>, just south-west of Lecce, was settled by the late ninth or early eighth century BC and has a wall circuit of two concentric rings running some four kilometres, plus a Roman amphitheatre; its identification as the birthplace of the poet Ennius is a <em>Renaissance</em> attribution rather than an ancient one. <strong>Cavallino</strong>, five kilometres from Lecce, is a large walled settlement abandoned in the early fifth century BC — a clean archaeological horizon. <strong>Muro Leccese</strong> is among the largest, around a hundred hectares within its walls. <strong>Vaste</strong> has Messapian walls and, better, an eleventh- or twelfth-century frescoed crypt that is the finest Byzantine interior in the southern Salento. And the two ports: <em>Hydruntum</em>, which is Otranto, and <em>Brentesion</em>, which is Brindisi, whose name is usually derived from a Messapic word for "stag's head," after the shape of its harbour.</p>
+
+<div class="panel">
+  <div class="h">The war between the Greeks and the natives, which the natives won</div>
+  <p><strong>Taras</strong> — Taranto — was founded by tradition in <strong>706 BC</strong> by Spartans: the <em>Partheniai</em>, under Phalanthos. It was <em>Sparta's only overseas colony</em> and became the richest city of Magna Graecia. This is why the Ionian side of the heel is Greek and the Adriatic side Messapian: two different worlds on one peninsula, forty kilometres apart, which is roughly the distance you will drive on Day 4.</p>
+  <p>Relations were chronically hostile, and the Greeks did not always win. Herodotus records the defeat of Taras and Rhegion by the Iapygians around <strong>473 BC</strong> as "the greatest slaughter of Greeks" he knew of — the site and the casualty figures are both disputed. Taras thereafter took to hiring mainland generals, with poor results: <strong>Archidamus III of Sparta</strong> was killed outside Manduria in 338 BC; Alexander of Epirus died a few years later; and finally <strong>Pyrrhus</strong> fought his famous Italian war (280&ndash;275 BC) on Taras's behalf against Rome, winning the battles and coining a phrase.</p>
+</div>
+
+<h2>Rome: a road to Greece</h2>
+<p>The Messapians largely sided with Rome. Taras fell in <strong>272 BC</strong>, and a Latin colony was planted at <strong>Brundisium in 244 BC</strong>, which made it the empire's gateway to the East. Everything follows from that. The <strong>Via Appia</strong>, begun in 312 BC by Appius Claudius Caecus and extended over the following century or two, ended at Brindisi, where two columns marked the terminus — one still stands, and the shaft of the other was given to Lecce in 1666 and topped with a statue of Sant'Oronzo, where it stands in the main square you will walk through on Day 0.</p>
+<p>The <strong>Via Traiana</strong> followed in AD 108&ndash;110, a faster coastal route through Barium and <strong>Egnatia</strong> — which is why you can put your fingers in Roman cart ruts at Egnazia on Day 5. Two more Roman notes: Virgil died at Brundisium in 19 BC, on his way back from Greece; and <strong>Cannae</strong>, where Hannibal destroyed a Roman army on 2 August 216 BC in the textbook double envelopment, is in northern Puglia. The Roman dead are given as roughly seventy thousand by Polybius and forty-eight thousand by Livy, which is a useful reminder of how ancient numbers work. Messapic died out under Latin by about the first century BC.</p>
+
+<h2>Byzantium: the long Greek period</h2>
+<p>This is the layer most visitors miss, and it is the one that explains the most.</p>
+<p>After Justinian's Gothic War the region was nominally imperial, then largely Lombard, and then the Byzantines came back: they recovered <strong>Bari in 876</strong> and made it their Italian capital. The <em class="term">Theme of Longobardia</em> was organised in the late ninth century and later absorbed into the <em class="term">Catepanate of Italy</em>, governed from Bari, and Byzantine rule lasted until <strong>1071</strong>. Nearly two centuries, on top of centuries of earlier imperial presence.</p>
+<p>The Salento was the deepest and most continuously Greek-administered part of it — garrisoned and repopulated from the East, with Basilian monasteries as the institutional carriers. That is why it kept the <strong>Greek rite</strong> for centuries after the Normans arrived, and why, in a pocket of villages inland from Otranto, it kept the Greek <em>language</em>. Greek liturgy survived in some Salento villages into the sixteenth and seventeenth centuries before Latinisation.</p>
+<p>The visible residue is the <strong>rock-hewn churches</strong>: cut into the walls of the <em>gravine</em> canyons at Massafra, Mottola, Ginosa and Laterza, and painted. The most remarkable within reach of your route is <strong>Santa Cristina at Carpignano Salentino</strong>, which carries a dated inscription of <strong>AD 959</strong> naming its painter, Theophylact — among the earliest securely dated Byzantine wall paintings in Italy. One correction while we are here: the story that these caves were carved by refugee monks fleeing iconoclasm is folklore, not archaeology.</p>
+
+<h2>Normans, Frederick II, and Spain</h2>
+<p><strong>Robert Guiscard</strong> arrived around 1047, was recognised Duke of Apulia at Melfi in 1059, and took Bari in 1071, ending Byzantine Italy. Bari's <strong>Basilica di San Nicola</strong> was begun in 1087 to house relics stolen from Myra; it is the prototype of Apulian Romanesque, and it is why Bari is still an Orthodox pilgrimage city today. The Otranto mosaic floor you will stand on belongs to this moment — laid 1163&ndash;65, in a Norman kingdom, by a man who had somehow heard of King Arthur.</p>
+<p><strong>Frederick II</strong> (1194&ndash;1250) treated Puglia as his heartland and built across it: the Constitutions of Melfi in 1231, castles at Bari, Trani, Gioia del Colle, Lucera and Brindisi, and above all <strong>Castel del Monte</strong> near Andria, whose relentless octagonal geometry has generated a very large literature and no agreement whatever on what it was for — hunting lodge, symbolic crown, astronomical instrument. Report the dispute; do not settle it.</p>
+<p>Then Angevins from 1266, Aragonese from 1442, and Spanish viceregal rule from 1503 to 1713. Spanish Puglia faced Ottoman and Barbary corsairs, and the answer was the <strong>coastal watchtowers</strong> — largely built in the 1530s to 1560s under Charles V and formalised by viceregal decree, sited in line of sight, of which perhaps ninety survive in the old Terra d'Otranto. Half the coastal place-names on your kayaking route are towers: Torre dell'Orso, Torre Sant'Andrea, Torre Sant'Emiliano, Torre Uluzzo, Torre Vado. From a kayak they are the most legible historical structure on the coast, and the field companion describes how the signalling chain worked.</p>
+<p>The event that made them necessary was the <strong>sack of Otranto in 1480</strong>, which the field companion treats in full. In short: an Ottoman fleet landed on 28 July, the city fell on 11 August, and on 14 August the male survivors — traditionally eight hundred and thirteen — were executed on the hill above the town. The bones are behind glass in the cathedral, and the visit distresses some people; it is worth saying so in advance rather than after.</p>
+
+<h2>Why Lecce looks like that</h2>
+<p>The <strong>Lecce Baroque</strong> is the most extravagant provincial architecture in Italy, and it has three causes that all operated at once.</p>
+<p>First, <strong>money</strong> — and specifically olive money. Terra d'Otranto oil was an export commodity, shipped from Gallipoli as lamp oil to light the streets of northern Europe, and it made the region genuinely wealthy in the seventeenth century. Second, <strong>competition</strong>: a dense population of religious orders building against one another in a Counter-Reformation climate, with Spanish taste running to <em>horror vacui</em>, the fear of an empty surface. And third, <strong>the stone</strong>. <em>Pietra leccese</em> is a fine-grained pale-gold Miocene limestone soft enough to be carved with a knife when freshly quarried, hardening on exposure to air. That single material property made deeply undercut foliage <em>cheap</em>. When you look at a façade in Lecce and wonder how anyone afforded it, the answer is partly that the stone was doing the work.</p>
+<p>The names to attach: <strong>Gabriele Riccardi</strong>, who began Santa Croce in 1549; <strong>Cesare Penna</strong>; and above all <strong>Giuseppe Zimbalo</strong>, called <em>lo Zingarello</em> (1620&ndash;1710), who did the upper façade of Santa Croce and the enormous cathedral bell tower of 1682. Then Giuseppe Cino and Emanuele Manieri. The style spread outward to Nardò, Galatina, Martina Franca and Ostuni, so you will meet it again on the Murge.</p>
+
+<h2>Unification, and the emptying</h2>
+<p>Italian unification in 1860&ndash;61 was not, in the south, an unambiguous liberation. It brought northern tariffs, the persistence of great estates, near-universal illiteracy, and a peasantry whose hopes of land were disappointed. What followed was <strong>brigandage</strong> (1861&ndash;65) — a rural insurgency as much as banditry, suppressed under an emergency law of 1863 — and then the emigration.</p>
+<p>Something like <strong>fourteen million people left Italy between 1876 and 1915</strong>. Puglia joined later and more heavily than Campania, mostly for the Americas, and then again in the 1950s to 1970s, this time northward, to Turin, Milan, Germany and Switzerland. <strong>Nearly every Salento village has a piazza emptier than its houses</strong>, and you will notice it. The <em>questione meridionale</em>, the Southern Question, was named in the nineteenth century and has not been closed.</p>
+<p>The twentieth century added: militant farm-labourer unionism, which made Puglia one of Italy's most contested rural regions around 1919&ndash;21 and again in 1946&ndash;50; the <strong>1950 land reform</strong>, which broke up some estates; and the <strong>Cassa per il Mezzogiorno</strong> (1950&ndash;1984), which funded southern infrastructure with genuinely mixed results — working aqueducts and motorways on one hand, and what Italians call <em>cathedrals in the desert</em> on the other. The largest of those was the Taranto steelworks, which has its own section later.</p>
+
+<div class="panel">
+  <div class="h">1991, and the image that changed how Italy sees itself</div>
+  <p>In March 1991, as the Albanian state collapsed, something like twenty-five thousand Albanians crossed to Brindisi and Otranto. On <strong>8 August 1991</strong> the freighter <em>Vlora</em> — hijacked at Durrës — docked at Bari with roughly <strong>twenty thousand people aboard</strong>, packed onto every horizontal surface. They were held in the city's football stadium. The photographs are the founding image of Italy as a country of immigration rather than emigration, which happened within a single generation.</p>
+  <p>The sequel is on your route. On <strong>28 March 1997</strong> the Albanian vessel <em>Kater i Radës</em>, crowded with migrants, sank off Otranto after a collision with an Italian warship during an interception. At least eighty-one died and probably many more; the gap between the confirmed and the estimated toll is part of the story. The raised hull is now part of a monument on the Otranto waterfront by the artist Costas Varotsos, <em>L'Approdo</em> — The Landing.</p>
+  <p>The same seventy-two kilometres carried Roman legions, Byzantine tax collectors, Ottoman fleets and Albanian speedboats. It is one continuous fact with different cargoes, and Otranto is where all of them touched land.</p>
+</div>
+
+<!-- ============ GRIKO ============ -->
+<h1 class="chapter">Griko</h1>
+<p class="kicker">A Greek language at the end of its life, and an open question</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">I</span>nland and north-west of Otranto, in nine villages, people speak a variety of Greek. It is called <em class="term">Griko</em>, and it is one of two Italiot Greek varieties — the other, <em>Greko</em>, survives in a smaller pocket in Calabria. If your itinerary makes an inland detour on the way south from Otranto, you may drive through it. If it takes the coast road via Porto Badisco and Castro, you will not, so it is worth asking, because these villages repay a stop.</p>
+
+<h2>The nine villages, and why tourist material says eleven</h2>
+<p>The linguistic nine are <strong>Calimera, Castrignano dei Greci, Corigliano d'Otranto, Martano, Martignano, Melpignano, Soleto, Sternatia and Zollino</strong>. The administrative <em>Unione dei Comuni della Grecìa Salentina</em>, created around the turn of the century, later took in three more comuni that are not Greek-speaking, which is why published counts vary. The linguistic nine and the local-government union are different things.</p>
+
+<h2>How many speakers, honestly</h2>
+<p>Figures here are unreliable and have been inflated by tourist boards for decades. Older surveys claimed something like twenty thousand people with some competence. Realistic recent assessments put <strong>fluent native speakers in the low thousands at most, plausibly the hundreds, overwhelmingly over seventy years old.</strong> UNESCO classes Griko as severely endangered. Transmission is effectively broken: almost nobody under fifty acquired it at home.</p>
+
+<div class="panel">
+  <div class="h">Where did it come from? A genuinely open question</div>
+  <p><strong>Gerhard Rohlfs</strong> argued for direct continuity from Magna Graecia — an unbroken Doric-descended vernacular spoken here since the Greek colonies, which would make Griko a living relic of the classical world. <strong>Giuseppe Morosi</strong> and others argued that the enclaves are residue of <em>Byzantine-era</em> settlement and administration, seventh to eleventh centuries, and therefore medieval rather than ancient.</p>
+  <p>The modern middle position is that Byzantine repopulation is the proximate source, possibly settling onto an older Greek substrate, with the boundaries of the enclave drawn by medieval rather than classical settlement patterns. <strong>Present it as a live dispute.</strong> The local formulation you will hear — "we have spoken Greek here since Pericles" — is a claim rather than a finding, and it is a claim with a good deal of civic pride invested in it. The Byzantine chapter of this book is the reason the Byzantine answer is probably nearer the truth.</p>
+</div>
+
+<h2>Revitalisation, and what it can realistically achieve</h2>
+<p>In practice revitalisation means bilingual road signs, elective courses in schools, a small publishing effort — the Ghetonìa association at Calimera has been the most durable — and festivals. But by far the most effective vector has been <strong>music</strong>. A great deal of the <em>Notte della Taranta</em> repertoire is in Griko, and two songs in particular, <em>Kalinifta</em> ("goodnight") and <em>Aremu rindineddha</em>, are known to hundreds of thousands of Italians who do not speak a word of the language. Italy's minority-language law of 1999 and regional provisions apply.</p>
+<p>The honest prospect: <strong>Griko will survive as heritage, performance and village pride, and not as a spoken vernacular.</strong> That is worth stating plainly rather than being sentimental about, because the two outcomes require completely different things and only one of them is still available.</p>
+<p>Three words to carry anyway, because saying them in the right village will produce a genuinely warm response: <em class="term">kalimera</em> (good morning), <em class="term">kalinifta</em> (goodnight), <em class="term">kalò</em> (good).</p>
+
+<!-- ============ OLIVES ============ -->
+<h1 class="chapter">The Olives, and What Killed Them</h1>
+<p class="kicker">The most important thing to understand before you look out of the window</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">P</span>uglia is the dominant olive region of Italy: something like fifty to sixty million trees on around three hundred and seventy thousand hectares, producing about half of the national oil in a normal year. Salento's own cultivars are <em>Cellina di Nardò</em> and <em>Ogliarola Salentina</em>. And in the decade since 2013, the commercial olive economy of the two southernmost provinces has effectively ended.</p>
+
+<p>This is not a footnote. It is the single largest change to a European agricultural landscape in living memory, and you will drive through the middle of it for four days. It needs explaining before you see it, because the alternative is either bewilderment or the assumption that somebody has been careless.</p>
+
+<h2>What happened</h2>
+<p><em class="term">Xylella fastidiosa</em> subspecies <em>pauca</em>, sequence type ST53, was first detected in Europe in <strong>October 2013</strong>, in the <strong>Gallipoli and Alezio area</strong> of Lecce province — which is to say, essentially at your Day 4 launch site. It was found on olives showing what Italian growers were already calling <em>complesso del disseccamento rapido dell'olivo</em>, olive quick decline syndrome.</p>
+<p>The strain is genetically closest to Central American isolates, and the working hypothesis is introduction on ornamental coffee plants. The bacterium colonises the xylem and blocks water transport, so the tree dies from the top down. <strong>There is no cure and no field-effective treatment.</strong> The European vector is the <strong>meadow spittlebug</strong>, <em>Philaenus spumarius</em> — the small insect whose nymphs make the "cuckoo spit" froth on plant stems — whose young live in ground cover, which is why mandatory spring tillage became part of the control regime.</p>
+
+<h2>The regime, and why people fought it</h2>
+<p>The EU response created an <strong>infected zone</strong>, a <strong>buffer zone</strong> around it, and — in the deep Salento, where eradication was abandoned as impossible — a <strong>containment area</strong>. In the eradication zone, infected plants had to be felled, together with all host plants within a specified radius. The radius and the zone widths were amended repeatedly.</p>
+<p>Compulsory felling of healthy-looking and sometimes monumental trees produced sustained and bitter resistance: blockades and tree occupations, a stream of administrative-court injunctions, and in 2015 a criminal investigation by the Lecce prosecutor into researchers and officials, eventually shelved without trial. Alongside real grievance ran thick conspiracy theory — that the epidemic had been invented to clear land for tourism, golf courses or photovoltaics; that the gas pipeline or agrochemicals were the cause; that the trees were dying of bad pruning or fungus; that <em>Xylella</em> does not kill olives at all. Some of this is still widely believed.</p>
+<p><strong>The consensus is the consensus, and it should be reported as such.</strong> But it is also worth being fair about why trust collapsed: <em>the state arrived with chainsaws before it arrived with compensation</em>, and it was asking people to cut down trees their great-grandparents had planted on the strength of a diagnosis they could not see.</p>
+
+<h2>The scale</h2>
+<p>The most-repeated figure is around <strong>twenty-one million trees dead or affected</strong> across the Salento, and it should be used carefully, because it conflates dead, infected and merely symptomatic. Industry estimates put cumulative damage in the range of one and a half billion euros and production losses in Lecce province at eighty to ninety per cent. <strong>Lecce and Brindisi provinces are, as a commercial oil economy, post-olive.</strong></p>
+
+<div class="panel">
+  <div class="h">Where the front is &mdash; and what it means for Day 5</div>
+  <p>The infection has moved north-north-west year on year, and the answer is no longer in doubt: <strong>the infected zone now takes in Monopoli, Polignano a Mare, Castellana Grotte, Alberobello and part of Putignano.</strong> Which is to say that the Valle d'Itria, where you sleep on Days 5 and 6, and Monopoli, where the trip ends, are <em>inside</em> the delimited area rather than beyond it.</p>
+  <p>Two qualifications, both real. The advance has <strong>slowed markedly</strong> — monitoring through the 2020s found the northern limit of the infected zone holding roughly stable rather than jumping, with isolated outbreaks further north (Polignano, Alberobello) eradicated as they appeared. And "infected zone" is a legal designation covering a whole comune, not a description of every grove in it: much of the Fasano&ndash;Ostuni monumental belt is still visibly alive. Compulsory spring tillage against the insect vector now applies across dozens of comuni in the Bari, Taranto and Brindisi provinces below two hundred metres.</p>
+  <p>Ask your hosts anyway, on the first evening. They will know their own trees, and it is the most important fact in their working lives.
+</div>
+
+<h2>What replaces them</h2>
+<p>Only two tolerant cultivars are authorised for replanting: <strong>Leccino</strong>, which becomes infected but carries a low bacterial load and shows limited symptoms, and <strong>FS-17</strong>, also sold as <em>Favolosa</em>. Tolerant, note, not immune. Replanting is slow — permits, cost, water, and five to ten years to production — and a great many growers have simply switched to vines, pomegranates or almonds, or sold the land to solar developers.</p>
+
+<h2>What you will actually see, which is the part that matters</h2>
+<p><strong>Between Lecce and Leuca</strong>, and especially between Gallipoli and Alessano, you are in the epicentre, and it is shocking. Kilometre after kilometre of <em>grey-white skeletal trunks</em>, bark peeling, bare in the season when an olive grove should be silver. Whole groves standing dead like a forest that burned without fire. Elsewhere groves felled, with stacked cordwood in the field corners or heaps of shredded trunk. Monumental trunks sawn to stumps and <strong>re-sprouting a mop of green from the base</strong> — some of them Leccino grafts, some just old rootstock trying again, and easy to misread as recovery when it is usually not. Cleared red earth replanted with young vines and almonds in tight modern rows. And an unmistakable spread of <strong>solar arrays on former grove land</strong>. Also dry-stone walls now enclosing nothing, and a serious and rising fire risk from all that standing dead wood.</p>
+<p>This is an ex-landscape, and saying so is more respectful than not.</p>
+<p><strong>Between the Salento and the Valle d'Itria</strong>, on Day 5, the transition is legible from the car and worth watching for. Around Ostuni and Fasano the monumental groves are still substantially <em>alive</em> — enormous contorted trunks, silver canopies, dry-stone walls, the underground mills — but interleaved with dead patches, quarantine notices and freshly cleared squares. Higher up, the Valle d'Itria is still green and dense: trulli, olives, vines, oaks, fruit. How much of that holds in autumn 2026 is exactly what to ask about.</p>
+
+<div class="panel">
+  <div class="h">Two things to hold in mind while looking at it</div>
+  <p><strong>The monumental trees are protected, and their age claims are inflated.</strong> Puglia's regional law of 2007 protects registered <em>ulivi monumentali</em>, requiring authorisation to fell, uproot or transplant one, and created a register whose count is quoted anywhere from sixty to ninety thousand trees. The densest concentration is the <em>Piana degli Ulivi Monumentali</em> between Fasano, Ostuni, Carovigno and Monopoli — immediately downhill from your second masseria. Trunks of a thousand years and more are defensible. The commonly retailed "two-thousand-year-old Roman tree" is not: olive trunks hollow out and regenerate from the base, so the visible wood is far younger than the organism, and single-tree ages of that order are essentially unverifiable.</p>
+  <p><strong>And the groves were an industrial plant.</strong> The reason the Salento is covered in olives is that seventeenth- to nineteenth-century Europe needed lamp oil, and Gallipoli was the principal export port for it. Kerosene ended that trade a century and a half ago and the trees stayed on, converted to edible oil. What has died here is the last surviving physical form of an obsolete energy industry — which does not make it less of a loss, but does explain why there are quite so many trees to lose.</p>
+</div>
+
+<!-- ============ WATER ============ -->
+<h1 class="chapter">Water, Which Decides Everything</h1>
+<p class="kicker">The quiet crisis behind the visible one</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">P</span>uglia is the driest large region in Italy and has almost no perennial rivers. Rain falls on karst limestone and sinks, disappearing down swallow holes and collapse dolines and re-emerging as coastal and submarine springs. The geology of that is in the field companion; what follows is what people did about it, and what is happening now.</p>
+
+<h2>An aqueduct instead of a river</h2>
+<p>The defining public work of this region is not a dam. It is the <strong>Acquedotto Pugliese</strong>, authorised by national law in <strong>1902</strong>, which takes water from the <strong>Sele springs at Caposele</strong> in Campania — on the far side of the Apennine watershed — carries it east through a tunnel and then runs it the length of Puglia by gravity. <strong>Water first reached Bari on 24 April 1915.</strong> It is among the largest single networks in Europe, on the order of twenty thousand kilometres, serving something like four million people in Puglia plus municipalities in Campania and Basilicata.</p>
+<p>Supplementary sources matter more than the founding story, though, and they are the region's political vulnerability. Puglia also draws on the Occhito reservoir in the north and — critically — on the <strong>Basilicata reservoirs</strong>: Pertusillo on the Agri, Monte Cotugno on the Sinni, and Camastra. <strong>Puglia's dependence on Basilicata's water is the central fact of its water politics, and Basilicata knows it.</strong></p>
+<p>You will meet the aqueduct's ceremonial terminus on Day 2, at the monumental dry waterfall descending to the harbour at Santa Maria di Leuca. It is worth understanding as a monument not to water arriving, but to the <em>idea</em> of water arriving, built by a region that had waited a very long time.</p>
+
+<h2>The drought, with the caveat it needs</h2>
+<p>2024 was severely dry across the far south of Italy. Sicily and Basilicata were placed under states of emergency; Basilicata's reservoirs hit critical levels in the second half of that year, and Potenza and dozens of municipalities went onto rotational rationing as the Camastra reservoir collapsed. Because Pugliese irrigation depends on the Basilicata system, the knock-on was <strong>irrigation cuts and reduced allocations to Pugliese consortia</strong>, with losses in fruit, table grapes, tomatoes and durum wheat. The following winter brought partial recovery without clearing the cumulative deficit.</p>
+<p><strong>2026 has been, by recent standards, a good year — and the argument has moved.</strong> Winter and spring rain left Puglia's reservoirs around <strong>77 per cent full</strong> in early summer, and the Basilicata reservoirs on which Puglia depends — Monte Cotugno, Pertusillo, Camastra, Basentello — at about <strong>81 per cent of authorised volume</strong>, some 128 million cubic metres up on the previous year. The complaint now is not drought but <em>leakage and missing infrastructure</em>: the farmers' association reported Puglia losing <strong>12.66 million cubic metres from its reservoirs in a single week</strong> in the summer heat, and is pressing for new storage rather than emergency relief. What is structural rather than seasonal is that the region has a thin margin and a supply it does not control.</p>
+
+<h2>Salt in the wells</h2>
+<p>The other half of the water story is underground and is more serious than the drought, because it is not seasonal.</p>
+<p>The Salento's karst aquifer is a <strong>lens of fresh water floating on sea water</strong>, and because the water table stands only a metre or three above sea level, the lens is thin — tens of metres. Decades of over-abstraction, including many thousands of unauthorised wells, have thinned it further and drawn the salt interface <em>upward and inland</em>. Chloride levels in coastal and even inland wells have risen enough to damage crops and in places to exceed potable limits. And then irrigating with brackish water salinises the soil, which compounds the problem. Treated wastewater has historically been disposed of into karst voids — the injection sink at Nardò is the notorious case — which puts effluent directly into the aquifer.</p>
+<p>For a reader who likes systems, this is the quiet crisis behind the visible one. <strong><em>Xylella</em> killed the trees. Water scarcity decides whether anything replaces them.</strong> A grower choosing between replanting tolerant olives, planting table grapes or selling to a solar developer is making a water decision as much as an economic one, and the solar array needs none.</p>
+
+<div class="panel">
+  <div class="h">And the practical question: can you drink it?</div>
+  <p><strong>Yes.</strong> Puglian tap water is potable and compliant with EU and Italian drinking-water standards. The widespread local belief otherwise has three real roots, none of them safety.</p>
+  <p><strong>History:</strong> water has always been imported here, precious, and rationed in dry years. Culturally it does not feel like something you take for granted, and that attitude outlives the engineering.</p>
+  <p><strong>Taste:</strong> the water is very hard, being drawn from limestone, and often tastes strongly of chlorine at the far end of long mains. Locals prefer bottled on flavour grounds.</p>
+  <p><strong>Genuine local problems:</strong> older coastal networks have suffered saline intrusion, and municipalities do occasionally post <em>acqua non potabile</em> notices or issue boil advisories.</p>
+  <p>So: drink it, expect a mineral and chlorine taste, and a carbon filter bottle fixes that. Obey any <em>non potabile</em> sign — common on garden, harbour and cemetery taps. If a masseria is on a private well or cistern, ask. And never drink from a coastal karst spring, however cold and inviting: it is brackish and unprotected.</p>
+</div>
+
+<!-- ============ PEOPLE AND WORK ============ -->
+<h1 class="chapter">Who Lives Here Now</h1>
+<p class="kicker">Demography, work, steel and electricity</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">P</span>uglia has roughly 3.9 million people and the number is falling. The mechanism is the classic southern combination of very low fertility plus persistent net out-migration of the young and educated — one estimate puts something like a million people leaving the Mezzogiorno between 2002 and 2021, disproportionately graduates. In the inner Salento the effect is visible from the road: villages with beautiful housing stock, immaculate churches, and nobody under forty in the piazza at six o'clock.</p>
+
+<h2>Work</h2>
+<p>Unemployment has genuinely improved — to roughly ten or eleven per cent from the mid-teens a decade ago — but the more telling figures are that <strong>youth unemployment remains around or above thirty per cent</strong> and the <em>employment rate</em> is near fifty per cent, well below the Italian average and far below the European one. Regional GDP per head is roughly two-thirds of the national figure. Read together, those numbers describe an economy in which a great many working-age people are neither employed nor counted as unemployed, which is the durable southern pattern and the thing the emigration figures are a symptom of.</p>
+<p>These are the figures most likely to be a year or two out of date by the time you read them, and they are the least important to get exactly right.</p>
+
+<h2>Taranto: a city where employment and epidemiology are in direct conflict</h2>
+<p>You will not go to Taranto, but you should know what it is, because it is the largest single fact in modern Puglia and it explains a great deal about southern Italian politics.</p>
+<p>The steelworks was built by the state in <strong>1965</strong> as the fourth integrated plant of the national steel company — the flagship of the Cassa per il Mezzogiorno. It became Europe's biggest single-site mill, on the order of fifteen hundred hectares, with twenty thousand jobs at its peak. It also produced a public-health catastrophe in the adjacent Tamburi district, with elevated cancer and respiratory-disease rates that have been the subject of epidemiological study and of litigation for decades.</p>
+<p>The chronology since: privatised to the Riva group in 1995; <strong>partially seized by prosecutors in 2012</strong> in a landmark emissions and public-health prosecution; taken over operationally by ArcelorMittal in 2018; renamed Acciaierie d'Italia in 2021 with the state as co-investor; and placed under <strong>extraordinary administration in February 2024</strong> after the state and ArcelorMittal fell out. Government commissioners then ran a sale process with a shrinking list of bidders against a background of blast-furnace shutdowns, repeated short-time working, strikes, and an unresolved decarbonisation plan involving direct-reduced iron, first on gas and eventually on hydrogen.</p>
+<p><strong>Where it stands now.</strong> Two binding offers arrived at the December deadline — from the American fund Bedrock Industries and from the <strong>Flacks Group</strong> — and in early 2026 the commissioners, with the industry ministry's authorisation, entered <em>exclusive</em> negotiation with Flacks. The plan on the table runs to roughly €5&nbsp;billion of investment and about <strong>8,500 jobs against the present 9,741</strong>, with the state retaining a 40 per cent stake to be bought out later; the stated aim was to close the sale within the first months of 2026. Whether it has closed by the time you travel is worth a glance at the news.</p>
+<p>What is not in doubt is the structure of the problem: Taranto is a city where a very large number of families depend on a plant that is measurably shortening lives, no Italian government of any colour has resolved it, and every proposed solution requires either enormous public money or accepting the loss of the jobs. If anyone raises it, that is the honest frame.</p>
+
+<h2>Electricity, which Puglia has a surprising amount of</h2>
+<p>Here is a fact that surprises most visitors: <strong>Puglia is Italy's leading wind region and among its top two for solar, and it is a substantial net exporter of electricity.</strong> Installed wind capacity is on the order of three gigawatts — something like a quarter of the national total — and photovoltaic capacity is of a similar or larger order. The flat, windy, sunny, sparsely populated south turns out to be very good at this.</p>
+<p>Two concrete things. <strong>Beleolico</strong>, in Taranto's outer harbour, was <strong>Italy's first offshore wind farm</strong>, commissioned in April 2022 — ten turbines, around thirty megawatts. Small, and a first. And the politics are not simple: there is real local opposition to <em>consumo di suolo</em>, the consumption of land, with utility-scale solar occupying former farmland <em>including land cleared of dead olives</em>, and a live argument about agrivoltaics and about who captures the value. When you see a solar array where a grove used to be, you are looking at the intersection of the last two chapters.</p>
+
+<div class="panel">
+  <div class="h">The pipeline under your Day 1 beach</div>
+  <p>The <strong>Trans Adriatic Pipeline</strong> — 878 kilometres from Greece through Albania and across the Adriatic seabed — makes landfall at <strong>San Foca, in the comune of Melendugno</strong>: the same few kilometres of coast as Torre dell'Orso, Torre Sant'Andrea and the Grotta della Poesia. It carries Azeri gas, with a capacity of ten billion cubic metres a year, expandable to twenty. The shore crossing is a <em>microtunnel beneath the beach</em>, and the receiving terminal sits about eight kilometres inland. Commercial operation began in November 2020.</p>
+  <p>The <strong>No TAP</strong> movement of 2015&ndash;2018 was one of Italy's bitterest local environmental conflicts: the transplanting of a couple of hundred olive trees at the landfall, clashes with police in 2017, dozens of people prosecuted, and — still resented locally — the Five Star Movement's abandonment of its promise to block the project on entering government in 2018. After Russia's gas cuts in 2022, TAP's flows rose and the national criticism largely evaporated.</p>
+  <p><strong>And what you see at San Foca is almost nothing.</strong> The pipeline is buried, the crossing is tunnelled, the beach looks like a beach. The visible infrastructure is a fenced, landscaped terminal inland and some marker signage. The gap between the scale of the fight and the invisibility of the result is worth a moment's thought, and it cuts both ways: the mitigation genuinely worked, and the people who fought it are entitled to point out that it worked because they fought.</p>
+</div>
+
+<h2>The national frame, briefly</h2>
+<p>Kept short deliberately, and written to survive being wrong. At the time of writing Italy's head of state is <strong>Sergio Mattarella</strong>, re-elected to a second seven-year term in January 2022, and the government is led by <strong>Giorgia Meloni</strong> of Fratelli d'Italia, in office since October 2022 in coalition with the Lega and Forza Italia, with a general election due by 2027. Growth has been weak but positive, inflation is back to something near two per cent, and public debt remains around a hundred and thirty-five per cent of GDP, the second-highest in the euro area.</p>
+<p>The dominant fiscal story of 2026 is the <strong>post-pandemic recovery programme</strong> — the Italian national plan under NextGenerationEU, worth roughly a hundred and ninety-four billion euros, whose spending deadline falls in mid-2026. That makes the absorption of those funds a live political issue during exactly the period of your trip, and it is why there is scaffolding on so many public buildings.</p>
+<p><strong>Regionally</strong>, Puglia's long Emiliano era ended with the 2025 election. <strong>Antonio Decaro</strong> — formerly the mayor of Bari, then an MEP — was proclaimed president on 7 January 2026, presented a ten-member cabinet on the 16th, and the region's twelfth legislature opened on 2 February 2026 with Toni Matarrelli as president of the regional council. If Puglia comes up in conversation, Decaro is a Bari figure rather than a Salento one, and that distinction still matters here.</p>
+
+<!-- ============ TOURISM ============ -->
+<h1 class="chapter">Tourism, and What You Are Part Of</h1>
+<p class="kicker">The boom, the pressure points, and the case for September</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">F</span>ifteen years ago Puglia was a region Italians holidayed in. It is now one of the most fashionable destinations in Europe, and the change has been fast enough that the infrastructure, the housing market and the water system are all visibly straining. Since you are a participant rather than an observer, it is worth knowing the shape of it.</p>
+
+<h2>The boom</h2>
+<p>Overnight stays were around fifteen million in 2019 and have set records since, with the foreign share climbing toward forty per cent — figures vary depending on whether unofficial accommodation is counted, which is a large caveat. The drivers are identifiable: <strong>low-cost airlines at Bari and Brindisi</strong>; the <em>masseria</em>-hotel model, which converted a distressed agricultural building stock into luxury accommodation almost overnight; sustained international press coverage on the theme of "the new Tuscany"; celebrity weddings; and the <strong>G7 summit held at a resort near Fasano in June 2024</strong>, which was an enormous free advertisement broadcast from a few kilometres from your second masseria.</p>
+
+<h2>The pressure points, and how they will look to you</h2>
+<p><strong>Alberobello</strong> has about ten thousand residents and well over a million visitors a year. Rione Monti, the famous quarter, is now almost entirely retail, and the residents have largely left the trulli. It is fed by coach itineraries and by cruise calls at Bari and Brindisi, which is why late September improves it much less than you would hope — perhaps a third fewer people, with the quarter still thronged from ten until five. <strong>The fix is the hour rather than the month:</strong> before nine or after six it is nearly empty, and <em>Aia Piccola</em>, where people still live, is quiet at any hour. Go to the second one.</p>
+<p><strong>Polignano a Mare</strong>'s Lama Monachile is a small pebble cove in a ravine receiving crowds far beyond its capacity, and it is the most photographed spot in Puglia. Late September removes the beach crowd that makes it impassable in August; early morning remains the only answer for photographs.</p>
+<p><strong>Otranto</strong>, by contrast, is transformed. In mid-August the old town and the seafront are shoulder to shoulder and parking is a half-hour problem. In the last week of September you can park, walk the Aragonese walls at sunset alone, get a table without booking, and see a twelfth-century mosaic floor without queuing. The town reverts to being a working port of about five and a half thousand people. Call it seventy or eighty per cent fewer visitors.</p>
+<p>Add <strong>Ostuni</strong>, and <strong>Gallipoli</strong>, which has additionally become a young clubbing destination in August — a fact that honest guides mention and brochures do not.</p>
+
+<h2>Rentals, water, and a beach-concession fight</h2>
+<p>Short-term rental growth in Puglia has been among Italy's fastest, with the predictable effect on local rents in Lecce, Ostuni and the coastal villages. Italy has introduced a mandatory national identification code for short-term rentals, enforceable from the start of 2025. Summer peaks strain the aqueduct and the waste systems of villages that multiply five- or tenfold in August — which connects directly to the water chapter, and is why a village of two thousand people has infrastructure sized for nobody in particular.</p>
+<p>And a running sore worth knowing about if the subject arises: <strong>beach concessions</strong>. The <em>lidi</em> that occupy most of the accessible Italian coastline hold long-standing state concessions, and European rules on services oblige Italy to put them out to competitive tender. Successive Italian governments have delayed this for years against the concession-holders' lobby, with a settlement pushing tenders toward the late 2020s. It is one of the most reliably explosive small subjects in Italian politics, and it is why the empty beach you land on in late September belongs, formally, to somebody.</p>
+
+<div class="panel">
+  <div class="h">August versus the end of September, said plainly</div>
+  <p><strong>The turn of September into October is materially better, and this is close to the best week of the Puglian year for what you are doing.</strong> The sea is still 23 to 25 °C, the air is in the high twenties, the crowds are sharply down, restaurants are attentive again, and accommodation and flights are twenty to forty per cent below August. Italians are back at work.</p>
+  <p>The honest trade-offs: <strong>most <em>lidi</em> and seasonal beach bars close between the tenth and the twentieth of September</strong>, so the beaches are beautiful, empty and entirely unserviced; some coastal restaurants and all the excursion-boat operators begin shutting; the days are shortening by two minutes each and sunset falls back from 18:35 to 18:25 across the week; and the first <em>scirocco</em> and the first autumn low-pressure systems arrive, which means real wind and swell risk on the exposed Adriatic coast. Budget one day off the water.</p>
+  <p>And the great August festivals are over: <strong>La Notte della Taranta</strong> at Melpignano, whose 2026 <em>Concertone</em> is on Saturday 22 August, the <em>pizzica scherma</em> knife-dance at Torrepaduli on the night of 15&ndash;16 August, and the patronal feasts including Lecce's own Sant'Oronzo. You miss all of them by five weeks or so. The consolation, which is real, is pizzica played to fifty people in a courtyard rather than to a hundred thousand in a field.</p>
+</div>
+
+<!-- ============ COURTESIES ============ -->
+<h1 class="chapter">Courtesies That Travel</h1>
+<p class="kicker">Language, churches, cameras and money</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">T</span>he dining and coffee conventions are in the field companion, in the chapter on the table. What follows is everything else: how to greet people, what dialect you are hearing, how to behave in a church that has a custodian at the door, when to ask before photographing, and the truth about tipping.</p>
+
+<h2>Greeting, which matters more than you expect</h2>
+<p><em class="term">Buongiorno</em> until roughly mid-afternoon, <em class="term">buonasera</em> from late afternoon — and southerners switch early, sometimes straight after lunch. <em class="term">Salve</em> is a useful neutral fallback if you cannot decide. <em>Ciao</em> is for people you know; with a stranger it reads as childish or presumptuous, so use the formal <em>Lei</em> with anyone older and in any transaction.</p>
+<p>The single most valuable habit: <strong>say <em>buongiorno</em> on entering a shop, a bar or a waiting room, and <em>arrivederci</em> or <em>buona giornata</em> on leaving.</strong> Walking in and out silently is the commonest tourist rudeness in Italy and it costs nothing to fix. Also useful: <em>permesso?</em> on entering someone's space, <em>piacere</em> on being introduced with a handshake, <em>scusi</em> rather than <em>scusa</em>, and <em>prego</em>, which does the work of "please do," "after you," "you're welcome" and "what can I get you."</p>
+
+<h2>What you are actually hearing</h2>
+<p><strong>Salentino is a distinct Romance dialect, not accented Italian.</strong> Older villagers may genuinely be more comfortable in it than in Italian, and a smiling <em>non ho capito, scusi</em> is all that is needed. Its audible signature is a retroflex <em>ddh</em> sound, so <em>bello</em> becomes <em>beddhu</em>.</p>
+<p>Words you will hear repeatedly: <em class="term">sciamu!</em> (let's go), <em class="term">mo'</em> (now), <em class="term">beddhu / beddha</em> (beautiful), <em class="term">cce ete?</em> (what is it?), <em class="term">nu picca</em> (a little), <em class="term">cumpà</em> (mate), <em class="term">tocca</em> (must, have to), <em class="term">spicciato</em> (finished), and <em class="term">sponzare</em>, to soak — which is what you do to a <em>frisella</em> before dressing it. And <em class="term">pizzicare</em>, to pinch, which is the root of <em>pizzica</em>.</p>
+<p>Food words double as dialect lessons: <em>puccia</em>, <em>pittule</em>, <em>sagne 'ncannulate</em>, <em>municeddhe</em> (snails), <em>spunzale</em> (spring onion), <em>scapece</em>. In the nine Greek villages, add <em>kalimera</em> and <em>kalinifta</em>.</p>
+
+<h2>Churches, and the things that need a custodian</h2>
+<p>Shoulders and knees covered, for both sexes, no bare midriffs, hats off for men. This is <strong>enforced, sometimes brusquely</strong>, at Otranto cathedral, at San Nicola in Bari and at Santa Croce in Lecce, all of which staff the door. Carry a light scarf and you will never be turned away. Do not wander or photograph during mass. At Otranto, do not step onto the roped sections of the mosaic — and once you have looked at the twelfth-century floor you are standing on, you will not want to.</p>
+<p>And a practical point that catches people out: many of the best things in the Salento <strong>need a custodian</strong> and are open only at set hours or by arrangement — the frescoed crypts at Vaste and Carpignano, the underground olive mills at Gallipoli, several of the smaller museums. They may close between seasons. Check locally the day before, expect a small cash fee, and be prepared for the arrangement to be somebody's cousin with a key.</p>
+
+<h2>Photography</h2>
+<p><strong>No flash in frescoed crypts.</strong> It is prohibited and it does real cumulative damage to pigment.</p>
+<p><strong>Ask before photographing people</strong> — the fishermen at Gallipoli's morning market, residents in doorways, the butchers at a Cisternino <em>fornello</em>. Most say yes if asked and resent it if not, and the difference in what you get is enormous. In <strong>Alberobello's Rione Monti</strong> the trullo interiors and courtyards are private homes and shops; some owners invite you in and then expect a purchase or a tip, which is a known friction point, so decide how you feel about that before you cross the threshold. Do not photograph naval installations at Taranto — an active naval base — or restricted areas of Brindisi port.</p>
+<p>On beaches: the <em>lidi</em> are private concessions where a sunbed is a paid service, with stretches of <em>spiaggia libera</em> between them. Topless is fairly common but not universal in the Salento; full nudity is limited to a few known spots. In late September most of this is academic because the beaches are empty.</p>
+
+<div class="panel">
+  <div class="h">Money and tipping &mdash; the truth rather than the myth</div>
+  <p><strong>Cards are near-universally accepted</strong>, including in small towns; merchants have been legally required to accept them for several years and contactless is standard. Visa and Mastercard everywhere, American Express patchy outside hotels. But <strong>carry a hundred or two hundred euros in cash</strong> for: informal parking attendants, <em>sagra</em> food stalls, village bars that grumble at putting a €1.20 espresso on plastic, church donations, market stalls, custodians with keys, and the cash-only <em>fornelli</em> at Cisternino.</p>
+  <p>Cash machines are in every town of size — Otranto, Castro, Tricase, Gallipoli, Nardò, Monopoli, Alberobello — though the smaller hamlets on the coast road may have none. Prefer bank-branded machines to the standalone tourist ones, and <strong>always decline the machine's own currency conversion</strong>: take the euro amount and let your own bank convert it.</p>
+  <p><strong>Italy has no tipping culture in the American sense.</strong> Staff are salaried, the <em>coperto</em> on a restaurant bill is a legal cover charge and not a gratuity, and no percentage is expected. What Italians actually do is round up, or leave a few euros after a good meal — five to ten euros on a good dinner for four is generous. Ten per cent is generous by local standards; twenty per cent is not "polite," it is conspicuous. At a bar, no tip for a coffee. Taxis, round up a euro or two. Hotel porter, a euro or two a bag.</p>
+  <p><strong>The one exception is the travel industry's own convention.</strong> Anglophone tour groups have created an expectation that does not exist in ordinary Italian life: guides and drivers on a guided week are customarily tipped, and the going international norm is of the order of five to ten euros per person per day for a lead guide, usually collected as a group at the end. <em>That is a tourism convention rather than an Italian one</em>, and you should know which of the two you are following so that you can decide rather than feel obliged.</p>
+</div>
+
+<h2>One conversational note</h2>
+<p>Italy is not a country where politics is dangerous to discuss, and people will tell you what they think with enthusiasm and at length. But two subjects in this region are not abstractions to the people you are talking to, and are worth handling with some care rather than curiosity.</p>
+<p>The first is <strong><em>Xylella</em></strong>. For a grower or a mill owner or their children, this is not an interesting ecological event; it is the destruction of a family asset and a working life, sometimes accompanied by a court order to cut down the trees themselves. Ask what happened and listen. Do not adjudicate the conspiracy theories out loud, and do not be surprised if the person telling you about it is still angry with the regional government, the European Union and the scientists in roughly equal measure.</p>
+<p>The second is <strong>emigration</strong>. Ask almost anyone in an inland Salento village about their children and you will be told where they live, which will not be here. It is the most ordinary conversation in the region and also the saddest one, and it is generally offered rather than resented — but it is worth understanding that "beautiful, and so quiet" is not, to a local, a compliment.</p>
+
+<hr class="quietrule">
+<p class="small" style="text-align:center;">Compiled September 2026 as a companion to <em>The Cliff &amp; the Cistern</em>.<br>
+Historical, linguistic and structural material is on firm ground. The <em>Xylella</em> front, the drought, the Taranto steelworks<br>
+and current officeholders are the four things to verify rather than trust.</p>
+
+</body>
+</html>

@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Cliff &amp; the Cistern — A Field Companion to Kayaking Puglia</title>
+<style>
+  :root{
+    --ink:#26262a;
+    --soft:#5a5750;
+    --terra:#a8762c;
+    --terra-d:#8a5d1c;
+    --green:#1c4c56;
+    --gold:#c9a227;
+    --cream:#fbf7ef;
+    --panel:#f5eddd;
+    --rule:#dbcfb6;
+  }
+
+  @page {
+    size: Letter;
+    margin: 24mm 20mm 20mm 20mm;
+    @top-right{
+      content: string(chaptitle);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#9a8f7c;
+    }
+    @top-left{
+      content: "Puglia 2026";
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 8pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#c3b79f;
+    }
+    @bottom-center{
+      content: counter(page);
+      font-family: "Carlito","DejaVu Sans",sans-serif;
+      font-size: 9pt; color:#9a8f7c;
+    }
+  }
+  @page cover { margin:0; @top-right{content:none} @top-left{content:none} @bottom-center{content:none} }
+  @page :first { @top-right{content:none} @top-left{content:none} }
+
+  html{ font-family:"Lora","GFS Baskerville",Georgia,serif; color:var(--ink); }
+  body{ margin:0; font-size:10.8pt; line-height:1.58; }
+
+  p{ orphans:3; widows:3; margin:0 0 .7em 0; text-align:justify; -webkit-hyphens:auto; hyphens:auto; }
+  p.first{ text-indent:0; }
+  p.run{ text-indent:1.3em; margin-top:-.3em; }
+
+  h1.chapter{
+    string-set: chaptitle content(text);
+    break-before: page;
+    font-size:25pt; font-weight:700; line-height:1.08;
+    color:var(--green); margin:0 0 .1em 0; letter-spacing:-.01em;
+  }
+  .kicker{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8.5pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--terra); margin:0 0 .35em 0; font-weight:700;
+  }
+  .chaprule{ height:2.2px; background:var(--terra); width:64px; margin:.15em 0 1.1em 0; border:0;}
+  h2{
+    font-size:13.5pt; color:var(--terra-d); font-weight:700;
+    margin:1.4em 0 .25em 0; letter-spacing:-.01em;
+  }
+  h3{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:9pt; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:1.2em 0 .3em 0;
+  }
+
+  p.lead{ text-indent:0; }
+  p.lead .dc{
+    font-size:3.05em; line-height:.76; float:left;
+    margin:.04em .08em -.02em 0; color:var(--terra);
+    font-weight:700;
+  }
+  .cover .scrim{ position:absolute; left:0; right:0; bottom:0; height:52%;
+     background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.18) 35%, rgba(0,0,0,.42) 100%); }
+
+  .panel{
+    background:var(--panel);
+    border-left:3px solid var(--gold);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    orphans:3; widows:3;
+    font-size:10.2pt;
+  }
+  .panel .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--terra-d); font-weight:700; margin:0 0 .3em 0;
+  }
+  .panel p{ text-align:left; }
+  .panel p:last-child{ margin-bottom:0; }
+
+  .watch{
+    background:#e9f1f2;
+    border-left:3px solid var(--green);
+    padding:.85em 1em .6em 1em;
+    margin:1.1em 0; border-radius:2px;
+    orphans:3; widows:3;
+    font-size:10.1pt;
+  }
+  .watch .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:0 0 .35em 0;
+  }
+  .watch p{ text-align:left; margin-bottom:.45em; }
+  .watch p:last-child{ margin-bottom:0; }
+  .watch .grp{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:8.2pt;
+     letter-spacing:.1em; text-transform:uppercase; color:var(--terra-d); font-weight:700; }
+  .star{ color:var(--terra); font-weight:700; }
+
+  .reflex{ break-inside:avoid; margin:.8em 0 1.2em 0; padding:1em 1.1em;
+     background:#faf4e8; border:1.5px solid var(--gold); border-radius:3px; }
+  .reflex .h{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:8.5pt; letter-spacing:.18em;
+     text-transform:uppercase; color:var(--terra-d); font-weight:700; margin:0 0 .6em 0; }
+  .reflex p{ font-size:11.2pt; line-height:1.75; margin:0 0 .32em 0; text-align:left; }
+  .reflex p:last-child{ margin-bottom:0; }
+  .reflex .k{ color:var(--terra-d); font-weight:700; }
+
+  .camp{ break-inside:avoid; margin:0 0 .95em 0; }
+  .camphead{
+    font-family:"Carlito","DejaVu Sans",sans-serif; font-size:10pt; font-weight:700;
+    color:var(--green); border-bottom:1.5px solid var(--terra);
+    padding-bottom:.18em; margin:0 0 .3em 0;
+  }
+  .camphead .meta{ float:right; color:var(--terra-d); font-weight:700; letter-spacing:.05em; font-size:8.2pt; }
+  .camp p{ font-size:10pt; text-align:left; margin:0 0 .35em 0; }
+  .camp p:last-child{ margin-bottom:0; }
+  .heads{ color:var(--terra-d); font-weight:700; }
+
+  .askblock{ break-inside:avoid; margin:0 0 1.05em 0; }
+  .askhead{
+    font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; font-weight:700;
+    color:var(--green); border-bottom:1.5px solid var(--terra);
+    padding-bottom:.2em; margin:0 0 .35em 0;
+  }
+  .askhead .when{ float:right; color:var(--terra-d); font-weight:700; letter-spacing:.06em; font-size:8.5pt; }
+  .askblock ul{ margin:.25em 0 .3em 0; padding-left:1.05em; list-style:none; }
+  .askblock li{ margin:.2em 0; text-indent:-1.05em; padding-left:1.05em; font-size:9.9pt; }
+  .askblock li::before{ content:"\25A1"; color:var(--gold); font-size:9pt; padding-right:.5em; }
+  .askblock .ctx{ font-size:9.2pt; color:var(--soft); font-style:italic; margin:.1em 0 .3em 0; }
+
+  em.term{ font-style:italic; color:var(--green); }
+  .small{ font-size:9.4pt; color:var(--soft); }
+
+  table.mv.wide{ font-size:8.1pt; }
+  table.mv.wide th{ font-size:6.9pt; letter-spacing:.04em; padding:.3em .22em; }
+  table.mv.wide td{ padding:.28em .22em; }
+  table.mv{ width:100%; border-collapse:collapse; font-size:9.4pt; margin:.6em 0 .3em 0; break-inside:avoid;
+            font-family:"Carlito","DejaVu Sans",sans-serif;}
+  table.mv th{ text-align:left; border-bottom:1.5px solid var(--terra);
+     padding:.35em .5em; color:var(--terra-d); text-transform:uppercase; letter-spacing:.08em; font-size:7.8pt;}
+  table.mv td{ padding:.35em .5em; border-bottom:.6px solid var(--rule); vertical-align:top; }
+  table.mv tr.heavy td{ background:#f6ede0; }
+  .flag{ color:var(--terra-d); font-weight:700; }
+
+  ul.tight{ margin:.2em 0 .7em 0; padding-left:1.1em; break-inside:avoid; }
+  ul.tight li{ margin:.12em 0; }
+
+  .quietrule{ border:0; border-top:1px solid var(--rule); margin:1.4em 0; }
+
+  /* ---- COVER ---- */
+  .cover{ page:cover; height:100vh; box-sizing:border-box;
+     background:
+       linear-gradient(180deg, #0a2b36 0%, #14515f 40%, #22808b 70%, #74bfb8 100%);
+     color:#f4fbfa; position:relative; overflow:hidden; }
+  .cover .sky{ position:absolute; inset:0; top:0; left:0; width:100%; height:100%; }
+  .cover .sun{ position:absolute; right:17%; top:13%; width:150px; height:150px;
+     border-radius:50%; background:radial-gradient(circle,#fff2cf 0%,#ffd98f 55%,rgba(255,217,143,0) 72%); }
+  .cover .content{ position:absolute; left:0; right:0; bottom:0; padding:0 22mm 26mm 22mm; }
+  .cover .eyebrow{ font-family:"Carlito","DejaVu Sans",sans-serif; letter-spacing:.34em;
+     text-transform:uppercase; font-size:10pt; color:#d9f0ec; margin-bottom:.7em;}
+  .cover h1{ font-size:41pt; line-height:1.02; margin:0 0 .18em 0; font-weight:700; letter-spacing:-.015em;}
+  .cover .sub{ font-size:15pt; font-style:italic; color:#e8f7f4; margin:0 0 1.1em 0;}
+  .cover .meta{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9.5pt; letter-spacing:.06em;
+     color:#d9efeb; border-top:1px solid rgba(244,251,250,.35); padding-top:.8em; max-width:150mm;}
+  .cover .route{ font-size:10.5pt; }
+  .toc-note{ font-style:italic; color:var(--soft); }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <svg class="sky" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <!-- limestone headland with sea arch, right -->
+    <g fill="#08222b" opacity="0.92">
+      <path d="M452 452 L452 336 Q498 318 540 328 L540 452 Z"/>
+      <path d="M540 452 L540 328 Q592 314 640 342 Q682 366 702 402 L702 452 Z"/>
+      <path d="M800 452 L800 372 Q762 380 736 404 L736 452 Z"/>
+      <!-- the arch void -->
+      <path d="M578 452 L578 402 Q604 372 636 402 L636 452 Z" fill="#1d6f7c" opacity="1"/>
+    </g>
+    <!-- lower headland, left -->
+    <g fill="#0a2932" opacity="0.88">
+      <path d="M0 452 L0 386 Q56 368 114 380 Q166 390 204 414 L204 452 Z"/>
+      <path d="M204 452 L204 416 Q240 402 278 414 L278 452 Z"/>
+    </g>
+    <!-- sea -->
+    <path d="M0 452 L800 452 L800 1000 L0 1000 Z" fill="#0b3f4c" opacity="0.42"/>
+    <!-- sea texture, upper water only -->
+    <g stroke="#bfe6e0" stroke-width="2.4" fill="none" opacity="0.22">
+      <path d="M70 520 q26 -12 52 0 q26 12 52 0"/>
+      <path d="M320 548 q26 -12 52 0 q26 12 52 0"/>
+      <path d="M560 512 q26 -12 52 0 q26 12 52 0"/>
+      <path d="M170 596 q26 -12 52 0 q26 12 52 0"/>
+      <path d="M450 620 q26 -12 52 0 q26 12 52 0"/>
+      <path d="M640 586 q26 -12 52 0 q26 12 52 0"/>
+      <path d="M250 664 q26 -12 52 0 q26 12 52 0"/>
+    </g>
+    <!-- two kayaks on the water -->
+    <g fill="#07202a" opacity="0.92">
+      <path d="M286 512 q46 -10 92 0 q-46 10 -92 0 Z"/>
+      <rect x="328" y="497" width="7" height="15" rx="3"/>
+      <rect x="305" y="490" width="2.8" height="24" rx="1.2" transform="rotate(20 306 502)"/>
+      <path d="M400 556 q39 -9 78 0 q-39 9 -78 0 Z"/>
+      <rect x="435" y="543" width="6.4" height="13" rx="2.8"/>
+      <rect x="459" y="536" width="2.6" height="22" rx="1.2" transform="rotate(-22 460 547)"/>
+    </g>
+    <!-- shearwaters -->
+    <g stroke="#0a2932" stroke-width="3" fill="none" opacity="0.5">
+      <path d="M170 218 q14 -13 28 0 q14 -13 28 0"/>
+      <path d="M242 254 q10 -10 20 0 q10 -10 20 0"/>
+      <path d="M122 274 q10 -10 20 0 q10 -10 20 0"/>
+    </g>
+  </svg>
+  <div class="sun"></div>
+  <div class="scrim"></div>
+  <div class="content">
+    <div class="eyebrow">A Field Companion &nbsp;&middot;&nbsp; 27 September &ndash; 3 October 2026</div>
+    <h1>The Cliff &amp; the Cistern</h1>
+    <div class="sub">Seven days by sea kayak along the heel of Italy</div>
+    <div class="meta">
+      <div class="route">Lecce &rarr; Torre dell'Orso &rarr; Capo di Leuca &rarr; Castro &amp; Otranto &rarr; the Ionian shore &rarr; Egnazia &amp; the Valle d'Itria &rarr; Santo Stefano &rarr; Monopoli</div>
+      <div style="margin-top:.5em;">27 September &ndash; 3 October &nbsp;&middot;&nbsp; two seas, one rock, and all the water underground</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ORIENTATION ============ -->
+<h1 class="chapter">The Shape of the Week</h1>
+<p class="kicker">Before you go</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">P</span>uglia is a single slab of pale, porous limestone, tilted gently into the sea, with almost no rivers on it and a great deal of water inside it. Nearly everything you will see in the next week follows from that one sentence. The caves you paddle into were dissolved out of the rock by fresh water meeting salt. The water is glass-clear because there are no rivers to muddy it. The towns drink from an aqueduct that had to be run across the Apennines from another region entirely. The cone on top of a trullo is not decoration, it is a rain catchment feeding a cistern. And the Romans complained about the water here two thousand years ago, in print, in a poem you can still read.</p>
+
+<p>This is not an itinerary — you have one of those, and it is a good one. This is a companion for the hours around the paddling: the meaning of the place-names, the geology under the hull, the reason a particular cave is famous, which local stories are true and which are gift-shop inventions, and what to watch for in the water and on the cliff. Read it in any order. A chapter the night before each day works well; so does reading the geology chapter once, early, because it makes the rest of the week cohere.</p>
+
+<figure style="break-inside:avoid; margin:1.2em 0 0.4em 0; text-align:center;">
+<svg viewBox="0 0 690 605" style="width:100%; max-width:490px;" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .lbl{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:16px; font-weight:700; fill:#26262a; }
+      .dsc{ font-family:"Lora",Georgia,serif; font-style:italic; font-size:13px; fill:#5a5750; }
+      .sea{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:15px; letter-spacing:.24em; fill:#7fadb3; }
+      .dnum{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:11px; font-weight:700; fill:#ffffff; }
+      .leg{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:12px; fill:#5a5750; }
+    </style>
+  </defs>
+
+  <!-- landmass: the heel, plotted from real coordinates and simplified -->
+  <path d="M66 0 L72 10 Q90 40 109 73 Q120 86 133 94
+           Q200 132 283 186 Q350 248 416 314
+           Q430 336 432 360 Q430 386 416 410 Q408 450 397 485
+           Q358 470 327 449 Q308 424 296 392 Q284 352 269 318
+           Q182 292 92 243 L0 232 L0 0 Z"
+        fill="#f4eddc" stroke="#cdbf9f" stroke-width="1.8"/>
+
+  <!-- sea labels -->
+  <text class="sea" x="528" y="118">ADRIATIC</text>
+  <text class="sea" x="112" y="452">IONIAN</text>
+
+  <!-- north arrow -->
+  <g stroke="#8b8578" stroke-width="1.5" fill="none">
+    <path d="M636 96 L636 48"/><path d="M629 58 L636 45 L643 58"/>
+  </g>
+  <text class="leg" x="636" y="114" text-anchor="middle">N</text>
+
+  <!-- continues off-frame -->
+  <text class="leg" x="20" y="26" fill="#8b8578">to Bari</text>
+  <text class="leg" x="14" y="216" fill="#8b8578">to Taranto</text>
+
+  <!-- IHO line -->
+  <path d="M397 485 L521 545" stroke="#7fadb3" stroke-width="1.8" stroke-dasharray="4 5"/>
+  <text class="leg" x="438" y="530" transform="rotate(26 438 530)">the line to Corfu</text>
+
+  <!-- route: the Salento loop -->
+  <path d="M345 286 L416 314 L432 360 L416 410 L397 485 L296 392 L345 286"
+        fill="none" stroke="#a8762c" stroke-width="2.2" stroke-dasharray="2.5 5.5" stroke-linecap="round"/>
+  <!-- route: north to Egnazia, the Valle d'Itria and Monopoli -->
+  <path d="M345 286 Q306 222 283 186 Q202 132 133 94 L109 73"
+        fill="none" stroke="#a8762c" stroke-width="2.2" stroke-dasharray="2.5 5.5" stroke-linecap="round"/>
+  <path d="M133 94 L92 130" fill="none" stroke="#a8762c" stroke-width="2.2" stroke-dasharray="2.5 5.5" stroke-linecap="round"/>
+
+  <!-- Monopoli, days 6-7 -->
+  <circle cx="109" cy="73" r="10" fill="#a8762c"/><text class="dnum" x="109" y="77" text-anchor="middle">6</text>
+  <text class="lbl" x="126" y="56">Monopoli</text>
+  <text class="dsc" x="126" y="71">and home from its station</text>
+
+  <!-- Egnazia, day 5 -->
+  <circle cx="133" cy="94" r="10" fill="#1c4c56"/><text class="dnum" x="133" y="98" text-anchor="middle">5</text>
+  <text class="lbl" x="150" y="101">Egnazia</text>
+  <text class="dsc" x="150" y="116">a drowned Roman port</text>
+
+  <!-- Valle d'Itria -->
+  <circle cx="92" cy="130" r="8" fill="#6b8f3e"/>
+  <text class="lbl" x="106" y="146">Valle d'Itria</text>
+  <text class="dsc" x="106" y="161">trulli, and roofs as rivers</text>
+
+  <!-- Lecce, day 0 -->
+  <circle cx="345" cy="286" r="10" fill="#1c4c56"/><text class="dnum" x="345" y="290" text-anchor="middle">0</text>
+  <text class="lbl" x="330" y="280" text-anchor="end">Lecce</text>
+  <text class="dsc" x="330" y="295" text-anchor="end">baroque, and a bad blurb</text>
+
+  <!-- Torre dell'Orso, day 1 -->
+  <circle cx="416" cy="314" r="10" fill="#a8762c"/><text class="dnum" x="416" y="318" text-anchor="middle">1</text>
+  <text class="lbl" x="434" y="309">Torre dell'Orso</text>
+  <text class="dsc" x="434" y="324">stacks in soft stone</text>
+
+  <!-- Otranto, day 3 -->
+  <circle cx="432" cy="360" r="10" fill="#a8762c"/><text class="dnum" x="432" y="364" text-anchor="middle">3</text>
+  <text class="lbl" x="450" y="356">Otranto</text>
+  <text class="dsc" x="450" y="371">Italy's easternmost point</text>
+
+  <!-- Castro -->
+  <circle cx="416" cy="410" r="8" fill="#8a5d1c"/>
+  <text class="lbl" x="432" y="406">Castro</text>
+  <text class="dsc" x="432" y="421">a cave full of endemics</text>
+
+  <!-- Leuca, day 2 -->
+  <circle cx="397" cy="485" r="10" fill="#a8762c"/><text class="dnum" x="397" y="489" text-anchor="middle">2</text>
+  <text class="lbl" x="414" y="482">Capo di Leuca</text>
+  <text class="dsc" x="414" y="497">the ends of the earth</text>
+
+  <!-- the Ionian shore, day 4 -->
+  <circle cx="296" cy="392" r="10" fill="#2f8d92"/><text class="dnum" x="296" y="396" text-anchor="middle">4</text>
+  <text class="lbl" x="280" y="386" text-anchor="end">the Ionian shore</text>
+  <text class="dsc" x="280" y="401" text-anchor="end">sand, dunes, turtles</text>
+
+  <!-- legend -->
+  <g transform="translate(316,582)">
+    <circle cx="0" cy="-4" r="6" fill="#a8762c"/><text class="leg" x="12" y="0">paddling day</text>
+    <circle cx="112" cy="-4" r="6" fill="#1c4c56"/><text class="leg" x="124" y="0">town or site</text>
+    <circle cx="232" cy="-4" r="6" fill="#6b8f3e"/><text class="leg" x="244" y="0">inland</text>
+  </g>
+</svg>
+<figcaption class="small" style="text-align:center; margin-top:.2em;">The week, schematic and not to scale. Two coasts fifty kilometres apart, facing opposite quadrants &mdash; which is the whole reason the trip works.</figcaption>
+</figure>
+
+<h2>One idea to carry the whole way</h2>
+<p>If a single thread runs through the week it is <em class="term">limestone and water</em>, and specifically the fact that here they are the same subject. This is karst country: rain does not run off it, it goes into it, down joints and fissures and dissolution pipes, and travels to the sea underground. So there are no rivers to speak of and no river mouths, which is why the water you paddle on is startlingly clear — there is simply no mud being delivered to it. There is a lens of fresh groundwater floating on salt water inside the rock, and where the two mix they dissolve limestone faster than either would alone, which is why the coast is drilled full of caves at almost exactly sea level. The fresh water leaks out at the cliff foot as cold springs you can find with your hand. The towns, unable to drink from any of this reliably, are supplied by an aqueduct built across a mountain range from Campania. And in the countryside, where there was no aqueduct and no river, every roof was shaped to fill a cistern. The cone of a trullo is a catchment. <strong>In a landscape with no rivers, the roof is the river.</strong></p>
+<p>Keep that in your head and the week stops being a series of pretty coves and becomes one system seen from several angles: the cave, the spring, the sulphur, the aqueduct, the cistern, the drought, and a Roman poet grumbling about the drinking water in 35 BC.</p>
+
+<h2>The days, and what each one asks of you</h2>
+<p>Your itinerary gives the plan; what follows is the shape of the effort, so nothing arrives as a surprise. There are no tides worth the name here and no tidal races at all, which removes the single most technical element of sea kayaking in northern Europe. What is left is wind, swell, sun and commitment — and on the cliff days, commitment is the real one, because between Otranto and Castro there are stretches of kilometres with nowhere to land.</p>
+
+<table class="mv">
+  <thead><tr><th style="width:7%">Day</th><th style="width:15%">Date</th><th style="width:26%">Where</th><th style="width:22%">The water</th><th style="width:30%">What the day asks</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Sat 26 Sep</td><td>Lecce &mdash; assemble</td><td>&mdash;</td><td>Walk on soft stone; eat late</td></tr>
+    <tr class="heavy"><td>1</td><td>Sun 27 Sep</td><td>Torre dell'Orso &rarr; Masseria Violante</td><td>Calcarenite cliffs, low stacks, open bay</td><td><span class="flag">First day: kit, rescues, sun discipline</span></td></tr>
+    <tr class="heavy"><td>2</td><td>Mon 28 Sep</td><td>Capo di Leuca; dinner at Tricase</td><td>Deep water, caves, a real headland</td><td><span class="flag">The most exposed water of the week</span></td></tr>
+    <tr class="heavy"><td>3</td><td>Tue 29 Sep</td><td>Castro &rarr; Zinzulusa; Otranto by road</td><td>Vertical limestone, no landings</td><td><span class="flag">Committing cliff coast, then a town</span></td></tr>
+    <tr><td>4</td><td>Wed 30 Sep</td><td>The Ionian shore, "Bora Bora"</td><td>Shallow, sandy, warmer, forgiving</td><td>The easy day &mdash; and the fallback in wind</td></tr>
+    <tr><td>5</td><td>Thu 1 Oct</td><td>Egnazia &rarr; Masseria Montanaro</td><td>Off the water</td><td>Two and a half hours of driving, and a ruin</td></tr>
+    <tr><td>6</td><td>Fri 2 Oct</td><td>Santo Stefano coast; Alberobello</td><td>Low rock, coves, clear shallows</td><td>A short paddle and a long afternoon</td></tr>
+    <tr><td>7</td><td>Sat 3 Oct</td><td>Monopoli &mdash; disperse, 9 a.m.</td><td>&mdash;</td><td>Trains: Bari Centrale, then airport or Rome</td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <div class="h">The days before it starts &mdash; Bari, then Lecce</div>
+  <p>Flying out on the 24th buys you a real buffer. On the plan as booked you land at Bari and sleep by the airport, then move down to <strong>Lecce for the nights of Friday the 25th and Saturday the 26th</strong>, meeting the guides at nine on Sunday morning. That is a day and a half of unscheduled time in the Salento, and two of the best things in the region are not on the itinerary at all.</p>
+  <p><strong>The Greek villages.</strong> The <em>Grecìa Salentina</em> — the nine villages where Griko is still spoken — lies <em>inland and north-west of Otranto</em>, so the coast road you take south on Days 2 and 3 does not pass through it. Melpignano, Corigliano d'Otranto and Martano are twenty-five to thirty-five kilometres from Lecce, an easy morning by car or on the Ferrovie del Sud Est line. Bilingual road signs, a Byzantine substrate, and a language that will not outlive its present speakers. The companion volume has the argument about where it came from, which is genuinely unsettled.</p>
+  <p><strong>Lecce itself</strong> deserves more than the evening it would otherwise get: Santa Croce, the Piazza del Duomo, the Roman amphitheatre sunk in Piazza Sant'Oronzo, and the column at the top of that square — the shaft of one of the two markers of the end of the Appian Way at Brindisi, given to Lecce in 1666. Breakfast is a <em>pasticciotto</em> eaten warm at the counter and a <em>caffè in ghiaccio con latte di mandorla</em>. Worth an hour: the <em class="term">cartapesta</em> workshops, papier-mâché being a genuine Lecce craft, born of a town that wanted Baroque statuary and could not afford marble.</p>
+  <p>And two dated things. <strong>Saturday 26 September &mdash; Day 0 &mdash; is the full moon</strong>, and the astronomy appendix explains why a twenty-minute drive east that evening is worth making. The feast of <strong>Santi Cosma e Damiano at Oria</strong>, fifty kilometres away, falls on and around the 26th and is one of the largest and oldest festivals in the region, with a horseback procession — worth checking, because you will otherwise miss every festival in Puglia by five weeks.</p>
+</div>
+
+<div class="panel">
+  <div class="h">A note on the paperwork, and how the days are numbered here</div>
+  <p><strong>The registration packet is clean; the website is not.</strong> The paragraph at the top of Tofino's public Puglia page — promising Arab-Norman palaces, Marsala tasted where it is made, and "western Sicily by sea kayak" — is boilerplate left over from their Sicily itinerary, and has nothing to do with a region on the other side of the country that has neither. The PDF they sent you opens with a proper Puglia description instead. Worth mentioning to them; it is the sort of thing that gets fixed when somebody points at it.</p>
+  <p><strong>The day numbering in this book is anchored to the drop-off.</strong> Day 7 is the Monopoli station hand-over at nine on the morning of <strong>Saturday 3 October</strong>, with nothing else in it. Counting back through six masseria nights &mdash; four at Violante, two at Montanaro &mdash; puts <strong>Day 1 on Sunday 27 September</strong> and <strong>Day 0, your arrival evening in Lecce, on Saturday the 26th</strong>. The packet's "DATES: September 27 – October 3" therefore describes Day 1 to Day 7, the days Tofino is responsible for; Day 0 is the night before, in your own hotel, which is why no accommodation is listed against it.</p>
+</div>
+
+<div class="panel">
+  <div class="h">What a paddling day actually feels like</div>
+  <p>Expect to be on the water early — a launch around half past seven or eight is not fussiness but the whole design of the day. The two coolest, calmest, clearest hours are the first two, the light on an east-facing cliff is at its best before eight, and the thermal wind and any afternoon convection are still hours away. On this coast the photography and the paddling want the same hour, which is a rare piece of luck.</p>
+  <p>A mixed group with cameras cruises at about four to four and a half kilometres an hour, not the five and a half of a fit soloist. So a real day is <strong>ten to sixteen kilometres over three to five hours afloat</strong>, plus a proper lunch ashore and the better part of an hour spent poking into caves and covering almost no distance at all. A six-kilometre cave day is a perfectly good day. Anyone promising twenty-five-kilometre days to a group like yours is selling a different trip. Reckon on sixty to ninety kilometres for the week, and budget one day lost to weather.</p>
+  <p>Two things about your dates specifically. The <strong>lidos are shut</strong> — most Salento beach establishments pull their umbrellas between the tenth and the twentieth of September, so by the end of the month it is over — so the beaches are beautiful, empty, and entirely unserviced: no showers, no bar, no lifeguard, often no open toilet. The van is the beach bar. And there is <strong>no shade anywhere on the water</strong>, for five to seven hours, which is the subject of the next box.</p>
+</div>
+
+<h2>On the water: wind is the only variable that matters</h2>
+<p>Learn the Italian wind names before you arrive, because the guides, the fishermen and the forecasts all use them and nobody will translate. The compass in local usage runs <em class="term">tramontana</em> (N), <em class="term">grecale</em> (NE), <em class="term">levante</em> (E), <em class="term">scirocco</em> (SE), <em class="term">ostro</em> or <em>mezzogiorno</em> (S), <em class="term">libeccio</em> (SW), <em class="term">ponente</em> (W), <em class="term">maestrale</em> (NW). Do not say <em>meltemi</em>; that is an Aegean wind and using it here marks you as a visitor who read the wrong book.</p>
+<p>Now the geometry, which is the single most useful planning fact of the week. The Adriatic side of Salento — Torre dell'Orso, Otranto, Castro, and on north to Monopoli — is a roughly north–south coast facing east. It is exposed to everything in the northeast-to-southeast quadrant: grecale, levante, scirocco. Any of those at Force 4 and the cliff coast is finished for the day: onshore swell against vertical rock, reflected chop, every cave shut, and no bail-out landing for kilometres. The Ionian side — Gallipoli, Porto Cesareo, the long sandy shore — faces the opposite way, west and southwest, and is exposed to libeccio, ponente and maestrale. <strong>The two coasts are complementary, and they are only about fifty kilometres apart across the isthmus, under an hour in the van.</strong> That is why a van-supported Salento week almost always gets on the water: there is nearly always a lee coast, and the guides will simply drive to it. If the plan changes at breakfast, this is why.</p>
+<p>Of the winds, the one to watch for is not the strongest but the <em>scirocco</em>. It comes off North Africa across a long fetch of warm water, adds three to six degrees and a great deal of humidity, and turns the sky a milky ochre with Saharan dust — a fine reddish grit on decks, sunglasses and lens fronts. It builds sea state fast and it usually means rain within a day and a half. It is also physically oppressive in a way that a brisk dry maestrale is not. A scirocco day is the day to shorten, not the windy day.</p>
+
+<h2>Caves, and the one number to remember</h2>
+<p>The cliff coast from Otranto to Leuca is one of the finest cave coasts in Italy, and cave work is most of what the good days consist of. It is also where people get hurt, in a very predictable way: <strong>surge lifts the boat and presses the paddler into the ceiling</strong>, and the injuries are to the scalp and the backs of the hands. Helmets are not optional for caves, arches or rock-hopping, and hands belong on the shaft rather than spread out near the walls.</p>
+<p>The number worth carrying is the amplification factor. A cave concentrates wave energy, so <strong>thirty centimetres of swell in the open can become sixty to a hundred centimetres of vertical surge at a constricted entrance</strong>, and more in a blowhole or a dead end. Judge from inside the cave rather than outside it: the highest wet mark on the wall is an honest record of what the sea has done in the last few minutes. Watch a full set — three to five minutes, not thirty seconds — before committing, go in on the back of a wave and come out on the back of a wave, and never enter a cave you cannot see out of. Above half a metre of swell, cave entry is over; above a metre, stay off the cliff coast altogether.</p>
+<p>Tides, mercifully, are almost irrelevant here: spring range at Otranto is on the order of twenty-five to thirty centimetres, against more than a metre at Venice. They matter in exactly one place — the last few centimetres of ceiling clearance at a low entrance — and even there the weather usually beats the tide table, since barometric set-up and wind-driven Adriatic seiche can add or remove twenty to forty centimetres and hold it for hours. Read the water, not the table.</p>
+
+<div class="panel">
+  <div class="h">Drinking, and the particular trap of a warm sea</div>
+  <p>This is the one piece of practical advice in this book I would ask you to take seriously, because the mechanism is quiet and the group it catches is precisely yours.</p>
+  <p>The sea in late September is <strong>23 to 26 °C</strong> and the air is around 26 °C. Your hands, forearms and lower body are wet all day, evaporative cooling works beautifully, and your skin feels comfortable. There is <em>no cold signal at all</em>, and thirst is suppressed relative to actual loss. Sweat loss at moderate paddling effort in that heat is <strong>half a litre to a litre an hour</strong> — three to five litres over a day — and paddlers in exactly these conditions routinely under-drink by thirty to fifty per cent and feel entirely fine until they are not.</p>
+  <p>It compounds in retirees for three reasons that have nothing to do with fitness: thirst sensation is blunted with age, the kidney's concentrating ability declines, and antihypertensives and diuretics are common and increase losses directly. There is a fourth reason nobody says out loud, which is that several people in any group deliberately drink less to avoid the problem of urinating from a kayak. That has to be discussed on day one or it silently drives everything else.</p>
+  <p>The answer is to take it out of the individual's hands. <strong>Carry three litres each, accessible without stopping</strong> — a bladder with a hose on the front deck, or bottles in a deck bag; two litres in the day hatch is ballast, not hydration. Ask the guide to call a drink break every twenty minutes, <strong>200 to 250 ml each time, thirsty or not</strong>. Put electrolytes in at least half of it, because replacing four litres of sweat with plain water risks dilutional hyponatraemia, whose early signs — headache, nausea, muddle — are indistinguishable from heat exhaustion. And the great advantage of a warm sea is that a hot, distressed paddler can simply get into it.</p>
+</div>
+
+<div class="panel">
+  <div class="h">Sun, in the two places you will not put sunscreen</div>
+  <p>Noon sun elevation across your week falls from about 48° to 46°, giving a clear-sky UV index around <strong>6</strong> at midday — a full stop below August's 9 or 10, which is exactly why it lulls people. Five to six hours afloat at that level, six days running, is a serious cumulative dose.</p>
+  <p>The kayak-specific part is reflection. A flat sea returns something like five to ten per cent of incident UV at high sun and <strong>thirty to forty per cent at the grazing angles of early morning and late afternoon</strong>; a rippled surface scatters it upward in every direction; white karst limestone is a good reflector too; and UV-A with much of the UV-B penetrates thirty to fifty centimetres of clear water, so the tops of your thighs take a dose from below. The result is a burn pattern that is diagnostic of sea kayaking: <strong>the underside of the chin and nose, the inside of the forearms, the earlobes, the backs of the hands, the tops of the feet, and above all the lower lip.</strong></p>
+  <p>The answer is cloth, not lotion. A long-sleeve UPF 50 rash top does not wash off, does not need reapplying to places you cannot reach, and removes the sunscreen-plus-salt-plus-neoprene paste that ruins necks by day three; wet, it is cooler than bare skin. Sunscreen then only has to cover face, ears, neck, hands and feet, which is a job people actually do properly. Add a cap under the helmet, polarised glasses on a retainer, and lip balm reapplied hourly.</p>
+</div>
+
+<h2>On watching</h2>
+<p>You will be looking at wildlife from the first morning to the last, and the companion volume — <em>Who's Who in the Water and on the Cliff</em> — is built to match this book: a section for each habitat you will actually be in, with the field marks that identify a thing rather than photographs of it. Through this book you will find blue boxes headed <em>What to watch for</em>, one for each leg, with the genuine prizes marked by a star.</p>
+<p>Two practical notes, and the first will sound odd. <strong>On this trip the mask and snorkel are the binoculars.</strong> On a safari you would be told to bring your own pair and never share; here the equivalent single most useful item is a mask you can put your face into over the side of the boat. In fifteen to thirty metres of horizontal visibility, over a <em class="term">Posidonia</em> meadow, a mask converts an empty blue surface into a populated landscape, and a great deal of what is on the watch-lists lives in the top three metres. Bring binoculars as well — eight by thirty-two is plenty, and a compact one that you will actually carry beats an excellent one you leave in the van — but if you bring only one optical instrument, bring the mask.</p>
+<p>The second: load a bird app and an identification app before you leave, and note that Puglia sits in a well-recorded corner of a very well-recorded country, so both will work. In late September you are watching a coast in the middle of autumn migration, which means the list changes daily and the interesting sightings are things passing through rather than things that live there.</p>
+
+<div class="panel">
+  <div class="h">How current this is</div>
+  <p>The deep material here — geology, archaeology, history, the biology of the caves — is stable and can be relied on. The things that go stale fast have now been checked against current sources: the <em>Xylella</em> zone boundaries, the sea-urchin closure (extended to 2029), the access regime at the Grotta della Poesia, this year's loggerhead nest counts, the date of the Notte della Taranta, and the February 2026 collapse of the Sant'Andrea arch. Two items remain genuinely open and are flagged where they appear: <strong>whether kayaks may approach the mouth of the Zinzulusa this season</strong>, which no published rule settles, and <strong>anything at all about your two masserie</strong>, on which I found nothing reliable and have invented nothing. Ask your guides on day one.</p>
+</div>
+
+<!-- ============ GEOLOGY ============ -->
+<h1 class="chapter">The Rock, and Why There Are Caves</h1>
+<p class="kicker">The idea under everything else</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">P</span>uglia is not part of the Apennines. It is the <em class="term">Apulian foreland</em> — the undeformed forebulge of the Adriatic microplate, a great slab of carbonate that the mountain-building to the west pushed against but never crumpled. That is why the region is flat, why its faults are straight rather than folded, and why it is made of essentially one substance. Beneath your feet all week is a Mesozoic carbonate platform something like five to six kilometres thick: the compacted floor of a shallow tropical sea that sat here, quietly manufacturing limestone out of shells and lime mud, for the better part of a hundred million years.</p>
+
+<h2>Three rocks, and one that is misnamed</h2>
+<p>You will touch three, and it is worth being able to tell them apart, because each one produces a different kind of coast.</p>
+<p><strong>Calcare di Altamura</strong> is the oldest and hardest — Upper Cretaceous platform limestone, well bedded, grey to white, several hundred metres thick. It is the bedrock of the Murge and the Valle d'Itria and it forms the vertical cliffs of the Adriatic coast south of Otranto. Where you have deep water immediately below a wall of rock and caves running back into the dark, you are on Altamura limestone. Two celebrated things sit in it elsewhere in the region: a Late Cretaceous dinosaur trackway at Altamura with thousands of footprints, and <em>Altamura Man</em>, a Neanderthal skeleton so thoroughly encrusted in calcite in the Lamalunga cave that it has largely been left where it lies.</p>
+<p><strong>Pietra leccese</strong> is the reason Lecce looks the way it does. It is a Miocene biocalcarenite, a fine yellowish marly limestone with a porosity of thirty to forty per cent, packed with foraminifera and bryozoans — soft enough to be carved with a knife when freshly quarried, and hardening on exposure to air. Quarried around Cursi and Melpignano, inland from Otranto. Every one of the impossible Baroque façades you will walk past on Day 0 exists because the local stone behaves like cheese for a week and then behaves like stone. The city's architecture is a rock property.</p>
+<p><strong>Calcarenite di Gravina</strong> is the youngest, softest and most consequential, and it is universally called <em class="term">tufo</em>, which is where the trouble starts.</p>
+
+<div class="panel">
+  <div class="h">The correction to have ready: Apulian "tufo" is not volcanic</div>
+  <p>In Naples, <em>tufo</em> means volcanic tuff — welded ash from the Campi Flegrei. In Puglia the same word is used for something entirely different: <strong>Calcarenite di Gravina</strong>, a Pliocene–Early Pleistocene bioclastic <em>calcareous sandstone</em> with no volcanic material in it whatever. It is a mass of cemented shell fragments, porosity thirty to fifty per cent, soft enough to be sawn into ashlar blocks with a hand saw — which is exactly what has been done with it for three thousand years. It is the stone of Otranto's walls, of most masseria masonry, and of the honey-coloured cliffs and stacks at Torre dell'Orso.</p>
+  <p>This is the most repeated error in writing about Puglia, and it is not pedantry, because the porosity is the point: it explains why the stacks and arches on the Adriatic coast keep falling down. A rock that is half air, weakly cemented, notched at the waterline by waves and eaten in the spray zone by salt crystallisation, is not a durable landform. <strong>Collapse here is the normal rate of the process, not an anomaly.</strong></p>
+</div>
+
+<h2>Why there are no rivers, and why that makes the water clear</h2>
+<p>Pure carbonate with high secondary permeability — joints, fractures, dissolution conduits — swallows rain before it can organise itself into channels. Rainfall in the Salento is modest, roughly 550 to 650 millimetres a year, and a large fraction of it infiltrates. What runoff does form goes down a swallow hole rather than to the sea.</p>
+<p>Three dialect words are worth having. A <em class="term">dolina</em> is the general closed karst depression. A <em class="term">vora</em> (plural <em>vore</em>) is the Salentine term for a steep-walled collapse shaft that swallows surface water — the classic pair, the <em>Vore di Barbarano</em>, are a short drive from Leuca, the larger of them some thirty metres deep. And a <em class="term">spunnulata</em>, from <em>sfondare</em>, "to cave in," is a small, often water-filled coastal collapse where the roof over a brackish conduit has dropped; they are characteristic of the Ionian shore you will paddle on Day 4.</p>
+<p>One honest qualification, because the sweeping version is wrong: "Puglia has no rivers" is true of the karst, not of the region. The Tavoliere plain around Foggia, well north of anywhere you are going, sits on Pleistocene clays and has real perennial rivers — the Candelaro, the Cervaro, the Ofanto. It is the Salento and the Murge that are dry, and dramatically so. The great inland canyons, the <em class="term">gravine</em> at Laterza and Massafra, are relicts cut in an earlier and much wetter regime; nothing flows in them now.</p>
+<p>The consequence you will notice within ten minutes of launching is the <strong>water clarity</strong>: horizontal visibility routinely fifteen to thirty metres. There is essentially no terrigenous sediment being delivered to this coast, because there are no rivers to deliver it, and the <em>Posidonia</em> meadows bind what little there is. What spoils it is onshore wind stirring sand — which is why the Ionian side goes milky within hours of a libeccio while the rocky Adriatic side stays clear even in swell, having nothing to stir.</p>
+
+<h2>The lens inside the rock</h2>
+<p>Fresh water is less dense than salt water, so the rain that goes into the limestone floats on the sea water that has soaked in from the sides, as a lens. The classical relation — <em class="term">Ghyben–Herzberg</em> — says that with fresh water at about 1,000 kilograms per cubic metre and sea water at about 1,025, you get roughly <strong>forty metres of fresh water below sea level for every metre of head above it</strong>. In the Salento the water table stands only one to three metres above sea level across most of the peninsula. Do the arithmetic and the lens is thin, on the order of tens of metres, which is why over-pumping here produces saline intrusion almost immediately and why water management is the central environmental question of the region. Two caveats a scientist will want: the interface is a diffuse mixing zone rather than a surface, and in conduit-dominated karst the Ghyben–Herzberg idealisation, which assumes flow through a porous medium, is a first approximation at best.</p>
+
+<figure style="break-inside:avoid; margin:1.1em 0 0.5em 0; text-align:center;">
+<svg viewBox="0 0 620 330" style="width:100%; max-width:460px;" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .g-lbl{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:11px; font-weight:700; fill:#26262a; }
+      .g-sm{ font-family:"Lora",Georgia,serif; font-style:italic; font-size:10.5px; fill:#5a5750; }
+      .g-tny{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:9px; fill:#5a5750; }
+    </style>
+  </defs>
+  <!-- sea -->
+  <rect x="400" y="150" width="220" height="180" fill="#cfe6e7"/>
+  <!-- land block -->
+  <path d="M0 110 L300 108 L360 118 L400 150 L400 330 L0 330 Z" fill="#f0e7d2" stroke="#cdbf9f" stroke-width="1.4"/>
+  <!-- saline wedge -->
+  <path d="M400 150 L400 330 L60 330 L400 150 Z" fill="#bcd8dc" opacity="0.75"/>
+  <!-- mixing zone band -->
+  <path d="M400 150 L60 330 L110 330 L400 168 Z" fill="#8fbcc4" opacity="0.55"/>
+  <!-- fresh lens -->
+  <path d="M0 158 L400 150 L60 330 L0 330 Z" fill="#e5f2ea" opacity="0.7"/>
+  <!-- water table line -->
+  <line x1="0" y1="158" x2="400" y2="150" stroke="#3a7d5c" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <!-- sea level line -->
+  <line x1="0" y1="150" x2="620" y2="150" stroke="#1c4c56" stroke-width="1.2"/>
+  <!-- cave at sea level in the cliff -->
+  <path d="M400 150 Q372 138 348 148 Q330 156 340 168 Q362 178 400 168 Z" fill="#cfe6e7" stroke="#1c4c56" stroke-width="1"/>
+  <!-- submarine spring plume -->
+  <g stroke="#3a7d5c" stroke-width="1.2" fill="none" opacity="0.8">
+    <path d="M404 176 q10 -10 4 -22"/><path d="M414 182 q12 -12 6 -26"/>
+  </g>
+  <!-- surface: sinkhole and infiltration arrows -->
+  <g stroke="#8a5d1c" stroke-width="1.4" fill="none">
+    <path d="M90 112 L90 152"/><path d="M86 146 L90 154 L94 146"/>
+    <path d="M190 110 L190 152"/><path d="M186 146 L190 154 L194 146"/>
+    <path d="M280 109 L280 152"/><path d="M276 146 L280 154 L284 146"/>
+  </g>
+  <path d="M126 108 q14 22 28 0" fill="#cfe6e7" stroke="#cdbf9f" stroke-width="1.2"/>
+  <!-- labels -->
+  <text class="g-lbl" x="8" y="98">rain in &mdash; no runoff</text>
+  <text class="g-tny" x="122" y="100">vora</text>
+  <text class="g-lbl" x="120" y="196">fresh lens</text>
+  <text class="g-sm" x="120" y="210">~40 m down per 1 m up</text>
+  <text class="g-lbl" x="196" y="286">salt water in the rock</text>
+  <text class="g-sm" x="120" y="256">mixing zone &mdash; where the rock dissolves fastest</text>
+  <text class="g-lbl" x="440" y="142">sea level</text>
+  <text class="g-lbl" x="452" y="188">cold spring</text>
+  <text class="g-sm" x="452" y="202">at the cliff foot</text>
+  <text class="g-lbl" x="300" y="132">cave</text>
+  <line x1="330" y1="136" x2="352" y2="150" stroke="#26262a" stroke-width="0.8"/>
+</svg>
+<figcaption class="small" style="text-align:center; margin-top:.2em;">Why the caves are at sea level. Two waters, each already saturated with calcite, dissolve limestone faster when mixed than either does alone &mdash; and they mix at the water table and at the shoreline.</figcaption>
+</figure>
+
+<h2>Mixing corrosion: the reason the caves are where they are</h2>
+<p>Here is the piece of chemistry that makes this coast what it is, and it is genuinely counter-intuitive. Take two bodies of water, each in equilibrium with calcite — each, in other words, unable to dissolve any more limestone. Mix them. Because the solubility of calcium carbonate is a non-linear function of dissolved carbon dioxide, the mixture is <strong>undersaturated</strong>, and starts eating rock again. This is <em class="term">mixing corrosion</em>, and it means dissolution is concentrated exactly where fresh groundwater meets sea water: at the water table, and at the coastline.</p>
+<p>So the caves form preferentially in a narrow horizontal band at sea level. Then wave action takes over and does the mechanical work of widening and roofing what dissolution began, which is why so many Salento sea caves are horizontally developed, wide-mouthed, and at or just above the waterline. Some are <em>flank-margin</em> caves formed at older sea-level stillstands, now either drowned or lifted a few metres by slow tectonic uplift — which is why you will sometimes see a cave mouth stranded four metres above the sea with nothing to have made it there.</p>
+
+<div class="panel">
+  <div class="h">Field note &middot; the coast at the last ice age</div>
+  <p>At the Last Glacial Maximum, roughly 26,500 to 19,000 years ago, global sea level stood something like <strong>120 to 134 metres below present</strong> — one careful reconstruction puts the lowstand near −134 m about 21,000 years ago. Two consequences matter here.</p>
+  <p>First, the <strong>northern Adriatic was dry land</strong>: a vast alluvial plain fed by the Po, extending hundreds of kilometres southeast of the modern Venice–Trieste line. Second, and this is the local point, <strong>the Strait of Otranto never closed</strong>. Its sill is about 780 to 800 metres deep, so the Adriatic stayed connected to the Ionian throughout, and the Adriatic remained a sea rather than becoming a lake. Off the Adriatic Salento the shelf is narrow, so the glacial shoreline was only a few kilometres out from today's; on the shallower Ionian side, considerably further.</p>
+  <p>And in the other direction: the Last Interglacial highstand, about 125,000 years ago, stood a few metres <em>above</em> present, and left the marine terraces you can read as low steps in the landscape behind the coast. When you paddle over Roman masonry at Egnazia on Day 5 you are looking at the modern end of the same curve.</p>
+</div>
+
+<h2>Where the water actually comes from: an aqueduct across a mountain range</h2>
+<p>A region with no rivers and a thin brackish lens cannot supply cities. The nineteenth-century answer was audacious: take water from Campania, on the far side of the Apennine watershed, and run it the length of Puglia by gravity. The source is the <strong>Sele springs at Caposele</strong> in the province of Avellino, emerging high enough to feed the entire system without pumping. Works began in the first decade of the twentieth century and water reached Bari in 1915; the <em class="term">Acquedotto Pugliese</em> is now usually described as serving around four million people over more than twenty thousand kilometres of network, and at completion was routinely called the largest aqueduct in Europe. The great engineering piece is the tunnel through the Apennine divide, damaged in the 1980 Irpinia earthquake, whose replacement has been under construction for a famously long time.</p>
+<p>You will meet the end of it on Day 2. At Santa Maria di Leuca a monumental staircase and waterfall descends the hillside to the harbour, with a Roman column at its head presented by the city of Rome: the <em>Cascata monumentale dell'Acquedotto Pugliese</em>, the symbolic terminus of the whole scheme. <strong>Expect it to be dry.</strong> It is opened only for rare ceremonial occasions, a handful of times since its inauguration. This is not a disappointment if you understand what you are looking at: a monument not to water arriving, but to the idea of water arriving — built by a region that had waited a very long time.</p>
+
+<div class="panel">
+  <div class="h">Horace complains about the water, 35 BC</div>
+  <p>The most enjoyable evidence that any of this is old comes from <em>Satires</em> 1.5, Horace's account of a journey down the Appian Way to Brundisium. Somewhere near the end of it he passes Gnatia — Egnazia, the ruin you will walk around on Day 5 — and describes it as <em>Gnatia lymphis iratis exstructa</em>: "Gnatia, built when the water-nymphs were angry."</p>
+  <p>It is a joke about bad water, and bad Apulian water runs right through the poem; a few lines earlier he grumbles that at Canusium the water is sold by the jug. In other words a Roman traveller in 35 BC, with no theory of karst hydrology available to him, had noticed precisely the thing this chapter is about. It is the best literary hook on the trip, and it is waiting for you at the site.</p>
+</div>
+
+<!-- ============ DAY 1 ============ -->
+<h1 class="chapter">The Soft Coast</h1>
+<p class="kicker">Day 1 &middot; Sunday 27 September &middot; Torre dell'Orso</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">Y</span>ou meet the guides at nine at the Caffettino café on Via Adriatica, just outside Lecce's walls to the north-east, and it is only a thirty-minute drive to the coast — so you will be on the water early, which sets the pattern for the week. Your first launch is from sand, into a shallow bay under low honey-coloured cliffs, and it is a deliberately gentle introduction — which is just as well, because day one of any kayaking week is really about kit, rescue practice and finding out how your back feels after three hours in a seat. The cliffs here are the soft stone, the <em>calcarenite</em> of the last chapter: warm-toned, crumbly, full of holes, and visibly losing the argument with the sea. This is a coast where geology happens on a human timescale.</p>
+
+<h2>Le Due Sorelle, and a piece of very recent news</h2>
+<p>At the southern end of the bay stand two stacks, fifteen or twenty metres high, called <em class="term">Le Due Sorelle</em>, the Two Sisters. The legend — two sisters who threw themselves from the cliff so as never to be parted, and were petrified by pitying gods — is the standard Mediterranean petrifaction story, attached to sea stacks from Capri to the Aegean, with no early attestation whatever. Enjoy it as folklore and do not repeat it as history.</p>
+<p>What is worth knowing is the state of the coast. This shoreline has lost two landforms in recent memory. In <strong>May 2019</strong> a third, smaller stack a few dozen metres south of the Sisters collapsed — the local headline ran, cheerfully, "the stack falls, the Two Sisters are saved." And then, overnight on <strong>14–15 February 2026</strong>, the far more famous <em>Arco di Sant'Andrea</em> — the "Arch of Lovers" at Torre Sant'Andrea, four kilometres up the coast — was destroyed by heavy seas during a storm named Oriana. It had been surveyed in 2022 and found to have a dangerously thinned supporting pillar; it was monitored, and left standing, and then one February night it was gone. Its loss was front-page news in Italy, and the geologists interviewed at the time made the wider point bluntly: <strong>fifty-three per cent of Puglia's coastline is classed as at risk of erosion.</strong></p>
+<p>If a guide tells you the arch is round the next headland, they are working from an old briefing. And the underlying point is the one from the geology chapter: in a rock that is half air, weakly cemented, undercut at the waterline and salt-weathered above it, <strong>arches and stacks are transient by construction.</strong> An arch is the moment between a cave and a stack; a stack is the moment between an arch and a shoal. You are photographing these landforms on their way out, and the interval between "spectacular" and "gone" is measured in decades.</p>
+
+<div class="panel">
+  <div class="h">The towers, and how the coast talked to itself</div>
+  <p>Torre dell'Orso and Torre Sant'Andrea are both named for towers, and you will see dozens more all week, ruinous, square, and always just in sight of the next one. They are <em class="term">torri costiere</em>, a systematic coastal watch system of the Kingdom of Naples, built from the 1530s onwards in response to Ottoman and Barbary raiding — the trauma events being the sack of Otranto in 1480 and the raids of the 1530s, in which Castro itself was taken. Estimates of the total for the Apulian coast run from something over three hundred to nearly four hundred, depending on what you count.</p>
+  <p>The interesting part is the protocol. Towers were sited for <strong>mutual line of sight</strong>, typically two to five kilometres apart. Warning went by <strong>smoke by day and fire by night</strong> on the terrace, and — this is the detail worth carrying — <strong>the number of signals encoded the number of enemy sails sighted.</strong> So the message travelling up the coast was not merely "danger" but a rough order of battle, moving far faster than a horse. A horn or bell backed it up, and mounted patrols rode the beaches between towers. Garrison was tiny: a <em>torriere</em> and one to three men, paid by a levy on the towns that benefited. The fortified farms inland — the <em>masserie</em> you are sleeping in — were the second line and the refuge. Towers and masserie are one system, and you are living in the back half of it.</p>
+</div>
+
+<h2>Two kilometres north: a hole in the ground with seven centuries of graffiti</h2>
+<p>Just north of Torre dell'Orso, at <strong>Roca Vecchia</strong>, is one of the most remarkable sites in Puglia and one that almost nobody outside the region has heard of. The <em class="term">Grotta della Poesia</em> is a near-circular collapse doline in the calcarenite, some thirty metres across, open to the sky, its floor flooded with clear water and connected to the sea by a short low tunnel. It is fed by fresh springs as well as by the sea, which is the whole point.</p>
+<p>The name has nothing to do with poetry. It comes from the local <em class="term">posìa</em>, "spring, water source," and describes exactly what the pool is. The romantic story — a princess who bathed there and inspired passing poets — is folk etymology built on a modern Italian misreading of a dialect word, and it is a clean, checkable example of the genre.</p>
+<p>The real content is next door. The adjacent <em>Grotta della Poesia Piccola</em> carries one of the richest bodies of <strong>Messapian inscription anywhere</strong> — graffiti in Messapian, Greek and Latin — counts run from several hundred to, on the site's own signage, over three thousand, depending on what is counted — spanning roughly the sixth century BC to the first century AD, recognised and published from 1983. The dedications name a local god, <em class="term">Thaotor Andirahas</em>, Latinised as Taotor and equated by Greek and Roman visitors with Zeus and Jupiter. The reconstructed ritual is simple and moving: descend to the spring, immerse yourself, cut your name into the rock. People did this, continuously, for something like seven hundred years. Above it, on the headland, are the remains of a Bronze Age fortified settlement destroyed by fire, full of Mycenaean-type pottery — evidence that this coast was a node in Adriatic–Aegean exchange rather than a periphery of it.</p>
+<p>Two practical warnings, both now confirmed. The sea tunnel is low, narrow and surgy, and is <strong>not a kayak passage</strong>; the pool is reached on foot. And <strong>swimming in it has been prohibited since 2019</strong> — not for safety but to stop erosion of the inscribed walls. The site is fenced, ticketed and numbers-limited in season, run as the Roca Vecchia archaeological park under the <em>ArcheoRoca</em> scheme; admission was €2 in 2025 and €5 by mid-2026, free to residents of Melendugno. Umbrellas, loungers, picnics and food are all banned, as is entering the underground tunnels. Expect to look rather than swim.</p>
+
+<div class="panel">
+  <div class="h">And behind the dunes, the best bird stop of the week</div>
+  <p>Minutes inland from Torre dell'Orso, behind the dune, is <strong>Le Cesine</strong> — a WWF reserve and Ramsar site, a relict coastal marsh of reedbed, brackish lagoon and pinewood with hides and marked trails. It is the single highest-value wildlife stop on the whole route, and late September is an excellent time: the first wintering ducks arriving, marsh harrier quartering the reeds, waders on the mud, glossy ibis (now regular in Italy and expanding), and hirundine roosts in the reeds at dusk. A little further north are the <strong>Laghi Alimini</strong> — one brackish and sea-connected, one spring-fed and fresher — with superb protected dune juniper woodland behind them.</p>
+  <p>If the wind takes a day off you, this is where to spend it. Ask early rather than on the morning, because it needs an hour of driving and a decision.</p>
+</div>
+
+<div class="watch">
+  <div class="h">What to watch for &middot; the sandy Adriatic shore</div>
+  <p><span class="grp">In the water</span> Over the meadows: <strong>salema</strong> in slow synchronised herds, heads into the current, grazing <em>Posidonia</em> — the only real herbivorous fish here. <strong>Damselfish</strong> shoals hanging above rock, and in late September their juveniles are <span class="star">electric blue</span>. <strong>Ornate wrasse</strong>, restless, turquoise crossed with orange bars — a thermophilic species whose spread north is one of the cleanest signals of a warming sea. <strong>Two-banded seabream</strong>, identified by exactly two black bands, one behind the gill cover and one round the tail base.</p>
+  <p><span class="grp">On the strandline</span> <strong>Posidonia banquettes</strong> — terraced brown berms of shed leaves, sometimes a metre high, which are not rubbish but a natural winter revetment holding the beach's sand inside them. <strong>Aegagropiles</strong>, the felted "sea balls" of rhizome fibre. <strong>Cuttlebones</strong>. The dried, crackling cellophane sails of <strong>Velella</strong>. And <strong>mermaid's purses</strong> — catshark and skate egg cases, your evidence that there are still sharks and rays offshore.</p>
+  <p><span class="grp">Overhead and ashore</span> <strong>Yellow-legged gull</strong> everywhere. <strong>Sandwich tern</strong> <span class="star">&#9733;</span> — long black bill tipped bright yellow, patrolling and plunge-diving. <strong>Osprey</strong> <span class="star">&#9733;</span>, and this is prime time for it: white head with a dark eye-stripe, long arched gull-like wings with black carpal patches, and it shakes itself in mid-air after a dive. <strong>Marsh harrier</strong> over the Cesine reeds, wings in a shallow V. <strong>Northern wheatear</strong> and <strong>whinchat</strong> on the fences — both classic late-September migrants. And on the towers, <strong>blue rock thrush</strong> <span class="star">&#9733;</span>: uniform slate-blue, sitting bolt upright on the highest point, then dropping vertically out of sight.</p>
+</div>
+
+<!-- ============ DAY 2 ============ -->
+<h1 class="chapter">Finibus Terrae</h1>
+<p class="kicker">Day 2 &middot; Monday 28 September &middot; Capo di Leuca and Tricase</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">L</span>euca is the tip of the heel, and it is the most exposed water of your week. It is also the place where you will be told the most untrue things in the shortest space of time, which makes it a good day to have read this chapter. The name, first: <em>Leuca</em> is from the Greek <em class="term">leukós</em>, "white" — the white cliffs — and not from Latin <em>lux</em>, whatever the signage suggests. The church on the headland is <strong>Santa Maria de Finibus Terrae</strong>, "at the ends of the earth," which is at least an honest description of how it feels.</p>
+
+<h2>The two seas: what is true, what is convention, and what you will actually feel</h2>
+<p>You will be told that here the Adriatic meets the Ionian, and that you can see the line. Three separate real things have been rolled together into that claim, and they are worth unpicking, because two of them are genuinely interesting.</p>
+<p><strong>The boundary is a cartographic convention.</strong> The International Hydrographic Organization defines the southern limit of the Adriatic as a line drawn from Cape Santa Maria di Leuca across to Corfu; locally the turning point is taken as <strong>Punta Meliso</strong>, the eastern tip below the sanctuary. Nothing physical happens along that line. It is a decision made in an office, and a sensible one.</p>
+<p><strong>The visible colour and foam lines are real, but they are not the boundary.</strong> They are <em class="term">convergence lines</em> — slicks of foam, plankton and fine sediment collecting where wind-driven and tidal shear brings surface water together. They form, drift, and dissipate, and they are in the wrong place as often as the right one. Photographs of "the two seas meeting" are photographs of a drifting slick. Which does not make them less beautiful; it makes them a different and more interesting phenomenon than advertised.</p>
+<p><strong>There is a genuine large-scale asymmetry, and it is invisible from a kayak.</strong> In the Strait of Otranto, Ionian surface water flows <em>north</em> into the Adriatic along the eastern, Albanian side, while Adriatic water — including the dense water formed in the northern Adriatic in winter — exits <em>southward</em> along the Italian side, partly at depth. So Leuca does sit on the outflow limb of a real circulation. This is oceanographically substantial and you will not see a trace of it.</p>
+<p><strong>And locally, the sea off the point genuinely is confused.</strong> Streams around the cape and over the shoal ground off <strong>Punta Ristola</strong> produce rips and short steep water, and badly so with wind against current. This is the one version of "two seas meeting" that a paddler experiences, and it is worth respecting: the day's briefing will centre on it.</p>
+
+<div class="panel">
+  <div class="h">Which point is the most anything? A short list of Leuca's standing errors</div>
+  <p><strong>Punta Meliso</strong> is the easternmost point <em>of the cape</em> and the conventional Adriatic–Ionian turning point.</p>
+  <p><strong>Punta Ristola</strong>, about a kilometre west, is the <strong>southernmost point of Apulia</strong> — and is very often described as the southernmost point of mainland Italy, which it is not. That is Punta Melito, in Calabria.</p>
+  <p><strong>Punta Palascìa</strong>, near Otranto and on tomorrow's route, is <strong>Italy's easternmost point</strong>, at about 18°31′ E. Leuca is frequently and wrongly given that title too.</p>
+  <p>So Leuca is neither the easternmost nor the southernmost point of Italy, and the "meeting of two seas" is a line on a chart. What it genuinely is: the tip of the heel, a headland with a serious cult history, and the terminus of an aqueduct. That is plenty.</p>
+</div>
+
+<h2>Caves with inscriptions in them</h2>
+<p>The cape is drilled with caves, and two of them are archaeological sites of the first rank. The <strong>Grotta del Diavolo</strong> at Punta Ristola, named for noises within once attributed to the devil, was excavated in the early twentieth century and produced a sequence running from the Upper Palaeolithic through the Neolithic and Bronze Age. The <strong>Grotta Porcinara</strong>, also on Punta Ristola, is the remarkable one: a <strong>sanctuary cave whose walls carry inscriptions in Messapian, Greek and Latin</strong>, in use from the Bronze Age to the Roman empire, with dedications to a god named in Messapian as <em>Zis</em> — Zeus — and in Latin to Jupiter.</p>
+<p>Its function is transparent once you are sitting in a small boat below it: this was where sailors made offerings <strong>before or after the crossing to Greece</strong>. It is the last solid ground, or the first. Combined with the Grotta della Poesia from yesterday, you will have visited two Messapian inscription-caves in two days, both of them sanctuaries at a threshold — one at the boundary between fresh water and salt, the other at the boundary between land and the open sea. That is not a coincidence; it is how these people thought.</p>
+<p>The church above continues the pattern. Santa Maria de Finibus Terrae stands on ground with a tradition of a pre-Christian temple of Minerva and a legend of St Peter landing here on his way to Rome; inside is an altar said to incorporate stone from the pagan temple. The present building is largely eighteenth-century, rebuilt after repeated corsair sackings. One honest note: unlike Castro, which you will see tomorrow, Leuca has <em>no</em> excavation supporting its Minerva tradition. The pattern of a headland cult later Christianised is real and well attested around the Mediterranean; the specific claim here rests on tradition alone, and the difference is worth keeping.</p>
+
+<h2>The staircase that has no water in it</h2>
+<p>Descending the hillside to the harbour is a monumental stair and waterfall with a Roman column at its head, presented by the city of Rome. This is the <strong>Cascata monumentale dell'Acquedotto Pugliese</strong> — the ceremonial terminus of the aqueduct that brought water from the Sele springs in Campania, across the Apennines, to a region that had none of its own. Expect it dry. It has been opened only a handful of times since its inauguration, for anniversaries and ceremonies. Read it as the geology chapter's monument: a region with no rivers built itself a waterfall, and turns it on for special occasions.</p>
+
+<h2>Dinner at Tricase, and the tree you should walk to first</h2>
+<p>The day ends inland at <strong>Tricase</strong>, and there is something there worth arriving an hour early for. In the countryside just outside the town stands the <strong>Quercia dei Cento Cavalieri</strong> — the Oak of the Hundred Knights, named for a legend that it once sheltered a hundred mounted men from a storm — with a crown spread usually quoted at around seven hundred square metres and an age given as seven to nine hundred years. Both figures are traditional rather than measured, and it does not matter, because the interesting thing about this tree is not its size.</p>
+<p>It is a <em class="term">Vallonea oak</em>, <em>Quercus ithaburensis</em> subsp. <em>macrolepis</em>, and it is <strong>an eastern-Mediterranean tree whose only native Italian stands are here in the Salento.</strong> Its natural range is Greece, the Aegean and Anatolia; a handful of localities around Tricase and Cutrofiano are a relict, a stranded fragment of a Greek flora left on the heel of Italy — the botanical counterpart of the Greek-speaking villages inland from Otranto, and of the same age of contact across that seventy-two kilometres of water.</p>
+<p>The diagnostic feature is the <strong>acorn cup</strong>, and it is unmistakable: enormous, woody, and covered in long recurved reflexed scales like a shaggy crown or a sea urchin, unlike any other European oak. That cup is the <em>vallonea</em> of commerce, exported in bulk for <strong>tanning leather</strong> because of its very high tannin content. The acorns take two years to mature and ripen in September and October, <strong>so your dates are exactly right to pick a cup up off the ground</strong> and put it in a pocket. Ask the guides to allow twenty minutes; it is a short detour and the light at that hour is good.</p>
+<p>Behind the town is the <strong>Bosco di Tricase</strong>, the woodland that gives the regional park half its name, and the darkest ground within reach of this coast. The moon is 94 per cent tonight, so it is not the night for stars — but note where it is, because it is the answer to "where could we see the Milky Way from here."</p>
+
+<div class="watch">
+  <div class="h">What to watch for &middot; the headland and the deep water</div>
+  <p><span class="grp">In the caves</span> <strong>Cardinalfish</strong> <span class="star">&#9733;</span> — small, orange-red, enormous black eye, hanging oblique or upside-down in the dark of a cave roof in small groups; the male broods the eggs in his mouth. <strong>Brown meagre</strong> <span class="star">&#9733;</span> in the shade of a deep overhang: high-backed, coppery-bronze, with brilliant white leading edges to the pelvic and anal fins. It <em>drums</em> — sonic muscles against the swim bladder — and although the spawning chorus is over by now, individual knocks still carry. <strong>Put an ear to the deck near a cave mouth at dusk.</strong> Also <strong>rock doves</strong> of genuinely wild type, which you will flush by paddling in.</p>
+  <p><span class="grp">On the rock at the waterline</span> The <strong>Lithophyllum trottoir</strong> <span class="star">&#9733;</span> — a hard pink-to-grey cornice of coralline red algae built <em>precisely at mean sea level</em>, sometimes projecting half a metre into a visor. It grows about a millimetre a year, which makes a living trottoir decades to centuries old and a fossil one, stranded above the sea, an archive of past sea level. It will also shred your hands and your gel-coat. Immediately above it, in the salt-spray crevices, <strong>rock samphire</strong>: fleshy blue-green divided leaves, pungently aromatic, in flower and fruit at the same time on your dates. You can photograph the entire vertical zonation in one frame from the boat.</p>
+  <p><span class="grp">Above</span> <strong>Peregrine</strong> <span class="star">&#9733;</span>, resident on these cliffs. <strong>Pallid swift</strong> — and this is the useful call of the week: common swift has left Italy by mid-August, while pallid swift is double-brooded, late, and lingers into October, so <strong>any swift screaming round Otranto or Leuca now is almost certainly pallid.</strong> <strong>Crag martin</strong>, banking hard against the rock face, with a row of small white spots across the fanned tail. And, on the horizon rather than overhead, <strong>Scopoli's</strong> and <strong>Yelkouan shearwaters</strong> <span class="star">&#9733;</span> — long lazy glides on bowed wings for the first, fast stiff whirring flight low to the water for the second.</p>
+</div>
+
+<!-- ============ DAY 3 ============ -->
+<h1 class="chapter">The Hard Coast</h1>
+<p class="kicker">Day 3 &middot; Tuesday 29 September &middot; Castro, the Zinzulusa, Otranto</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">T</span>oday the rock changes and so does the coast. From here north to Otranto you are on Cretaceous limestone: hard, grey, well bedded, with deep water immediately below vertical walls, caves running back into the dark, and almost nowhere to land between the towers. It is the finest paddling of the week and the most committing, and it is the day most likely to be moved for wind. It is also, mile for mile, the densest concentration of interesting things on the whole route — a cave full of endemic crustaceans, a cave that changed Italian science, a town that Virgil may have had in mind, four caves that smell of rotten eggs, and a cathedral floor with King Arthur on it.</p>
+
+<h2>The Zinzulusa: rags, and a shrimp with relatives in Libya</h2>
+<p>The cave between Castro and Santa Cesarea is called <em class="term">Zinzulusa</em> from the Salentine dialect word <em>zinzuli</em>, rags — the stalactites in the entrance chamber hang like washing put out to dry. It is one of the more satisfying cave names in Italy and a genuine dialect etymology. Its discovery is attributed to a bishop of Castro in the 1790s; nineteenth-century naturalists described it; and in the twentieth century Piero Parenzan studied its biology and named the terminal pool <strong>Cocito</strong>, after Cocytus, the underworld river. That is a scientist's joke: a black, sulphurous, apparently lifeless water named for the river of the dead, which turns out to be full of endemics.</p>
+<p>The Cocito is <em class="term">anchialine</em> — brackish, density-stratified, connected to the sea underground but with no open passage, and anoxic and sulphidic at depth. What lives in it is the reason the cave is famous among biologists rather than tourists. <strong><em>Spelaeomysis bottazzii</em></strong> is a blind stygobitic mysid crustacean endemic to Apulian groundwaters, found here and in wells across the Salento. <strong><em>Typhlocaris salentina</em></strong> is a blind, unpigmented shrimp — and its family tree is the best sentence available on this trip.</p>
+
+<div class="panel">
+  <div class="h">Field note &middot; a shrimp that proves where the sea used to be</div>
+  <p><em>Typhlocaris salentina</em> has only two close relatives in the world. One, <em>T. galilea</em>, lives in groundwater in Israel. The other, <em>T. lethaea</em>, lives in Cyrenaica, in Libya. A genus split between the heel of Italy, the Levant and North Africa, in blind cave shrimps that cannot cross open sea, is not something dispersal can explain. It is a <strong>Tethyan relict distribution</strong>: the animals did not travel, the coastline did. They are the stranded descendants of a fauna that inhabited the shallow margins of the Tethys Ocean, cut off and left in isolated pockets of groundwater by the closure of that sea and the extraordinary subsequent history of the Mediterranean — including, five and a half million years ago, its near-total desiccation.</p>
+  <p>A blind shrimp in a hole in the cliff at Castro is therefore a piece of evidence about the arrangement of the continents. There is also a sponge in there — <em>Higginsia ciccaresei</em> — described from this cave as recently as the late 1990s, which is a reminder that new animals were still being found in a ticketed Italian show cave within living memory.</p>
+</div>
+
+<p><strong>You almost certainly cannot paddle in.</strong> The Zinzulusa is entered on foot, by ticketed guided tour, down a stair from the coast road, and swimming inside is prohibited. Boat trips from Castro pass its sea mouth and duck briefly into the adjacent Grotta Azzurra. Plan the day as: paddle the coast and the blue cave, land at Castro, walk in. Confirm the current arrangements — they have tightened repeatedly, and there is a real chance of restrictions on approaching the mouth at all. And whatever else you do inside a Salento sea cave this week, see the box on bats at the end of this chapter: late September is the worst possible time to disturb a roost.</p>
+
+<h2>Grotta Romanelli: the cave that made Italian prehistory</h2>
+<p>A few hundred metres along the cliff is a hole that looks like nothing and matters enormously. <strong>Grotta Romanelli</strong> was excavated from about 1900, and it produced the first clearly stratified Italian sequence in which extinct Pleistocene fauna and Palaeolithic industry were <em>demonstrably superposed</em> — the observation that put Italian Quaternary science on a modern footing, decades after the French sites had settled the question north of the Alps. It also yielded what are generally counted as the first Palaeolithic wall engravings recognised in Italy, including an incised aurochs.</p>
+<p>The faunal list is a climate record. <em>Hippopotamus amphibius</em> in the lower levels — the warm, wet end. Aurochs, elephant, and <em>Equus hydruntinus</em>, the European wild ass, whose species name is taken from <em>Hydruntum</em>: Otranto. The animal is named after this coast. And, startlingly, the <strong>great auk</strong> — one of the southernmost records anywhere of a flightless North Atlantic seabird, which is a cold-stage indicator of some force in the Mediterranean. The cave is unstable, closed to the public, and reachable only from the sea. From a kayak it is a hole in a cliff. The point is entirely what came out of it.</p>
+
+<h2>Castro, and the question of Aeneas</h2>
+<p>Castro is a small port with a long history and one very large literary claim: that this is where <strong>Aeneas first set foot in Italy</strong>. It is worth getting the actual evidence straight, because the honest version is more interesting than the plaque.</p>
+<p>In <em>Aeneid</em> III, Aeneas sights <em>Italiam</em> — low hills on the horizon, and Achates crying out first. Then, as the breeze freshens, "the harbour opens now nearer, and a temple of Minerva appears on the height." Then the omen of four white horses grazing, which Anchises reads as war.</p>
+<p><strong>Virgil never writes "Castrum Minervae."</strong> He writes of a harbour and a temple of Minerva on a height. The place-name comes from later Roman geographical sources, not from the poem. The identification with Castro rests on three legs: the toponym, the topography — a harbour on the Adriatic Salento with a height above it, facing the crossing from Greece — and, since 2000, excavation.</p>
+<p>And the excavation is real. Work from 2000 by the Università del Salento, on the high ground by the cathedral, revealed a <strong>Messapian sanctuary</strong> with substantial fifth- and fourth-century fortification walls and a votive deposit running from the Archaic period into Roman times, full of Greek and Italiote imports that document sustained traffic across the strait. The headline find is fragments of a large cult statue of <strong>Athena</strong> in local limestone.</p>
+<p>So here is the honest ledger. <em>Evidenced:</em> there was an indigenous Messapian sanctuary at Castro to a goddess identified with Athena and Minerva, active for centuries, and known to Greek-speaking sailors. <em>Reasonable inference:</em> Virgil, writing in the Augustan age, invoked a real and famous cult site that anyone making the Otranto crossing would recognise — that is precisely why he chose it. <em>Speculation:</em> that Aeneas landed there. No excavator claims to have found Aeneas. And the rival local tradition that he landed at Porto Badisco, a few kilometres north, has no archaeological support at all.</p>
+
+<h2>Santa Cesarea Terme: you will smell it before you see it</h2>
+<p>Your lunch stop exists because of a smell. At the cliff foot, four caves open to the sea — <strong>Gattulla, Fetida, Solfurea and Solfatara</strong> — from which sulphurous thermal water emerges at temperatures usually given collectively as somewhere between twenty-three and thirty-three degrees. The names are honest: <em>Fetida</em> means what you think.</p>
+<p>The chemistry: the waters are chloride–sodium, essentially seawater-dominated and mixed with the karst aquifer, and they carry <strong>hydrogen sulphide</strong>, which is detectable by the human nose at parts per billion. That is why the smell owns the entire town rather than just the caves. Two explanations compete and both may be operating. One is biogenic and shallow: <strong>sulphate-reducing bacteria</strong> working on the abundant marine sulphate within the coastal aquifer. The other is deep: circulation down to the <strong>Triassic evaporites</strong> — anhydrite and gypsum — that underlie the carbonate platform, which would also account for temperatures above the local mean. I would not pretend to settle it for you; present both.</p>
+<p>The legends are excellent. The classical version places the <strong>Gigantomachy</strong> here — giants defeated by Hercules, whose rotting bodies produce the stench — hooked to an ancient toponym for this district, <em>Leuternia</em>, where several ancient authors located the destruction of the Giants. The Christian version: Santa Cesarea, a girl fleeing her incestuous father, hid in a cave; the earth swallowed him; the sulphur is his corpse. Two legends, one smell, and in both cases the explanation is a buried body — which, given that the actual answer involves anaerobic bacteria digesting sulphate in the dark, is not a bad piece of intuition.</p>
+<p>Look up while you eat. Above the sea stands <strong>Villa Sticchi</strong>, an extraordinary Moorish-revival house with an onion dome, horseshoe arches and polychrome banding, built at the end of the nineteenth century. Its style is not whimsy: the Orientalising idiom was advertising, positioning the town as a <em>spa of the East</em> on a coast that looks toward Albania and Greece.</p>
+
+<h2>Otranto: a floor, a wall of skulls, and the narrowest crossing</h2>
+<p>You arrive in the late afternoon of <strong>29 September, which is Michaelmas</strong> &mdash; the feast of San Michele Arcangelo, widely kept in Salento comuni, so there may well be something going on in a piazza on the way. And you arrive in the best month of the year to be here. In August the old town is shoulder-to-shoulder; in the last week of September you can park, walk the Aragonese walls at sunset more or less alone, get a table without booking, and stand on the cathedral floor without queuing. The town reverts to being a working port of about five and a half thousand people.</p>
+<p><strong>The floor is the thing.</strong> The cathedral of Santa Maria Annunziata contains a mosaic pavement laid in <strong>1163–65</strong> by a priest-monk named Pantaleone, covering nave, aisles and presbytery in a deliberately restricted palette of local limestone tesserae — white, ochre, red, grey-green. The scheme is a <strong>Tree of Life</strong> rising out of a pair of elephants, its branches filled with medallions: the zodiac, the labours of the months, Adam and Eve, Cain and Abel, Noah's Ark, the Tower of Babel, real and impossible beasts, Alexander the Great borne aloft by griffins, and — mounted, labelled <em>REX ARTVRVS</em> — one of the <strong>earliest datable images of King Arthur anywhere in Europe</strong>, roughly contemporary with the first Arthurian romances. It is in a Norman cathedral on the heel of Italy, which tells you something about how fast stories travelled in the twelfth century.</p>
+<p>It survived the Ottoman sack of 1480, when the cathedral was used as a stable and a mosque, for the simple reason that it is on the floor.</p>
+
+<div class="panel">
+  <div class="h">The 800 Martyrs: what happened, and what is convention</div>
+  <p>An Ottoman fleet under Gedik Ahmed Pasha landed near Otranto in late July 1480. The town fell in August after bombardment, and the survivors were killed or enslaved. Tradition holds that <strong>eight hundred men</strong> were taken to the hill above the town and beheaded on 14 August for refusing to convert, their spokesman a tailor named Antonio Primaldo. Their bones are displayed in the <em>Cappella dei Martiri</em> in the cathedral, in tall glazed cases: walls of skulls and long bones, with the stone traditionally identified as the execution block.</p>
+  <p>A mass execution certainly occurred, and the sack was catastrophic — plausibly half of a town of a few thousand killed, with many shipped as slaves to the Albanian coast. But <strong>the figure 800 is conventional</strong>, deriving from sixteenth-century narratives written decades afterwards within an explicitly hagiographic frame, and the "refused to convert" structure is part of that frame. Modern historians accept the massacre and treat the number and the motive as tradition rather than as established fact.</p>
+  <p>The martyrs were beatified in 1771 and <strong>canonised on 12 May 2013</strong> by Pope Francis, on a decree signed by Benedict XVI days before his resignation. That canonisation is a judgement that they died <em>in odium fidei</em>; it is not, and does not claim to be, a historical verdict on the arithmetic. Both things can be held at once, and the chapel is more affecting, not less, for holding them.</p>
+</div>
+
+<h2>Punta Palascìa, and seventy-two kilometres of continuous history</h2>
+<p>Five kilometres south of the town, a nineteenth-century lighthouse stands on <strong>Punta Palascìa</strong> — the easternmost point of mainland Italy, at about 18°31′ E. From here the narrowest crossing of the Strait of Otranto is roughly <strong>seventy-two kilometres</strong> to the Albanian shore. You can genuinely see Albania, but be realistic about what you are looking for: not the coastline but the <strong>Ceraunian mountains</strong> behind it, which rise to around two thousand metres, so the geometry is generous and the limiting factor is haze rather than the curvature of the Earth. Expect it after a clear tramontana, at dawn or in the last light — not on a hazy September afternoon.</p>
+<p>Because Italy runs a single time zone whose nominal meridian is 15° E, and Salento sits three and a half degrees east of it, <strong>solar noon here falls at about 12:36</strong> and the whole day is shifted early. On the same clock face in late September, Otranto's sunrise is twenty-five minutes before Rome's and thirty-nine minutes before Milan's. Mornings are luminously early; evenings end abruptly.</p>
+<p>That seventy-two kilometres is worth standing still for. The same crossing carried Roman traffic to Dyrrachium and onward along the Via Egnatia to Constantinople; Byzantine administration for centuries, which is why Salento kept the Greek rite and still has Greek-speaking villages inland; the Ottoman fleet of 1480; Albanian speedboats in the 1990s; and today's crossings from further east. In March 1997 the <em>Kater i Radës</em>, an Albanian vessel crowded with migrants, collided with an Italian navy corvette during an interception in the strait and sank; the confirmed dead number in the eighties and the probable toll is considerably higher, and the gap between those two figures is part of the story. The wreck was later raised, and the artist Costas Varotsos incorporated its hull into a monument at Otranto, <em>L'Approdo &mdash; Opera all'Umanità Migrante</em>: The Landing, a work for migrant humanity. It is a hull tilted out of a bed of glass, and it is worth walking to.</p>
+<p>It is one continuous fact with different cargoes. Otranto is the place where all of them touch land.</p>
+
+<div class="panel">
+  <div class="h">Bats, and why late September is the wrong month to shout in a cave</div>
+  <p>Salento's sea caves hold bat roosts — Schreiber's bent-winged bat above all, which is strictly cave-dwelling year-round and forms dense clusters on ceilings, plus horseshoe bats, mouse-eared bats, and the local speciality <em>Myotis capaccinii</em>, which trawls the water surface with disproportionately large feet.</p>
+  <p><strong>Late September is the worst possible time to disturb them.</strong> Mediterranean bats are in pre-hibernation hyperphagia and autumn swarming, laying down the fat that determines whether they survive the winter. A flushed cluster burns energy it cannot replace, and disturbance at this stage has measurable survival costs. So: no torches on ceilings, <strong>no shouting or whistling to test the echo</strong> — a standard sea-cave habit and a genuinely damaging one — no flash, stay near the entrance, don't linger, and turn back if you smell ammonia or see a guano floor, which means an occupied roost. Many Salento caves are designated bat roosts within protected sites and entry is restricted or gated.</p>
+  <p>The unsentimental version of the same advice: a sea cave with any swell running is the most dangerous place a kayak can be. Most of the time the conservation answer and the safety answer point the same way.</p>
+</div>
+
+<div class="watch">
+  <div class="h">What to watch for &middot; the limestone cliff coast</div>
+  <p><span class="grp">Under the boat</span> This is not meadow country — the shelf is narrow and the rock is the habitat. Look for <strong>dusky grouper</strong> <span class="star">&#9733;</span> in a cave mouth, facing out, brown with pale blotches it can switch on and off and a pale margin to the tail; outside a reserve expect a brief distant glimpse rather than an inspection. <strong>Moray</strong> <span class="star">&#9733;</span> with its head out of a hole, mouth gaping rhythmically — which is breathing, not threat. <strong>Painted comber</strong>, propped on its pectoral fins, blue-washed belly and scribbled cheek. <strong>Scorpionfish</strong>, motionless and entirely confident, letting you come to a hand's width. And where clean exposed rock at half a metre to three metres carries a bushy brown canopy of <strong>Cystoseira</strong>, take it as a statement about that stretch of coast: it is the Mediterranean's kelp-forest analogue and it disappears under pollution, sediment and urchin grazing.</p>
+  <p><span class="grp">Do not touch</span> The <strong>bearded fireworm</strong> — flattened, segmented, orange to olive, with a white bristle bundle on each side of every segment, crawling openly across rock in broad daylight, which is exactly what catches people out. The bristles are hollow, detach on contact, and burn for hours. Never brush or rub them; lift them out with adhesive tape. Relevant because you will be hauling boats over rock all week. Likewise <strong>sea urchins</strong> wedged at ankle depth in every crevice: the purple one carries a hat of shell fragments and pebbles, the black one is bare and sits on exposed vertical rock. Closed, stiff-soled shoes for every landing, without exception.</p>
+  <p><span class="grp">On the wall and above it</span> <strong>Shag</strong> of the Mediterranean race <span class="star">&#9733;</span> — slimmer than a cormorant, oily bottle-green, steep forehead, and the one line worth memorising: <strong>a "cormorant" with a white belly on a Salento rock is a young</strong> <em>desmarestii</em> <strong>shag</strong>. It swims very low and jumps clear of the water in a forward arc before diving. Also <strong>peregrine</strong>, <strong>blue rock thrush</strong>, <strong>crag martin</strong>, and <strong>pallid swift</strong> round the old town of Otranto at dusk.</p>
+</div>
+
+<!-- ============ DAY 4 ============ -->
+<h1 class="chapter">The Other Sea</h1>
+<p class="kicker">Day 4 &middot; Wednesday 30 September &middot; the Ionian shore</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">C</span>ross fifty kilometres of flat olive country and the sea changes character completely. The Ionian side of Salento is young rock and sand: low relief, long dune systems, coastal pinewoods, a gently shelving bottom, water a degree or two warmer, and — where the karst has collapsed over a brackish conduit — small round flooded holes called <em class="term">spunnulate</em> sitting just behind the beach. It is forgiving to land on and forgiving to fall into, and after two days of vertical limestone with nowhere to stop, it feels like a different holiday.</p>
+
+<p>It also has a structural role in the week that is worth understanding. The Adriatic coast faces east and the Ionian coast faces west, so they are <strong>never bad on the same day</strong>. When the guides look at a grecale forecast over breakfast and decide to drive across the isthmus, this is the day they are driving to. It is not a consolation prize; it is the reason the trip has a high success rate on the water.</p>
+
+<div class="panel">
+  <div class="h">One thing worth confirming with your guides</div>
+  <p>Your itinerary describes "San Giovanni Beach, affectionately named Bora Bora by locals," on "the Ionian coast of Salento near Gallipoli." <em>Bora Bora</em> is a beach-club name rather than a place-name, and there is more than one candidate. The description — very shallow turquoise shoals, fine white sand — fits <strong>Torre San Giovanni</strong>, in the comune of Ugento, about twenty kilometres south of Gallipoli, where a sixteenth-century tower and lighthouse stand over exactly that kind of water. It could also be an establishment on the Gallipoli littoral proper. Worth a question at breakfast, because the two are forty minutes apart and the surrounding interest is different.</p>
+</div>
+
+<h2>Gallipoli: the town that lit London</h2>
+<p>Whether or not you land there, Gallipoli is the point of the Ionian coast, and its story is the economic key to the entire Salento landscape. The name is authentically Greek — <em class="term">Kallípolis</em>, "beautiful city" — and it is attested in antiquity, which makes it that rare thing on this trip: <strong>a pretty etymology that happens to be correct.</strong> Worth saying precisely because this book keeps demolishing the others.</p>
+<p>From the seventeenth to the nineteenth century Gallipoli was <strong>the principal European export port for <em>olio lampante</em></strong> — lamp oil. Inedible, cheap, and shipped in enormous quantity to London, Amsterdam, Hamburg, Trieste and Russia for <strong>street lighting, soap-making and the wool industry</strong>. Gallipoli oil was priced on the northern exchanges. Then kerosene and gas arrived, the trade collapsed, and Salento olive-growing had to reinvent itself around edible oil.</p>
+<p>Hold that next to the landscape you have just driven through, because it explains it. <strong>The monumental olive groves of the Salento exist because Europe needed to see in the dark.</strong> Those trees were an industrial plant, and the industry they served has been obsolete for a century and a half.</p>
+
+<div class="panel">
+  <div class="h">Where the oil was made: underground, at eighteen degrees</div>
+  <p>Gallipoli's old town sits on top of dozens of <em class="term">frantoi ipogei</em> — olive mills cut into the calcarenite three to five metres below street level. The layout was standard: a rock-cut chamber with a millstone turned by a blindfolded horse or donkey walking a circle, stone presses, settling tanks, stalls for the animals, and <strong>sleeping niches for the workers</strong>. A crew — a <em>nachiro</em> and his <em>trappitari</em> — lived down there for the whole campaign, roughly November to April, barely coming out.</p>
+  <p>The usual explanation offered is concealment from the tax collector. The real one is <strong>thermal</strong>: underground the chamber holds steady at around eighteen degrees, which keeps the olive paste fluid and the oil flowing, and in a walled town it also saved land. Gallipoli's old town is credited with at least thirty-five of them; the Salento as a whole has hundreds. Two or three in Gallipoli are usually open to visit, and if you have the chance, take it — a mill lit by a single lamp, with a horse walking a circle for five months, is a much more useful image of the Salento's economy than an olive grove is.</p>
+  <p>While you are there: the celebrated <strong>"Fontana Greca"</strong> on the waterfront is a sixteenth-century Renaissance work, not a Hellenistic one, despite both the name and the signage.</p>
+</div>
+
+<h2>Turtles, and a real chance</h2>
+<p>The Ionian arc is the nesting coast, and the numbers are now genuinely striking. Italian loggerhead nesting has gone from 443 nests in 2023 to 601 in 2024 and <strong>over 700 in 2025</strong> — a record — with Sicily, Calabria, Campania and Puglia carrying most of it. <strong>Puglia alone recorded around a hundred nests in 2025</strong>, the great majority in Lecce province, and hatching concentrates in the Salento and the protected area at Porto Cesareo. The work is coordinated through Legambiente's EU <em>LIFE Turtlenest</em> project. The sandy beaches running north-west from Gallipoli through Punta Prosciutto and Torre Colimena are part of that coast.</p>
+<p>The timing works in your favour. Nesting runs roughly May to August, incubation takes forty-five to seventy days, and so <strong>hatching runs from late July into October</strong> — meaning your dates fall in the tail of the hatching season. What that makes plausible, on an Ionian beach, is one of three things: a <strong>fenced and signed nest</strong> with a volunteer night watch; a <strong>hatchling emergence</strong>, which happens at night or just before dawn; or a <strong>nest excavation</strong> a few days after emergence, when volunteers open the chamber to count shells and rescue stragglers. The last of these is done in the open, and the volunteers are usually delighted to explain what they are doing. It is worth asking your guides to ask locally — this is a plannable highlight rather than a fantasy.</p>
+<p>The rules, if you find yourself near a nest: never dig, never use white light on a nesting beach, never point a torch at a hatchling — light disorientation is the main cause of hatchling mortality — and if you find a fresh crawl, a double track like a small tractor's coming up the beach, report it rather than following it. Strandings, injured or entangled turtles: the coastguard, on <strong>1530</strong>.</p>
+
+<h2>A word about what is not here any more</h2>
+<p>Two absences are worth knowing, because both are recent and both are the kind of thing a guidebook quietly omits.</p>
+<p>The first is the <strong>fan mussel</strong>, <em>Pinna nobilis</em> — the Mediterranean's largest bivalve, up to a metre tall, standing vertically in sand and seagrass, endemic to this sea. Beginning in autumn 2016 off Spain, a mass mortality driven principally by a haplosporidian parasite swept the entire Mediterranean within three or four years, with site-level mortality of eighty-five to a hundred per cent. Across most of its range the species is now <strong>functionally extinct</strong>, and it was reassessed as Critically Endangered in 2019. Survival has been concentrated in lagoons where salinity or temperature falls outside the parasite's tolerance. So what you will find in a Salento meadow is <strong>the ghost rather than the animal</strong>: empty valves still standing upright and full of sediment, or fallen and half-buried, thin and brittle and iridescent inside. A standing dead <em>Pinna</em> is the most eloquent object in the meadow.</p>
+<p>It is not quite hopeless, though. Survivors are being found and genetically studied in the northern Adriatic under the LIFE PINNA project, and a citizen-science scheme run from the CNR laboratory at Taranto — <em>SOS Pinna</em> — has collected reports of a small number of survivors in the gulf, animals that may carry natural resistance. So on the Ionian side a live one is not impossible. If you find one — mantle tissue visible in the gape, valves closing as your shadow passes — treat it as data. Do not touch it, do not stir the sediment, photograph it, note the position and depth, and report it. Single live records now matter, and there is a project that wants them. And know the look-alike, which is genuinely useful: <em>Pinna rudis</em> is smaller, lives on rock rather than in seagrass, and bears strong ribs with rows of open tubular scales — and it was far less affected by the die-off. <strong>Ribbed and spiny, on rock: possibly alive. Smooth fan in seagrass: almost certainly a dead shell.</strong></p>
+<p>The second absence is the <strong>monk seal</strong>, and it is written into the map. The Otranto–Leuca coast is scattered with caves named <em class="term">Grotta del Bove Marino</em> — "cave of the sea ox," which is the Italian vernacular for the Mediterranean monk seal. You can find them on the chart before you paddle. Italian breeding was extinguished by the mid-twentieth century, with the last records in the 1970s, and the world population is now of the order of six to eight hundred animals, cored in Greece and Turkey. But since roughly the 2010s vagrants have been reappearing in Italian waters, including the Adriatic, presumably dispersing from a recovering Greek population; individuals have been photographed in southern Italian sea caves. The caves here are structurally still suitable — high-tide entrances, internal beaches, darkness. The honest odds in one week are essentially zero, but they are not structurally impossible, and this is exactly where it would happen. <strong>The coast documents its own lost fauna in its place-names</strong>, which is worth a moment's silence in a cave named for an animal nobody alive has seen there.</p>
+
+<div class="watch">
+  <div class="h">What to watch for &middot; the sandy Ionian shore</div>
+  <p><span class="grp">In the meadow &mdash; put your face in</span> This is the best snorkelling of the week: warm, shallow, sheltered, with the strongest <em>Posidonia</em> of the route. Learn to read it from the surface, because you can survey the habitat's condition as you paddle. <strong>Dark, textured, tall, on a raised step</strong> = living <em>Posidonia</em> on <em>matte</em>, the peat-like terrace of rhizomes it builds at one to six centimetres a year. <strong>Pale, sparse, low, on flat sand</strong> = <em>Cymodocea</em>, leaves two to four millimetres wide instead of a centimetre. <strong>Smooth grey terrace with a cut edge and no shoots</strong> = <strong>dead matte</strong>, centuries of growth that will not return in a human lifetime. And <strong>a brilliant white patch or a long straight white scar inside dark meadow</strong> = anchor damage, which you can count.</p>
+  <p><span class="grp">In it</span> <strong>Rainbow wrasse</strong> — and note the trap, because you will think you are seeing two species: it is protogynous, so the brown-and-white form and the green-blue form with an orange zigzag stripe are female-phase and secondary-male of the same fish. <strong>Cuttlefish</strong>, small juveniles at this time of year since the adults die after spring spawning. <strong>Octopus</strong> <span class="star">&#9733;</span> — find the midden first, a neat scatter of broken shells at a hole mouth, then look for eyes on raised turrets. <strong>Striped red mullet</strong> probing sand with its chin barbels, usually shadowed by a wrasse stealing what it flushes.</p>
+  <p><span class="grp">Jellyfish, honestly</span> Late September is peak gelatinous season here, and happily the two you will see most of are the two that barely sting. <strong>Barrel jellyfish</strong> — bell thirty to sixty centimetres, firm and whitish-blue with a violet frilled margin and <em>no long tentacles at all</em>; you will paddle through them and the size is more alarming than the animal. <strong>Fried-egg jellyfish</strong> — a smooth brown-yellow "yolk" in a translucent rim, with small fish sheltering underneath, harmless, and at its annual peak right now. The one that matters is <strong>Pelagia noctiluca</strong>, the mauve stinger: small, only three to ten centimetres, pink to lilac, with a warty bell and eight long thin tentacles, and <strong>stinging cells over the bell as well</strong>, so there is no safe part of it. It is entirely oceanic in its life cycle, so swarms arrive overnight on the wind with no local warning. If you see three or four in a paddle, expect many more and think twice about swimming.</p>
+  <p><span class="grp">On the beach and behind it</span> <strong>Sea daffodil</strong> — flowering over by now, so look instead for the swollen three-angled capsules and the angular corky black seeds, which float and are dispersed by the sea. <strong>Large-fruited juniper</strong> in the dune woodland, prostrate and wind-sculpted, with glaucous berries twelve to fifteen millimetres across. <strong>Crested lark</strong> on every track, spiky crest up and down, absurdly tame. And on the salt pans north of Gallipoli, <strong>greater flamingo</strong> <span class="star">&#9733;</span> is realistic: watch for the sharply kinked bill used <em>upside down</em> with the head inverted below the surface, and note that the greyest birds in the flock are this year's young.</p>
+</div>
+
+<!-- ============ DAYS 5-6 ============ -->
+<h1 class="chapter">North to the Trulli</h1>
+<p class="kicker">Days 5 and 6 &middot; Thursday 1 &ndash; Friday 2 October &middot; Egnazia and the Valle d'Itria</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">D</span>ay 5 is the driving day — something like a hundred and fifty kilometres and two and a half hours behind the wheel, with a ruin in the middle of it. What changes is not just the scenery but the rock: you leave the flat young calcarenite of the Salento and climb onto the Cretaceous limestone of the Murge, which is higher, greener, walled, and covered in a landscape that has no obvious parallel anywhere. The transition is worth watching for out of the window, because you can see the geology turn over.</p>
+
+<h2>Egnazia: a Roman road with the ruts still in it, and a harbour under the water</h2>
+<p>Egnazia — <em>Egnatia</em>, Greek <em>Gnathia</em> — sits on the coast between Fasano and Monopoli, and it is the best archaeological site on your route by a distance. Occupation begins in the Bronze Age on the acropolis promontory; from about the sixth to the fourth century BC it is a fortified <strong>Messapian</strong> town behind a great wall circuit some two kilometres long, still standing several metres high in places; then a flourishing Roman <em>municipium</em>.</p>
+<p>Three things to make sure you see.</p>
+<p><strong>The Via Traiana.</strong> Trajan's faster branch of the Appian Way from Beneventum to Brundisium, built AD 108–110, runs <em>straight through the site</em>, and its paving still carries <strong>deep parallel wheel ruts</strong> worn by iron-shod cart tyres. It is the most immediate object at Egnazia and the best single lesson in Roman traffic volume anywhere on this coast — not a monument to engineering but a record of use.</p>
+<p><strong>The submerged harbour.</strong> This is the reason to be pleased you are travelling with kayaks. The <strong>ancient harbour works lie just offshore</strong> below the acropolis — moles, breakwaters and squared blocks in roughly one to three metres of water, along with shoreline quarries. In calm clear conditions you paddle over straight lines of Roman masonry. And the reason they are underwater is a number you can read directly off the seabed: <strong>relative sea level here has risen on the order of one and a half to two metres since Roman times</strong>, from a combination of global rise and local subsidence. Very few places let you measure a geophysical quantity by looking down through the water at a wall.</p>
+<p><strong>The painted tombs and the pottery.</strong> The necropolis includes Hellenistic painted chamber tombs. And Egnazia gives its name to <em class="term">Gnathia ware</em>, the fourth- and third-century black-glaze pottery overpainted in white, yellow and red with vines, ivy and garlands. One correction, though: <strong>the principal production centre was Taras — Taranto — and other Apulian workshops.</strong> The name records where the pots were first recognised in quantity, in these tombs, not where they were made. "Gnathia ware from Gnathia" is a museum-label fiction.</p>
+
+<div class="panel">
+  <div class="h">Horace's joke, and the surprising fact that there really was a show</div>
+  <p>Stand at the site and you can read <em>Satires</em> 1.5, lines 97 onward, more or less on location. Horace has reached the last stage of his journey to Brundisium:</p>
+  <p style="margin-left:1.2em; font-style:italic;">dein Gnatia lymphis / iratis exstructa dedit risusque iocosque, / dum flamma sine tura liquescere limine sacro / persuadere cupit. credat Iudaeus Apella, / non ego&hellip;</p>
+  <p>"Then Gnatia — built when the water-nymphs were angry — gave us our laughter and our jokes, while it tried to persuade us that on the temple threshold incense melts without a flame. Let Apella the Jew believe it; not I. For I have learnt that the gods lead a life free of care, and that if nature works some marvel, it is not the gods who send it down, out of sorts, from the high roof of heaven."</p>
+  <p>Two jokes. The first, <em>lymphis iratis exstructa</em>, is about the water, and it is the karst hydrology of Chapter Two seen from the inside of a Roman travelling party. The second is the miracle: incense that liquefies on the sacred threshold without fire, which Horace refuses with an Epicurean shrug and a sneer at credulity.</p>
+  <p>Here is the twist. <strong>The wonder is independently attested.</strong> The elder Pliny records a sacred stone at Egnatia on which wood placed there catches fire of its own accord. So there really was a local attraction — most plausibly a hydrocarbon or gas seep in the limestone, possibly assisted by a competent showman. Horace went, saw it, and declined to be impressed. A rationalist tourist debunking an Apulian marvel in 35 BC is this book's own project with a Roman ancestor, and you can stand where he stood while being unimpressed yourself.</p>
+</div>
+
+<h2>Trulli: what is true, and what is a very good story</h2>
+<p>A <em class="term">trullo</em> — from Greek <em>troûllos</em>, dome; the local dialect calls it a <em>casedda</em> — is a dry-stone corbelled building with no mortar in its structural fabric. The anatomy repays a minute's attention: a thick cylindrical <strong>double-skin wall</strong>, often one and a half to two and a half metres through, rubble-filled between two faces; an <strong>inner corbelled dome</strong> of horizontally laid rings, each oversailing the last; and an <strong>outer cone</strong> of overlapping limestone slabs called <em class="term">chiancarelle</em>, laid like scales, closed with a keystone and topped by a pinnacle.</p>
+<p>You will be told, several times, that they were built without mortar so that they could be pulled down before a royal inspection, to evade the <em class="term">Prammatica de Baronibus</em> — the Spanish law requiring royal licence, and tribute, for founding a new settlement. It is a wonderful story and it is worth knowing which parts of it are solid.</p>
+<p><strong>Solid:</strong> the <em>Prammatica</em> was real, and so was the feudal context. Alberobello genuinely developed under the Acquaviva d'Aragona counts of Conversano — notably Giangirolamo II, "the one-eyed man of Puglia," in the seventeenth century. And the town's <strong>emancipation from feudal jurisdiction by decree of Ferdinand IV in May 1797</strong> is a documented event that Alberobello still celebrates.</p>
+<p><strong>Not solid:</strong> the mechanism. Corbelled dry-stone building is ancient and widespread around the Mediterranean — Sardinian <em>nuraghi</em>, Irish <em>clocháns</em>, Provençal <em>bories</em>, and the Apulian <em>specchie</em> — and its use on the Murge is a plain response to materials: an abundance of flat limestone slabs that had to be cleared off the fields anyway, thin soils, and <strong>no timber</strong> for a framed roof. Dated trulli are overwhelmingly sixteenth to nineteenth century, and the form is agricultural first — field shelters, stores, stables — and domestic second. Also, and decisively, the idea of dismantling and rebuilding a village of corbelled stone domes at short notice does not survive contact with the buildings, which are heavy, interlocked and slow to raise. The mainstream verdict is that the legend is a <strong>later rationalisation</strong> which fused a real law and a real grievance with an ordinary building technique.</p>
+<p>Two more small corrections while you are there. The claim that each pinnacle form identified the builder's family is traditional and unproven. And the whitewashed symbols on the cones — crosses, hearts, solar and zodiacal marks — are apotropaic and devotional but of uncertain and probably quite recent date; reading them as survivals of pagan cult is modern interpretation, not evidence.</p>
+
+<div class="panel">
+  <div class="h">How a trullo actually works &mdash; and the roof as a river</div>
+  <p><strong>Thermally.</strong> A metre or more of wall and a stone dome give very high thermal mass and therefore a long time lag, so the interior tracks the <em>daily mean</em> rather than the daily maximum; the openings are small and few, limiting gain; lime whitewash gives a high albedo; and the height of the dome stratifies hot air above head level. The result is genuinely cool in summer — and cold and damp in winter, which is why there is a fireplace built into the wall thickness and why animals were often stabled in an alcove for their heat.</p>
+  <p><strong>Hydrologically, and this is the point of the whole book.</strong> The cone is a deliberate rainwater catchment. The <em>chiancarelle</em> shed water down overlapping courses to a channelled eaves and a spout, which delivers into a <strong>rock-cut cistern beneath the building</strong>, drawn by bucket or pump. Run the arithmetic: a roof of forty to sixty square metres under about six hundred millimetres of annual rainfall, with losses, yields perhaps twenty to thirty cubic metres a year — which was the household's entire supply. In a landscape with no rivers, <strong>the roof is the river</strong>, and the cone is not a picturesque choice but a piece of water engineering that happens to be beautiful.</p>
+</div>
+
+<h2>The masseria you are sleeping in</h2>
+<p>A <em class="term">masseria</em> — from Latin <em>massa</em>, a landed estate — is a self-contained agricultural complex: the owner's or steward's house, workers' quarters, a chapel, stables, a threshing floor, an oil mill or wine cellar, one or more cisterns, often a dovecote. And on the coast, in the sixteenth and seventeenth centuries, <strong>defensive features</strong>: corner towers, machicolations and drop-boxes, a single fortified gate, gun loops, blind ground-floor walls. That fortification is the inland half of the watchtower system from Day 1. The towers gave warning; the masserie gave shelter to people and stock. Building peaks in the sixteenth to eighteenth centuries, with a second wave after the abolition of feudalism in 1806, when masserie become capitalist estates.</p>
+<p>Things worth looking for in your own courtyard, which will tell you which kind of masseria you are in: a date stone or coat of arms over the portal; a defensive tower or drop-boxes, which place the complex in the raiding period rather than the agricultural nineteenth century; the <em>trappeto</em>, the oil mill; the cistern mouth and how the yard is graded to feed it. And in the Valle d'Itria specifically, look for <strong>trulli or <em>caselle</em> standing in the grounds of a masonry masseria</strong> — the two building traditions of this book in one farmyard, because the same estate needed a house and a field shelter and used the same slabs for both.</p>
+
+<div class="panel">
+  <div class="h">Olives: the honest version, and what you will see from the road</div>
+  <p>Two things need saying before you look out of the window, because otherwise the landscape will be either misleading or shocking.</p>
+  <p><strong>First, the age claims.</strong> The Fasano–Ostuni plain, which you are driving into, holds Italy's greatest concentration of monumental olive trees, protected by regional law. Trunks of a thousand years and more are defensible. The commonly retailed <strong>"two-thousand-year-old Roman tree" is not</strong> — olive trunks hollow out and regenerate from the base, so the visible wood is far younger than the organism, and single-tree ages of that order are essentially unverifiable. The groves are genuinely ancient as <em>groves</em>; individual trees are a different question.</p>
+  <p><strong>Second, and more important:</strong> since 2013 the bacterium <em>Xylella fastidiosa</em>, spread by a small sap-feeding insect, has killed millions of olive trees in the Salento, monumental trees among them. Large tracts of the landscape south of Lecce are <strong>skeletal grey standing deadwood</strong>, and you will have driven through them on Days 1 to 4 without necessarily understanding what you were looking at. Watch for a detail that misleads people: many felled trees are <strong>re-sprouting from the base</strong>, which looks like recovery and is not — the sprouts are usually infected too. Whether the containment front has reached the Fasano and Valle d'Itria groves by 2026 is exactly the kind of thing to ask your hosts, who will know, and to look at with your own eyes. The companion volume on the region sets out the epidemic properly.</p>
+</div>
+
+<h2>Day 6: a short paddle, a UNESCO town, and dinner in a butcher's shop</h2>
+<p>The Santo Stefano coast north of Monopoli is low limestone and calcarenite with small coves and clear shallows — a gentler and prettier version of the cliff coast, with landings. It is a half-day, deliberately, because the afternoon belongs to Alberobello.</p>
+<p>Day 5 ends with dinner in one of the Valle d'Itria's <em class="term">città bianche</em> — the white towns, Locorotondo, Cisternino, Martina Franca and Ostuni among them, lime-washed against the summer sun on a limestone plateau where nothing else was pale. Day 6 is the paddling.</p>
+<p><strong>Alberobello</strong>, inscribed on the World Heritage List in 1996, comprises two historic trullo quarters. <em>Rione Monti</em> is the steep, dense, famous one and is now essentially a shopping street; <em>Aia Piccola</em> is smaller, quieter, and still substantially residential. Total trullo counts circulate from about fourteen hundred to over sixteen hundred, and are usually rounded to fifteen hundred. Be realistic about the crowds: Alberobello is fed by coach itineraries and cruise calls at Bari and Brindisi, so <strong>late September improves it far less than it improves Otranto</strong> — perhaps a third fewer people, and Rione Monti is still thronged from ten until five. The fix is the hour rather than the month. Before nine or after six it is nearly empty, and <strong>Aia Piccola, where people actually live, is quiet at any hour.</strong> If you have a choice, go to the second one.</p>
+<p>Dinner is in <strong>Cisternino</strong>, a whitewashed hill town on the Murgia rim at around four hundred metres, and it is worth knowing how the local institution works before you are standing in it. Certain <strong>butchers' shops double as dining rooms</strong> — the <em class="term">fornello pronto</em>. The sequence: you go to the counter and <strong>choose raw meat by sight and by weight</strong>; the butcher weighs it, prices it, and puts it on the wood or charcoal grill at the back; you take a table in the shop or on the street with bread, a side dish and rough wine; and when it is ready it arrives on paper, and <strong>you pay by the weight of meat, not by the dish.</strong> It began as a way for butchers to sell what had not moved over the counter, and it is still recognisably a butcher's shop with tables in it rather than a restaurant.</p>
+<p>What you are eating is <em class="term">bombette</em> — "little bombs": thin slices of pork neck rolled round caciocavallo cheese, sometimes with pancetta or lard, skewered and grilled until the cheese bursts, which is where the name comes from. Cisternino and Martina Franca both claim their invention, an argument not to be settled by visitors. On the same grill: <em>gnummareddi</em>, offal rolls bound in caul, and knife-cut sausage. Practical notes: several of these places are cash-only, close one day a week, do not take bookings, and have a queue from about half past eight.</p>
+
+<div class="watch">
+  <div class="h">What to watch for &middot; inland, and at the masseria</div>
+  <p><span class="grp">On walls and ruins</span> Every wall lizard you see will be the <strong>Italian wall lizard</strong>, bright green over at least the front half of the back — at Egnazia they will run over your feet. Also look for the <strong>ocellated skink</strong> <span class="star">&#9733;</span>, a Salento speciality: cylindrical, glossy, sausage-shaped with tiny legs and rows of black-ringed white ocelli, which does not run like a lizard but <em>wriggles</em> snake-like into litter — much more often heard as a rustle at the base of a dry-stone wall than seen. Two geckos, separable by one rule: <strong>bulky, warty, bold, grey and out in daylight = Moorish gecko; small, pale, translucent, squeaky and shy = Turkish gecko.</strong> The chirp in the masonry at night is the second one.</p>
+  <p><span class="grp">Snakes, and the good news</span> Salento's snakes are the <strong>western whip snake</strong> — here almost always the melanistic form, a uniformly glossy blue-black ribbon crossing a track at high speed — and the <strong>four-lined snake</strong> <span class="star">&#9733;</span>, Italy's largest, a heavy, slow, straw-coloured animal to two metres with a famously docile temperament, and a stronghold in Puglia. Its juveniles are grey with dark saddles and look like a different species, which is why they get killed as vipers. On vipers, the reassuring local version is <em>almost</em> right, and the companion volume sets out why it is not quite. The asp viper is genuinely among the rarest reptiles of the Salento — but it is recorded here, and the published localities include <strong>Otranto, Santa Cesarea and Ugento</strong>: your Day 3 lunch stop, the town you walk that evening, and possibly your Day 4 beach. So a snake in your path is still almost certainly the harmless whip snake or four-lined snake and worth stopping for, and the universal rule applies regardless — <strong>no hands into dry-stone walls, or under rocks and overhangs you cannot see behind.</strong></p>
+  <p><span class="grp">Birds around the buildings</span> <strong>Little owl</strong>, almost guaranteed — squat, flat-headed, fierce yellow eyes under white brows, frequently out in daylight on a wall, bobbing and glaring. <strong>Barn owl</strong> in the outbuildings. <strong>Hoopoe</strong> on the tracks. <strong>Italian sparrow</strong> <span class="star">&#9873;</span> — a national endemic and a stabilised hybrid species, one of the best-studied cases of hybrid speciation in birds: chestnut crown running right to the forehead, clean white cheeks. <strong>Sardinian warbler</strong> scolding from inside a lentisc like a pebble shaken in a tin, and <strong>Cetti's warbler</strong> exploding at you from a ditch. <strong>Jay</strong>, busily caching acorns from the holm oaks — planting next century's woodland while you watch. And two arrivals that mark the season: the <strong>first black redstarts</strong> on the trulli and the <strong>first robin</strong> ticking in the garden, both of which appear in the far south from late September.</p>
+  <p><span class="grp">And one plant to find</span> The <strong>fragno</strong>, or Macedonian oak <span class="star">&#9873;</span> — the signature deciduous oak of the Murge and the Valle d'Itria, whose <strong>natural western limit in the world lies here</strong>. The <em>fragno</em> woods around Martina Franca and Ceglie Messapica are the westernmost stands anywhere. An eastern tree, at the end of its range, in the middle of your last landscape.</p>
+</div>
+
+<!-- ============ DAY 7 ============ -->
+<h1 class="chapter">Monopoli, and the Way Home</h1>
+<p class="kicker">Day 7 &middot; Saturday 3 October &middot; a port, a raft, and the trains</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">T</span>he last morning is short, and it ends at a railway station, which is a slightly abrupt way to finish a week at sea. Monopoli is worth the hour or two you get. It is a working Adriatic fishing port with a bright-painted fleet of <em class="term">gozzi</em> — the traditional carvel-built, double-ended, high-stemmed boats of this coast, once lateen-rigged and now motorised — still landing fish at the Porto Vecchio for a quayside market. If a shipwright's yard happens to be open, that is the best single scene of the last day; ask.</p>
+
+<h2>Two claims about a small city</h2>
+<p>The name is Greek-derived and first attested in the Byzantine period, and tradition has Monopoli founded by refugees from the destruction of <strong>Egnazia</strong> in late antiquity — which makes Day 5 and Day 7 a single narrative. Treat it as tradition: continuity of settlement on the site is likely, and the refugee story is a story.</p>
+<p>Two buildings, and one distinction worth having. <strong>Santa Maria Amalfitana</strong> is a Romanesque church built over a rock-cut crypt in a natural cave by the <strong>Amalfitan</strong> merchant community — physical evidence that the maritime republic of Amalfi held a trading colony on this coast. Do not confuse it with the cathedral, the <strong>Basilica della Madonna della Madia</strong>, an eighteenth-century Baroque rebuild whose own legend is the arrival of a Marian icon on a <em>raft</em> in December 1117, the raft's timbers conveniently providing the beams for the cathedral roof. The event is re-enacted twice a year. Two Amalfitan-flavoured stories, one archaeological and one hagiographic, which is a good note on which to end a week of separating the two.</p>
+<p>You will also be told that Monopoli's countryside contains <strong>ninety-nine <em>contrade</em></strong>, each with its chapel. Ninety-nine is a conventional number — the folkloric "almost a hundred" — rather than a cadastral count. What is true is that the countryside really is scattered with dozens of small rural churches and a great many masserie. And in the harbour, the bastioned <strong>Castello Carlo V</strong> of about 1552, later a prison: the coastal defence programme of Day 1, at town scale.</p>
+
+<div class="panel">
+  <div class="h">Getting out: the one thing people get wrong about Puglian trains</div>
+  <p><strong>Monopoli is on the Trenitalia Adriatic main line</strong> — Bari–Brindisi–Lecce. It is <em>not</em> served by Ferrovie del Sud Est, which is the separate network running inland from Bari to Alberobello, Locorotondo and Martina Franca. This is the most-confused point in Puglian rail planning, and the rule is simple: <strong>coastal towns are Trenitalia; the Valle d'Itria hill towns are FSE.</strong></p>
+  <p>From Monopoli to <strong>Bari Centrale</strong> is roughly forty to fifty minutes on a Regionale, or thirty to thirty-five on a faster service, with departures through the day. From Bari Centrale, the <strong>Ferrotramviaria airport shuttle</strong> reaches Bari airport in about eighteen to twenty minutes, running every fifteen to thirty. Allow an hour and a half to two hours door to check-in. For Rome, <strong>Frecciarossa Bari–Roma Termini takes about four hours</strong>. Buy ahead; the fare roughly halves.</p>
+</div>
+
+<div class="panel">
+  <div class="h">The free Saturday between the drop-off and the flight</div>
+  <p>You are handed over at Monopoli station at nine on Saturday morning; you are at the airport hotel that night and in a cab at four. Which means the trap that catches most people on this itinerary is already dealt with &mdash; the Ferrotramviaria airport train's first departure is somewhere around five in the morning, which is no use at all when check-in opens at four, and anyone planning to sleep in central Bari and take the train has a problem. You do not. What you have instead is <strong>an unplanned day, with bags to solve and a railway line to use.</strong></p>
+  <p><strong>The shape of it.</strong> Left luggage exists at Bari Centrale, so: drop the bags there mid-morning and collect them on the way out to the hotel. Three things are then worth the time. <strong>Monopoli itself</strong> is where you are already standing, and Saturday morning is when the quayside fish market is worth seeing. <strong>Polignano a Mare</strong> is eight kilometres up the same railway line — the cove at Lama Monachile is the most photographed place in Puglia and in early October it is actually approachable. And <strong>Bari Vecchia</strong>, the old town, gives you the Basilica di San Nicola from Chapter Three — the prototype of Apulian Romanesque, built in 1087 for relics stolen from Myra, and still an Orthodox pilgrimage church — plus, on Strada Arco Basso, the street where women make orecchiette on tables outside their front doors. That last one is either the most authentic thing in Bari or the most performed, depending on who you ask, and it is worth forming your own view.</p>
+  <p><strong>And one consolation for the alarm clock.</strong> At half past four on Sunday morning, driving to the terminal, the sky will be at its best of the whole trip. <strong>Saturn</strong> stands twenty-seven degrees up in the west, one day from opposition. <strong>Jupiter</strong> is twenty degrees up in the east and blazing at magnitude &minus;1.7, with <strong>Mars</strong> above it. The last-quarter moon is high in the south-east. Astronomical dawn is not until 05:20 and civil dawn not until 06:24, so you will be looking at a genuinely dark sky containing two planets and no Milky Way washed out by anything. It is not much of a trade for a six a.m. flight, but it is something.</p>
+</div>
+
+<h2>Things a naturalist will notice on the way out</h2>
+<p>Three, if you are paying attention. The <strong>grape harvest</strong> is in its last days — Negroamaro runs through late September and only the later reds, Susumaniello among them, are still coming in during the first week of October — so there may still be tractors with grape bins on the roads and the smell of fermentation around the <em>cantine</em>. It is the best week of the year to see a winery working and the worst week to expect a leisurely tour, since everybody has twenty tonnes to process. The <strong>olive harvest, by contrast, has not started</strong> — you are a fortnight early. Early green picking begins mid-to-late October and the bulk is November, so the fruit is still green and hard, the mills are silent and being cleaned, and <strong>the new oil does not yet exist.</strong> Anyone selling you <em>olio novello</em> in September is selling last year's. And the <strong>acorns are falling</strong> — holm oak, <em>fragno</em>, and if you got to Tricase, the extraordinary shaggy cups of the Vallonea oak.</p>
+<p>Which is the right note to end on, because it is the same note the week started on. This is not autumn. It is the last week of a nine-month drought, and everything in flower is a leafless bulb living on stored water — the sea squill spikes standing a metre and a half out of bare burnt hillside, the little lilac stars of autumn squill in the grazed turf, the first ivy-leaved cyclamen under the holm oaks. The bushes on the cliffs that look dead are <em>summer</em>-deciduous and about to come into leaf. If serious rain falls while you are here, the whole landscape will change visibly within two days: a green flush, fungi, amphibians calling out of season, tortoises up and walking after aestivating through the heat.</p>
+<p>Guidebooks describe a Mediterranean autumn that does not exist. The real event is the drought breaking, and there is a fair chance it happens in front of you.</p>
+
+<!-- ============ TABLE ============ -->
+<h1 class="chapter">At the Table</h1>
+<p class="kicker">What to order, and when the kitchen is open</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">S</span>alento cooking is the poorest cuisine in Italy raised to a high standard, and it helps to know that before you order, because the best things on the menu are frequently the cheapest. This was a landscape of bread, pulses, wild greens, olive oil and whatever the sea gave up. Meat was a Sunday matter, and the Valle d'Itria's grilled-pork culture is a different and richer tradition sixty kilometres north. Both are on your route, which is lucky.</p>
+
+<h2>The Salento table</h2>
+<p>Start with the two dishes that are the region rather than a restaurant's idea of it. <em class="term">Fave e cicoria</em> is a purée of dried split fava beans beside boiled wild chicory, with raw oil poured over — sweet, bitter, and the most Salentine thing there is. <em class="term">Ciceri e tria</em> is chickpeas with <em>tria</em> pasta, part of it boiled and part deep-fried and scattered on top for crunch; the word <em>tria</em> descends from the Arabic <em>itriyya</em>, which is a whole history in one noun. Traditionally it belongs to St Joseph's day in March, but you will find it.</p>
+<p>For eating on your feet: <em class="term">puccia</em>, a round leavened loaf split and filled to order; <em class="term">rustico leccese</em>, two discs of puff pastry sealing béchamel, tomato, mozzarella and nutmeg, eaten hot and standing and impossible to manage tidily; <em class="term">pittule</em>, dough fritters plain or with cauliflower or salt cod; and <em class="term">frisella</em>, the twice-baked ring rusk that was sailors' bread — you <em>sponzare</em> it, a quick dunk in water, then dress it with tomato, oregano, oil and salt. It is the best thing to eat out of a kayak that has ever been invented, and it was designed for exactly that.</p>
+<p>Breakfast is a <em class="term">pasticciotto</em>: an oval lard-shortcrust shell of pastry cream, baked, eaten <strong>warm</strong>, standing at the bar. The origin story places it at Galatina in 1745, at the Ascalone pastry shop, improvised from leftover pastry and cream; the shop is still there, and the date is family tradition rather than documentation. And with it, the local coffee: <em class="term">caffè leccese</em>, espresso poured over ice with almond milk. Order it as <em>caffè in ghiaccio con latte di mandorla</em>. In Lecce every bar makes it; north of Brindisi you may have to explain yourself.</p>
+<p>Two things to approach with open eyes. <em class="term">Ricotta forte</em> is ricotta fermented for weeks into a pungent spreadable paste, genuinely divisive; try a smear on bruschetta before you buy a jar. And <strong>sea urchins</strong> — <em>ricci</em>, eaten raw with bread — are a Salento signature that you should not order, and this one is now settled. A regional law of 2023 imposed a three-year harvesting ban; in 2026 Puglia <strong>extended the closure to 30 June 2029</strong>, adding permanent scientific monitoring, product traceability, measures against the illegal market, and the possibility of limited experimental harvesting by licensed fishermen only when the data justify it. The monitoring is working: a University of Salento survey of six areas along three hundred kilometres of Salento coast in 2025 found both numbers and shell diameters up on 2023. So <strong>urchins on a menu during your week are illegal</strong>, and the polite thing is not to ask for them.</p>
+
+<h2>The Valle d'Itria table</h2>
+<p>Northward the cooking gets richer and turns to the grill. <strong>Bombette</strong> and the <em>fornello pronto</em> are described in the Day 6 chapter; what to add is <strong>capocollo di Martina Franca</strong>, a Slow Food presidium cured pork neck lightly smoked over <em>fragno</em> oak — the same Macedonian oak whose western limit is in these woods, which is a pleasing closed loop. And <strong>burrata</strong>, invented at Andria, a mozzarella pouch filled with cream and shreds of curd: eat it the day it is made, because day-old burrata is a much sadder object.</p>
+<p>One seasonal trap worth avoiding: <em>orecchiette con cime di rapa</em>, the dish everyone associates with Puglia, is a <strong>November-to-March</strong> dish. In late September you want orecchiette with tomato and hard ricotta, or with mussels. Ordering turnip tops in September gets you something frozen.</p>
+
+<div class="panel">
+  <div class="h">Wine, in five names</div>
+  <p><strong>Primitivo</strong> — the flagship red, dark and warm and often over fourteen per cent. It is genetically identical to Zinfandel, and to the Croatian Tribidrag, which is a nice thing to mention to any Californian at the table. <em>Primitivo di Manduria</em> is the classic zone; the higher, cooler Murgia versions are fresher.</p>
+  <p><strong>Negroamaro</strong> — the Salento workhorse and, for most food, the better choice: savoury, bitter-edged, lighter in feel than Primitivo. <em>Salice Salentino</em> is its classic expression, usually with a dash of Malvasia Nera.</p>
+  <p><strong>Susumaniello</strong> — a nearly extinct Brindisi variety now fashionable: dark, herbal, higher in acid. The most interesting "new" red in the region.</p>
+  <p><strong>Verdeca</strong> and <strong>Fiano Minutolo</strong> — the Valle d'Itria whites, from Locorotondo and Martina Franca. Verdeca was historically shipped north as vermouth base and is now made lean, saline and low in alcohol; Minutolo is aromatic, citrus-and-herb, rescued from near-extinction, and is not the same variety as Campanian Fiano. These are the region's most food-friendly wines and the most undersold.</p>
+  <p><strong>Rosato</strong> — Puglia is the historic home of Italian rosé, and a bottle from Leone de Castris is generally credited as the first Italian rosé bottled and marketed, in the 1940s, for American troops. <strong>Order it knowing that Pugliese rosato is deep-coloured, dry and structured</strong>, nothing like Provence. If you are expecting pale, you will think something has gone wrong.</p>
+</div>
+
+<div class="panel">
+  <div class="h">Tasting the oil &mdash; and the one thing to know</div>
+  <p><strong>Bitterness and a pepper that makes you cough are marks of fresh polyphenols, not defects.</strong> That is the single most useful sentence about olive oil, and most visitors have it backwards. The method: a little in a small glass, cupped in one palm and covered with the other to warm it; smell for cut grass, artichoke, green almond, tomato leaf; then sip a small amount, drawing air through it; and assess bitterness at the back of the tongue and pungency in the throat.</p>
+  <p>The regional styles run from <strong>Coratina</strong> in the north — one of the world's highest-polyphenol cultivars, aggressively bitter and peppery and very stable — through the softer, almondy <strong>Ogliarola</strong> and <strong>Peranzana</strong>, to the Salento's <strong>Cellina di Nardò</strong> and <strong>Ogliarola Salentina</strong>, gentler and grassier, and now scarce because of <em>Xylella</em>. The defects to be able to name: rancid (crayon, putty, old walnut), fusty or muddy, winey-vinegary, musty. Buy DOP where you can, insist on a harvest date, insist on dark glass, and buy small.</p>
+  <p>And remember there is no new oil in September. The harvest starts in October and <em>olio novello</em> is a late-November pleasure. What you can buy now is last year's oil at its most honest price, and table olives being cured.</p>
+</div>
+
+<h2>Pizzica, and the thing it used to be</h2>
+<p>You will hear <em class="term">pizzica</em> — frame drum, violin, accordion, a driving 12/8 — in piazzas and masserie all week, and it is worth knowing that what you are hearing is a revival rather than a survival, because the original was not entertainment.</p>
+<p><em class="term">Tarantismo</em> was an affliction attributed to the bite of the <em>taranta</em>, a spider conflated in local belief between the large, harmless wolf spider <em>Lycosa tarantula</em> and the genuinely neurotoxic Mediterranean black widow, <em>Latrodectus tredecimguttatus</em>. Sufferers were overwhelmingly <strong>women</strong>, mostly poor farm labourers, and the affliction recurred annually, typically in late June. The remedy was musical: musicians played in the house until they found the rhythm and melody the <em>tarantata</em> responded to, and she danced, sometimes for days, on a sheet on the floor, with coloured cloths, until she was "liberated." The public phase was a pilgrimage on 28–29 June to the small <strong>chapel of San Paolo at Galatina</strong>, where sufferers drank from the well beside it. The chapel is small, usually shut, and does not look like the centre of anything, which is itself worth reporting.</p>
+<p>In June 1959 the ethnographer <strong>Ernesto De Martino</strong> took an interdisciplinary team to Galatina — an ethnomusicologist, a psychiatrist, a psychologist, an anthropologist and a photographer — and published <em class="term">La terra del rimorso</em>, "The Land of Remorse," in 1961. His argument is still the reference point: this was not spider poisoning but a <strong>culturally coded institution for handling otherwise inexpressible distress</strong>, anchored in poverty, forced marriage, sexual repression, bereavement and brutal agricultural labour, and given a socially licensed form of expression together with a ritual exit. The spider was the symbol that allowed the unsayable to be performed. He documented it as it was ending; a handful of <em>tarantate</em> were recorded into the 1980s and the practice is now extinct.</p>
+<p>The pizzica you will hear grew from the 1990s onward, and its great annual event, <strong>La Notte della Taranta</strong>, tours the Greek-speaking villages of the <em>Grecìa Salentina</em> through August and closes with an enormous free concert at Melpignano before a crowd usually reported in six figures. The 2026 <em>Concertone</em> falls on <strong>Saturday 22 August</strong> — Ermal Meta as <em>maestro concertatore</em>, the Mediterranean as the theme, after a twenty-stop village tour opening at Corigliano d'Otranto — which means <strong>you miss it by five weeks.</strong> The consolation is real: what survives into late September is pizzica played to fifty people in a piazza or a masseria courtyard rather than to a hundred thousand in a field, which for a group like yours is not a downgrade.</p>
+<p>And if you want the least touristic version of the tradition, it is not the concert. It is the <em class="term">pizzica scherma</em>, the "dance of the knives," at Torrepaduli on the night of 15–16 August — a mimed knife-duel danced inside a ring of drummers. Also missed, and also worth knowing exists.</p>
+
+<div class="panel">
+  <div class="h">Eight things about eating in Italy that actually matter</div>
+  <p><strong>1.</strong> Say <em>buongiorno</em> on entering a bar, shop or waiting room and <em>arrivederci</em> on leaving. Walking in and out silently is the commonest tourist rudeness, and it costs nothing to fix. <em>Salve</em> is a useful neutral fallback; <em>ciao</em> is for people you know.</p>
+  <p><strong>2.</strong> Bread goes on the tablecloth, not on a plate, and its purpose is to mop the sauce at the end — <em>fare la scarpetta</em>. Technically informal; universally done.</p>
+  <p><strong>3.</strong> No parmesan on fish. Ever. It is the one request that gets a visible reaction.</p>
+  <p><strong>4.</strong> Cappuccino after a meal is not done by Italians. Nobody will refuse you; it simply marks you.</p>
+  <p><strong>5.</strong> The bill is not brought until you ask: <em>il conto, per favore</em>. The <em>coperto</em>, a euro and a half to three per head, is a legal cover charge and not a tip.</p>
+  <p><strong>6.</strong> Standing at the bar is cheapest and sitting at a table costs several times as much. That is a legitimate charge, not a scam. In busier bars you pay at the till first and hand the receipt to the barista.</p>
+  <p><strong>7.</strong> Lunch is one to half past two; dinner starts at eight, kitchens closing around half past ten. The Cisternino <em>fornelli</em> open only in the evening. Book, even in September, and expect a weekly closing day.</p>
+  <p><strong>8. Tipping, honestly.</strong> Italy has no tipping culture in the American sense: staff are salaried, no percentage is expected, and rounding up or leaving five to ten euros after a good dinner is generous. Twenty per cent is not polite, it is conspicuous. The exception is the travel industry's own convention, in which guides and drivers on a guided week are customarily tipped — of the order of five to ten euros per person per day for the lead guide, usually collected as a group at the end. <strong>That is a tourism norm rather than an Italian one</strong>, and you should know which of the two you are following.</p>
+</div>
+
+<!-- ============ APPENDIX I ============ -->
+<h1 class="chapter">Appendix I: What to Ask, and When</h1>
+<p class="kicker">Five conversations worth having</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">G</span>uides, hosts and custodians know a great deal that they will not volunteer, largely because nobody asks. These are the five conversations that reliably pay, with the moment to have each one. Ask them early rather than late: most of them change what happens next.</p>
+
+<div class="askblock">
+  <div class="askhead">With the guides, over the first coffee <span class="when">Day 1, before launching</span></div>
+  <p class="ctx">This is the conversation that shapes the whole week, and it takes ten minutes.</p>
+  <ul>
+    <li>What is the wind doing, and which coast are we on because of it? (Then ask them to keep telling you, daily. Understanding the lee-coast logic makes every change of plan legible instead of arbitrary.)</li>
+    <li>What is your cave protocol — one boat at a time, who counts in and out, who stations at the entrance?</li>
+    <li>Will you call drink breaks on a clock, every twenty minutes, rather than leaving it to us? And can we settle the urinating-from-a-kayak question now, out loud, so nobody quietly dehydrates all week?</li>
+    <li>Which hospital is nearest to today's launch, and do you carry a VHF? (The coastguard is 1530; the general emergency number is 112.)</li>
+    <li>Can we do rescue practice today, in warm water, rather than discovering it on the cliff coast on Wednesday?</li>
+    <li>Where does the Zinzulusa currently allow kayaks, and what is the access situation at the Grotta della Poesia this season?</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">With the masseria host <span class="when">Day 1 or 2, at dinner</span></div>
+  <p class="ctx">Hosts are usually the family, they are frequently the fourth generation on the place, and almost nobody asks them anything.</p>
+  <ul>
+    <li>How old is the building, and is there a date stone? Was it ever fortified — is there a tower, are there drop-boxes over the gate?</li>
+    <li>Where is the cistern, and is it still used? How is the yard graded to feed it?</li>
+    <li>Has <em>Xylella</em> reached your groves? What have you done about it — replanted, and with what?</li>
+    <li>Where does your water actually come from — the aqueduct, or a well? Has there been rationing?</li>
+    <li>Is there a <em>sagra</em> or a festival within an hour of here this week? (This is the only reliable way to find out. Sagre are advertised two to four weeks ahead, on lamp posts.)</li>
+    <li>Is anybody harvesting grapes nearby that we could go and look at?</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">At Castro, before or after walking into the Zinzulusa <span class="when">Day 3</span></div>
+  <p class="ctx">The cave guides are often local and often much better informed than the script requires.</p>
+  <ul>
+    <li>Is the Cocito pool on the tour, and can you point out where the fresh water sits on the salt?</li>
+    <li>Do you get biologists here? What are they working on now?</li>
+    <li>Are there bats in the upper chambers at the moment, and are any parts closed for them?</li>
+    <li>Where exactly is Grotta Romanelli from the water, and is anyone excavating this season?</li>
+    <li>Where are the Athena fragments from the sanctuary displayed, and is it open?</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">In Otranto, in the cathedral <span class="when">Day 3, late afternoon</span></div>
+  <p class="ctx">The mosaic rewards a custodian's attention, and the martyrs' chapel rewards a careful question.</p>
+  <ul>
+    <li>Where is <em>Rex Arturus</em>, and where are Alexander and the griffins? (They are easy to walk past.)</li>
+    <li>Which parts of the pavement are restoration and which are twelfth-century?</li>
+    <li>What is actually known about the number of the martyrs, as opposed to the tradition?</li>
+    <li>Outside: where is the Varotsos monument to the <em>Kater i Radës</em>, and can you see Albania today?</li>
+  </ul>
+</div>
+
+<div class="askblock">
+  <div class="askhead">Wherever wine or oil is being sold <span class="when">Any day, and Day 7</span></div>
+  <p class="ctx">Two of these questions will get you a much better bottle than the label would.</p>
+  <ul>
+    <li>What is the harvest date on this oil? (Anything without one, or in clear glass, put down.)</li>
+    <li>Which cultivar — and is it Salentina, or has <em>Xylella</em> ended that here?</li>
+    <li>Do you have a Verdeca or a Minutolo? (Asking for the local white rather than the famous red changes the conversation entirely.)</li>
+    <li>Is the vendemmia finished? What was this year like?</li>
+    <li>Are <em>ricci</em> legal at the moment? (Ask before ordering, not after.)</li>
+  </ul>
+</div>
+
+<!-- ============ APPENDIX II ============ -->
+<h1 class="chapter">Appendix II: Sun, Moon and the Sky</h1>
+<p class="kicker">A bright start and a dark finish</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">T</span>hree astronomical facts shape these dates, and they are unusually well arranged. The <strong>September equinox fell on the 23rd</strong>, so the nights are already longer than the days and lengthening by about two minutes each. The <strong>full moon falls on Saturday 26 September</strong> — Day 0, your last evening in Lecce — after which the moon rises roughly half an hour later every night, so the week walks steadily out of moonlight and into darkness. And <strong>Saturn reaches opposition on 5 October</strong>, two days after you fly home, which means that for the entire trip it rises within minutes of sunset and is up all night at its brightest and largest of the year.</p>
+
+<h2>The sun, and the easternmost-point effect</h2>
+<p>Computed for Punta Palascìa (40.11° N, 18.52° E), Central European Summer Time, sea-level horizon with standard refraction. The Lecce days are included because you have them.</p>
+
+<table class="mv">
+  <thead><tr><th>Date</th><th>Civil dawn</th><th>Sunrise</th><th>Solar noon</th><th>Sunset</th><th>Civil dusk</th><th>Daylight</th><th>Noon sun</th></tr></thead>
+  <tbody>
+    <tr><td>Fri 25 Sep &mdash; Lecce</td><td>06:08</td><td>06:35</td><td>12:37</td><td>18:38</td><td>19:06</td><td>12 h 02 m</td><td>48.9&deg;</td></tr>
+    <tr><td>Sat 26 Sep &mdash; Day 0</td><td>06:09</td><td>06:36</td><td>12:37</td><td>18:36</td><td>19:04</td><td>12 h 00 m</td><td>48.6&deg;</td></tr>
+    <tr class="heavy"><td><strong>Sun 27 Sep</strong> &mdash; Day 1</td><td>06:10</td><td>06:37</td><td>12:36</td><td>18:35</td><td>19:02</td><td>11 h 57 m</td><td>48.2&deg;</td></tr>
+    <tr><td>Mon 28 Sep &mdash; Day 2</td><td>06:11</td><td>06:38</td><td>12:36</td><td>18:33</td><td>19:01</td><td>11 h 54 m</td><td>47.8&deg;</td></tr>
+    <tr><td>Tue 29 Sep &mdash; Day 3</td><td>06:12</td><td>06:39</td><td>12:36</td><td>18:32</td><td>18:59</td><td>11 h 52 m</td><td>47.4&deg;</td></tr>
+    <tr><td>Wed 30 Sep &mdash; Day 4</td><td>06:13</td><td>06:40</td><td>12:35</td><td>18:30</td><td>18:57</td><td>11 h 49 m</td><td>47.0&deg;</td></tr>
+    <tr><td>Thu 1 Oct &mdash; Day 5</td><td>06:14</td><td>06:41</td><td>12:35</td><td>18:28</td><td>18:56</td><td>11 h 46 m</td><td>46.6&deg;</td></tr>
+    <tr><td>Fri 2 Oct &mdash; Day 6</td><td>06:15</td><td>06:42</td><td>12:35</td><td>18:27</td><td>18:54</td><td>11 h 44 m</td><td>46.2&deg;</td></tr>
+    <tr class="heavy"><td><strong>Sat 3 Oct</strong> &mdash; Day 7</td><td>06:16</td><td>06:43</td><td>12:34</td><td>18:25</td><td>18:53</td><td>11 h 41 m</td><td>45.8&deg;</td></tr>
+  </tbody>
+</table>
+<p class="small">Across the week you lose twenty-one minutes of daylight, most of it off the end of the day: sunrise slips eight minutes later, sunset thirteen minutes earlier. A 07:30 launch is comfortably an hour after sunrise; a 19:30 dinner is dinner in the dark.</p>
+
+<p>Italy runs one time zone on a nominal meridian of 15° E, and Salento sits three and a half degrees east of it. So <strong>solar noon here is about 12:36, not 13:00</strong>, and the whole day is displaced early. Compared on the same clock face on 30 September: Otranto's sunrise at 06:40 against Rome's 07:05 and Milan's 07:19 — <strong>Otranto is twenty-five minutes ahead of Rome and thirty-nine ahead of Milan.</strong></p>
+
+<h2>The moon: the week's actual story</h2>
+<table class="mv">
+  <thead><tr><th style="width:22%">Date</th><th style="width:15%">Moonrise</th><th style="width:11%">Lit</th><th>Relative to sunset, and what it means</th></tr></thead>
+  <tbody>
+    <tr><td>Fri 25 Sep &mdash; Lecce</td><td>17:55</td><td>99%</td><td>Rises 43 min <em>before</em> sunset &mdash; up in daylight</td></tr>
+    <tr class="heavy"><td><strong>Sat 26 Sep</strong> &mdash; Day 0</td><td><strong>18:18</strong></td><td><strong>100%</strong></td><td><span class="flag">Full moon, rising 18 min before sunset. See the box.</span></td></tr>
+    <tr class="heavy"><td><strong>Sun 27 Sep</strong> &mdash; Day 1</td><td><strong>18:42</strong></td><td>98%</td><td><span class="flag">7 min after sunset, with Saturn nine degrees away</span></td></tr>
+    <tr><td>Mon 28 Sep &mdash; Day 2</td><td>19:10</td><td>94%</td><td>37 min after sunset; you are at dinner in Tricase</td></tr>
+    <tr><td>Tue 29 Sep &mdash; Day 3</td><td>19:42</td><td>88%</td><td>An hour after sunset; Otranto's walls in moonlight</td></tr>
+    <tr><td>Wed 30 Sep &mdash; Day 4</td><td>20:23</td><td>79%</td><td>Nearly two hours of darkness first</td></tr>
+    <tr><td>Thu 1 Oct &mdash; Day 5</td><td>21:14</td><td>69%</td><td>Two and three-quarter hours of dark sky after dusk</td></tr>
+    <tr class="heavy"><td><strong>Fri 2 Oct</strong> &mdash; Day 6</td><td><strong>22:15</strong></td><td>58%</td><td><span class="flag">Three and a half hours of dark, inland. The stargazing night.</span></td></tr>
+    <tr><td>Sat 3 Oct &mdash; Day 7</td><td>23:25</td><td>47%</td><td>Last quarter the following day, as you travel home</td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <div class="h">The two evenings worth planning, and one is before the paddling starts</div>
+  <p><strong>Saturday 26 September &mdash; Day 0, and the full moon itself.</strong> The moon rises at 18:18 and the sun sets at 18:36, so for eighteen minutes both are in the sky. You will be in Lecce with the afternoon free, and Lecce is eleven kilometres inland: a twenty-minute drive east to <strong>San Cataldo</strong> or the shore at <strong>Torre Chianca</strong> puts you on an open eastern horizon with nothing but water for seventy kilometres. Full moons rise at sunset by definition &mdash; what makes this one worth the trouble is that you happen to be on the correct coast of Italy for it, with nothing else to do. And <strong>Saturn is about eight degrees off it</strong>, a fist at arm's length: a full moon with a bright planet beside it is genuinely uncommon.</p>
+  <p><strong>Sunday 27 September &mdash; Day 1, and arguably the better photograph.</strong> The moon is still 98 per cent lit and rises at <strong>18:42, seven minutes after sunset</strong>, so it comes up out of a sea that has already gone dark while the sky behind you is still colouring. You will be at Masseria Violante after your first day on the water, close to the Adriatic. Ask about it at lunch rather than at dinner, because by dinner it will have happened.</p>
+  <p>And the real version, if the guides are willing and the sea is flat: <strong>a moonlight paddle on the 27th or 28th</strong>, on water at 24 °C, over a bottom you can see. It is one of the better experiences available to a human being, and this is the week for it.</p>
+</div>
+
+<h2>Saturn, two days from opposition</h2>
+<p>You could not have timed this better on purpose. <strong>Saturn reaches opposition on 5 October</strong> — closest to Earth, fully lit, up all night — and you are there for the week immediately before. Across your dates it <strong>rises between 19:01 and 18:32</strong>, which is to say within a few minutes of sunset every single evening, and by midnight it stands about <strong>50° high in the south</strong> at magnitude 0.3, the brightest steady point in that half of the sky. It does not twinkle; that is how you know it is a planet.</p>
+<p>One caveat before somebody puts a telescope on it. <strong>The ring plane passed edge-on to Earth in 2025</strong>, so through 2026 the rings are still nearly closed — a thin bright line ruled through the disc rather than the postcard ellipse. Arguably more interesting, and certainly rarer: this happens twice in Saturn's twenty-nine-year orbit. Any small telescope will show it, and firmly braced binoculars will at least show you that the planet is not round.</p>
+
+<h2>The rest of the sky</h2>
+<p><strong>Jupiter is the pre-dawn object</strong>, and you will be up for it: it rises around 02:50, and by half past six — while you are pulling on a rash top — it is high in the east at magnitude &minus;1.7, the brightest thing up there. Mars is also a morning object but faint at this apparition. <strong>Venus and Mercury are technically evening objects and effectively invisible</strong>, sitting one to three degrees above the western horizon in the dusk glow. Don't waste an evening on them.</p>
+<p><strong>Constellations, briefly.</strong> After dark the Summer Triangle — Vega, Deneb, Altair — is still high in the west with the Milky Way running through it; Cygnus overhead is its richest part. In the east, Pegasus and Andromeda are climbing, and the Andromeda Galaxy is a naked-eye smudge from a dark site. Low in the south, alone in a large empty patch, is <strong>Fomalhaut</strong> — worth finding because it is the only bright thing in that whole region of sky, and because one of the first directly imaged exoplanetary systems was found around it.</p>
+<p><strong>Where to stand, and when.</strong> The Salento coast is fairly built up and its skies are not dark; the darkest ground within reach is the cliff plateau between Otranto and Leuca and the <strong>Bosco di Tricase</strong> behind it — which is convenient, because you are having dinner at Tricase on Day 2. But the moon is 94 per cent that night. The genuine dark-sky nights are <strong>Days 5 and 6, at Masseria Montanaro in the Valle d'Itria</strong>, with two and three-quarter and three and a half hours of darkness before moonrise, inland and away from the coastal glow. <strong>Take the moon at the start of the week and the stars at the end of it.</strong></p>
+
+<!-- ============ APPENDIX III ============ -->
+<h1 class="chapter">Appendix III: The Kit That Earns Its Place</h1>
+<p class="kicker">Hands, feet, sun, and a small bag of tweezers</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">M</span>ost of what wrecks a week of warm-water sea kayaking is not dramatic. It is a blister that becomes an infection, a foot laid on a sea urchin, six days of accumulated sun, and a slow fluid deficit nobody noticed. All four are cheap to prevent and expensive to fix, and none of them appears on a standard packing list.</p>
+
+<h3>Feet — the single firmest rule in this book</h3>
+<p><strong>Stiff-soled closed reef shoes or wetsuit boots with a real sole, worn for every landing, without exception.</strong> No bare feet, no flip-flops, no thin neoprene socks. The rocky Adriatic landings are the norm on this trip and they present, in order of how often they end somebody's week: <strong>sea urchins</strong> wedged in every crevice at exactly the depth you put a foot; the <strong>Lithophyllum trottoir</strong>, which is razor-sharp, brittle, slippery and ecologically protected; bubbled, undercut karst limestone edged like broken glass; and the <strong>fireworm</strong>, which is why you never grope blindly under an overhang for a handhold. On the sandy Ionian side add the buried <strong>weeverfish</strong>, whose venomous dorsal spine is genuinely agonising and whose treatment is hot-water immersion.</p>
+<p>And take warm-water infection seriously. Any wound with spreading redness, heat and swelling after immersion in a 25 °C sea needs medical review and probably antibiotics rather than stoicism. Check your tetanus status before you fly.</p>
+
+<h3>Hands — tape on day one, not day three</h3>
+<p>Six consecutive days of wet gripping is the classic multi-day attrition. Blisters form at the base of the index finger and the web of the thumb, then macerate into salt sores in the wet creases, and by day four an otherwise fit paddler is off the water with an infected palm. So: <strong>tape the known hot spots with zinc-oxide tape on day one</strong>, before there is anything to tape over. Fingerless gloves or pogies. A correctly sized shaft and a deliberately loose grip, because over-gripping is the root cause. Rinse hands in fresh water and dry them properly at every break and at the end of the day, and use a lanolin or zinc barrier cream overnight. Keep nails short; waterlogged nails split.</p>
+
+<h3>Sun — the cloth answer</h3>
+<p>Long-sleeve UPF 50 rash top; a brimmed or legionnaire cap <em>under</em> the helmet; polarised sunglasses on a retainer; long sun tights or board shorts covering the thighs; SPF lip balm reapplied hourly, because the lower lip is the most commonly burned surface on a kayak. Then mineral sunscreen only on face, ears, neck, hands and feet. Pre-treat the chafe points on day one with zinc or a silicone balm — <strong>back of the neck, armpits, and the sit bones against a wet seat</strong>, since dried salt crystals in a seat pad are an abrasive. Rinse the cockpit daily.</p>
+
+<h3>Water</h3>
+<p>Three litres minimum, on the front deck or in a deck bag, accessible without stopping. Electrolytes in at least half of it. A litre and a half in the day hatch is ballast. Puglian tap water is potable and is fine to fill from — it is hard and often tastes of chlorine at the far end of long mains, which is why locals prefer bottled, and a carbon filter bottle fixes it. Obey any <em>acqua non potabile</em> sign, which is common on garden, harbour and cemetery taps. Never drink from a coastal karst spring, however inviting and cold: it is brackish and unprotected.</p>
+
+<div class="reflex">
+  <div class="h">The small bag that handles almost everything</div>
+  <p><span class="k">Fine tweezers and a magnifier</span> &mdash; for urchin spines and fireworm bristles, and genuinely fiddly work you want to do properly in good light.</p>
+  <p><span class="k">A roll of adhesive tape</span> &mdash; pressed on and lifted, it is the correct way to remove fireworm bristles. Never brush or rub them.</p>
+  <p><span class="k">A plastic card</span> &mdash; for scraping jellyfish tentacle fragments off without applying pressure.</p>
+  <p><span class="k">A small bottle of vinegar</span> &mdash; for <em>urchin spines</em>, where acetic acid genuinely helps dissolve calcareous fragments. <span class="k">Not</span> for jellyfish stings, where it is cubozoan-specific and can make a <em>Pelagia</em> sting worse.</p>
+  <p><span class="k">Hydrocortisone cream and an oral antihistamine</span> &mdash; for the itch phase, and expect delayed flares at a sting site for one to three weeks.</p>
+  <p><span class="k">Thin gloves</span> &mdash; for hauling boats over rock.</p>
+  <p><span class="k">A thermos of hot water</span>, if the masseria will fill one &mdash; hot immersion at about 42&ndash;45 °C has the best evidence for pain relief in marine envenomation. Cold packs are the standard beach measure and also work. This is the one genuinely contested point in the field; carry both if you can.</p>
+</div>
+
+<div class="panel">
+  <div class="h">Jellyfish first aid: three things to stop doing</div>
+  <p><strong>Vinegar is not a general treatment.</strong> Acetic acid is specific to Indo-Pacific box jellyfish. On Mediterranean species — <em>Pelagia</em> above all — it has been shown to <em>trigger</em> discharge of unfired stinging capsules in some species, making the sting worse.</p>
+  <p><strong>Urine does nothing.</strong> It is not sterile, its osmolarity is wrong and variable, and being hypotonic it can fire unfired capsules. It is folklore.</p>
+  <p><strong>Fresh water is actively harmful</strong>, for the same osmotic reason. So is alcohol. So is rubbing with a towel or sand, since mechanical pressure discharges the remaining capsules.</p>
+  <p><strong>What to do:</strong> get out of the water; rinse copiously with <em>seawater</em>; lift adherent fragments off without pressure using a card or tweezers; then analgesia — hot immersion or a cold pack; then a topical steroid and an antihistamine. Seek help for a large-area sting, anything on the face, or any systemic symptom.</p>
+</div>
+
+<!-- ============ APPENDIX IV ============ -->
+<h1 class="chapter">Appendix IV: Photography, Day by Day</h1>
+<p class="kicker">A supplement to the general notes</p>
+<hr class="chaprule">
+
+<p class="lead"><span class="dc">T</span>he general photography document covers technique; this appendix covers only what is specific to this coast and these dates. Three facts do most of the work: the Adriatic coast faces east, the Ionian coast faces west, and you are shooting from a moving platform in a salt aerosol.</p>
+
+<h2>Adriatic mornings, Ionian evenings</h2>
+<p><strong>The Adriatic Salento coast — Torre dell'Orso, Otranto, Castro, Leuca — is a morning coast, unambiguously.</strong> The sun rises out of the sea between 06:37 and 06:43 on these dates, over Albania. Between about 06:45 and 08:00, low frontal light lands directly on the cliff faces, warm and raking, with the sea sidelit to backlit. That is the best light of the day, and it coincides exactly with the calmest water and the best cave conditions. <strong>The photography and the paddling want the same hour</strong>, which almost never happens and should be exploited ruthlessly: get up. By ten the light is steep and the cliffs go flat; by afternoon the whole coast is in its own shadow or under harsh top light and the sea reads blue-black.</p>
+<p><strong>The Ionian coast is an evening coast.</strong> Sunset between 18:35 and 18:25 across the week, golden hour roughly 17:30 to 18:35, civil twilight ending between 19:02 and 18:53. Gallipoli's old town on its island, lit frontally from the west in the last hour, is the set-piece shot of the trip. Mornings there are backlit and flat. One operational caveat: an Ionian evening paddle finishes in fading light, so be landed before civil twilight, which now ends before seven.</p>
+
+<h2>Shooting into a sea cave</h2>
+<p>The problem is eight to twelve stops of dynamic range between the sunlit entrance and glowing water on one hand and the interior on the other, and <strong>you cannot bracket from a moving kayak.</strong> So: raw, single frame, <strong>expose for the highlights</strong> — the entrance and the luminous water — let the walls fall dark, and lift the shadows afterwards. Use the entrance as a compositional element rather than letting it fill the frame.</p>
+<p>The signature Salento image is the turquoise glow of light refracted up through water into a cave mouth: meter off the water, go wide, keep ISO as low as the shutter allows. But motion sets the floor at 1/250 to 1/500 to kill boat movement, which in a dark chamber means ISO 1600 to 6400 — plan around a body that is clean at 3200. <strong>Take the polariser off inside caves</strong>: it costs one and a half to two stops and kills the water-glow you came for. Put it back on for open-water turquoise and wet rock. And bright water outside plus dark rock inside defeats autofocus, so use single-point AF on wet rock at the waterline, or pre-focus and lock.</p>
+
+<h2>Salt, which is the real enemy</h2>
+<p>Two threats: salt aerosol from paddle drips and wind, which dries to a haze on the front element and creeps into zoom barrels and battery doors; and a single drop of seawater on a sensor during a lens change.</p>
+<ul class="tight">
+  <li><strong>One camera, one lens, no lens changes afloat.</strong> A 24–70 or 16–35 equivalent. Frankly, a rugged compact or action camera will produce more usable frames than a system camera you are afraid to take out.</li>
+  <li>A genuinely waterproof deck bag or micro case, <strong>leashed to the deck lines</strong>, so a capsize costs a soaking rather than a camera.</li>
+  <li>A sacrificial clear filter on the front element that you can wipe without fear for the coating.</li>
+  <li><strong>Two microfibres: one damp with fresh water, one dry. Never dry-wipe salt crystals</strong> — that is what scratches coatings.</li>
+  <li>A small fresh-water squeeze bottle, and a barely-damp wipe-down of the body every evening. Salt left on a barrel or battery door for six days will corrode and seize it.</li>
+  <li>Silica gel in the case overnight; a September masseria is humid.</li>
+  <li>Weather-sealed bodies survive spray, not immersion. Nothing survives a capsize with an open bag.</li>
+  <li>And the one nobody warns you about: <strong>sunscreen transfers from fingers to the rear screen and the eyepiece</strong> and is very hard to remove. Wash your hands before shooting, or accept a permanently smeared display.</li>
+</ul>
+
+<h2>And the scirocco</h2>
+<p>If a scirocco blows, you will be shooting in Saharan dust: a milky ochre sky, visibility down to a few kilometres, an orange sun at midday, and a fine reddish grit on every surface including your lens front. Two consequences. Photographically it is a gift — distant headlands separate into pale receding planes and the light goes strange and lovely. Mechanically it is the worst day of the week for a camera. Wipe with the damp cloth only, and often.</p>
+
+<hr class="quietrule">
+<p class="small" style="text-align:center;">Compiled September 2026 as a companion to Tofino Expeditions' <em>Kayaking Puglia</em> itinerary.<br>
+Where a claim is contested, that is stated. Where a figure is likely to have changed, that is flagged.<br>
+Check anything that matters before you fly.</p>
+
+</body>
+</html>
