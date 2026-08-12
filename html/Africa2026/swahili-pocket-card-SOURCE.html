@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Swahili &amp; Setswana &mdash; Pocket Card</title>
+<style>
+  :root{
+    --ink:#2a2621;
+    --soft:#5c5347;
+    --terra:#8a6d1f;
+    --terra-d:#6f5615;
+    --green:#37493c;
+    --gold:#c98a3c;
+    --cream:#fbf7ef;
+    --panel:#f4ecdd;
+    --rule:#d8cbb3;
+  }
+
+  @page {
+    size: Letter;
+    margin: 14mm 14mm 13mm 14mm;
+    @top-left{
+      content: "Safari 2026";
+      font-family:"Carlito","DejaVu Sans",sans-serif;
+      font-size:7.5pt; letter-spacing:.14em; text-transform:uppercase;
+      color:#c3b79f;
+    }
+    @top-right{
+      content: string(pagetitle);
+      font-family:"Carlito","DejaVu Sans",sans-serif;
+      font-size:7.5pt; letter-spacing:.12em; text-transform:uppercase;
+      color:#9a8f7c;
+    }
+    @bottom-left{
+      content: "Pocket Card · Rev 1 · 12 August 2026";
+      font-family:"Carlito","DejaVu Sans",sans-serif;
+      font-size:7pt; letter-spacing:.08em; color:#a89c86;
+    }
+    @bottom-center{
+      content: counter(page);
+      font-family:"Carlito","DejaVu Sans",sans-serif;
+      font-size:8.5pt; color:#9a8f7c;
+    }
+  }
+  @page :first{ @top-right{content:none} }
+
+  html{ font-family:"Lora","GFS Baskerville",Georgia,serif; color:var(--ink); }
+  body{ margin:0; font-size:9pt; line-height:1.42; }
+  p{ margin:0 0 .5em 0; text-align:left; }
+
+  /* ---- masthead ---- */
+  .mast{ border-bottom:2.2px solid var(--terra); padding-bottom:.5em; margin:0 0 1em 0; }
+  .mast .kicker{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:7.6pt; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--terra); font-weight:700; margin:0 0 .25em 0;
+  }
+  .mast h1{
+    string-set: pagetitle "Swahili & Setswana";
+    font-size:23pt; font-weight:700; line-height:1.04; color:var(--green);
+    margin:0 0 .18em 0; letter-spacing:-.015em;
+  }
+  .mast .sub{ font-size:10pt; font-style:italic; color:var(--soft); margin:0; }
+
+  .pagehead{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:7.6pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--terra); font-weight:700;
+    border-bottom:2.2px solid var(--terra); padding-bottom:.45em; margin:0 0 1em 0;
+  }
+  .pagehead .r{ float:right; color:#a89c86; letter-spacing:.14em; }
+
+  /* ---- two-column frame (table = reliable in paged CSS) ---- */
+  table.cols{ width:100%; border-collapse:separate; border-spacing:0; }
+  table.cols > tbody > tr > td{ vertical-align:top; padding:0; }
+  td.L{ width:49%; padding-right:5mm !important; }
+  td.R{ width:49%; padding-left:5mm !important; border-left:.6px solid var(--rule); }
+
+  h3{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:8.2pt; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--green); font-weight:700;
+    margin:1.05em 0 .32em 0; border-bottom:1.2px solid var(--rule); padding-bottom:.14em;
+  }
+  h3:first-child, .pagehead + h3{ margin-top:0; }
+
+  /* ---- phrase tables ---- */
+  table.ph{ width:100%; border-collapse:collapse; margin:0 0 .2em 0; break-inside:avoid; }
+  table.ph td{ padding:.2em .3em .2em 0; border-bottom:.5px solid #e8dfcc; vertical-align:top; }
+  table.ph td.sw{ font-weight:700; color:var(--terra-d); width:44%; }
+  table.ph td.en{ color:var(--ink); font-size:8.6pt; }
+  table.ph tr:last-child td{ border-bottom:0; }
+  .say{ font-family:"Carlito","DejaVu Sans",sans-serif; font-size:7.6pt; color:var(--soft);
+        letter-spacing:.02em; display:block; font-weight:400; }
+
+  /* ---- panels ---- */
+  .panel{
+    background:var(--panel); border-left:3px solid var(--gold);
+    padding:.6em .75em .5em .75em; margin:.7em 0; border-radius:2px;
+    break-inside:avoid; font-size:8.5pt; line-height:1.4;
+  }
+  .panel .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:7.4pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--terra-d); font-weight:700; margin:0 0 .28em 0;
+  }
+  .panel p:last-child{ margin-bottom:0; }
+  .watch{
+    background:#eef2ec; border-left:3px solid var(--green);
+    padding:.6em .75em .5em .75em; margin:.7em 0; border-radius:2px;
+    break-inside:avoid; font-size:8.5pt; line-height:1.4;
+  }
+  .watch .h{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:7.4pt; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:0 0 .28em 0;
+  }
+  .watch p:last-child{ margin-bottom:0; }
+
+  b.sw{ color:var(--terra-d); }
+  em.gl{ font-style:italic; color:var(--soft); }
+
+  /* ---- numbers strip ---- */
+  table.num{ width:100%; border-collapse:collapse; font-family:"Carlito","DejaVu Sans",sans-serif;
+             font-size:8.2pt; break-inside:avoid; }
+  table.num td{ padding:.22em .3em; border-bottom:.5px solid #e8dfcc; }
+  table.num td.d{ color:var(--terra-d); font-weight:700; width:14%; }
+  table.num td.w{ width:36%; }
+
+  /* ---- animal grid ---- */
+  table.an{ width:100%; border-collapse:collapse; font-size:8.4pt; break-inside:avoid; }
+  table.an td{ padding:.2em .3em .2em 0; border-bottom:.5px solid #e8dfcc; vertical-align:top; }
+  table.an td.k{ font-weight:700; color:var(--terra-d); width:52%; }
+  table.an tr.hv td{ background:#f6ede0; }
+
+  /* ---- setswana footer band ---- */
+  .band{ margin-top:1.1em; border-top:2.2px solid var(--green); padding-top:.7em; break-inside:avoid; }
+  .band .lab{
+    font-family:"Carlito","DejaVu Sans",sans-serif;
+    font-size:7.6pt; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--green); font-weight:700; margin:0 0 .1em 0;
+  }
+  .band .note{ font-size:8.4pt; color:var(--soft); font-style:italic; margin:0 0 .5em 0; }
+
+  .pg2{ break-before:page; font-size:8.7pt; }
+  .pg2 table.ph td{ padding:.14em .3em .14em 0; }
+  .pg2 table.an td{ padding:.14em .3em .14em 0; }
+  .pg2 h3{ margin:.85em 0 .26em 0; }
+  .pg2 .watch{ margin:.6em 0 0 0; }
+</style>
+</head><body>
+
+<!-- =====================  PAGE 1  ===================== -->
+<section class="mast">
+  <p class="kicker">Kiswahili &middot; Tanzania &amp; Kenya</p>
+  <h1>Swahili &amp; Setswana</h1>
+  <p class="sub">Enough to be greeted well, thank people properly, and name what you are looking at.</p>
+</section>
+
+<table class="cols"><tbody><tr>
+<td class="L">
+
+  <h3>Saying it</h3>
+  <p>Swahili is spelled as it sounds &mdash; five clean vowels, no silent letters, no reduction. <b class="sw">a</b> as in <em class="gl">father</em>, <b class="sw">e</b> as in <em class="gl">bet</em>, <b class="sw">i</b> as in <em class="gl">machine</em>, <b class="sw">o</b> as in <em class="gl">or</em>, <b class="sw">u</b> as in <em class="gl">flute</em>. Stress falls on the second-to-last syllable, bar a few Arabic loanwords. <b class="sw">ny</b> is the <em class="gl">ny</em> of canyon; <b class="sw">ng&rsquo;</b> is a single nasal sound, as in <em class="gl">singer</em>.</p>
+  <h3>Greeting is a ritual</h3>
+  <p>You do not walk up and ask for something. There is an exchange first, and it is short, formulaic, and expected. Skipping it reads as rudeness; doing it badly does not.</p>
+
+  <table class="ph"><tbody>
+    <tr><td class="sw">Hujambo?<span class="say">hoo-JAM-boh</span></td><td class="en">How are you? <em class="gl">(to one person)</em></td></tr>
+    <tr><td class="sw">Sijambo<span class="say">see-JAM-boh</span></td><td class="en">I&rsquo;m fine &mdash; <em class="gl">the required reply</em></td></tr>
+    <tr><td class="sw">Hamjambo?</td><td class="en">How are you all? <em class="gl">(to a group)</em></td></tr>
+    <tr><td class="sw">Hatujambo</td><td class="en">We&rsquo;re all fine</td></tr>
+    <tr><td class="sw">Habari?<span class="say">ha-BA-ree</span></td><td class="en">What news? <em class="gl">the everyday opener</em></td></tr>
+    <tr><td class="sw">Nzuri / Safi / Salama</td><td class="en">Good / clean / peaceful &mdash; <em class="gl">any works</em></td></tr>
+    <tr><td class="sw">Habari za asubuhi?</td><td class="en">Good morning <em class="gl">(lit. news of the morning)</em></td></tr>
+    <tr><td class="sw">Mambo?<span class="say">MAM-boh</span></td><td class="en">How&rsquo;s things? <em class="gl">informal, young</em></td></tr>
+    <tr><td class="sw">Poa!<span class="say">POH-ah</span></td><td class="en">Cool! &mdash; <em class="gl">reply to Mambo</em></td></tr>
+    <tr><td class="sw">Karibu / Karibuni</td><td class="en">Welcome <em class="gl">(one / several)</em></td></tr>
+    <tr><td class="sw">Kwaheri</td><td class="en">Goodbye</td></tr>
+    <tr><td class="sw">Tutaonana</td><td class="en">See you again</td></tr>
+    <tr><td class="sw">Lala salama</td><td class="en">Sleep well</td></tr>
+  </tbody></table>
+
+  <div class="panel">
+    <p class="h">The one that earns you goodwill</p>
+    <p>To anyone visibly older than you, say <b class="sw">Shikamoo</b> <em class="gl">(shee-ka-MOH-oh)</em>. It is a mark of respect &mdash; literally &ldquo;I hold your feet.&rdquo; The reply is <b class="sw">Marahaba</b>. Children use it to adults, adults to elders. As a grey-haired visitor you will be on the receiving end of it too, so know the answer.</p>
+  </div>
+
+  <div class="watch">
+    <p class="h">About &ldquo;Jambo&rdquo;</p>
+    <p>Camp staff will greet you with <b class="sw">Jambo!</b> It is real but simplified &mdash; the version reserved for tourists. Answering <b class="sw">Sijambo</b>, or better <b class="sw">Habari?</b>, signals you have made some effort. It is reliably well received.</p>
+  </div>
+
+</td>
+<td class="R">
+
+  <h3>Courtesies</h3>
+  <table class="ph"><tbody>
+    <tr><td class="sw">Asante / Asante sana</td><td class="en">Thank you / thank you very much</td></tr>
+    <tr><td class="sw">Karibu</td><td class="en">You&rsquo;re welcome <em class="gl">(also: welcome)</em></td></tr>
+    <tr><td class="sw">Tafadhali</td><td class="en">Please</td></tr>
+    <tr><td class="sw">Samahani</td><td class="en">Excuse me / sorry</td></tr>
+    <tr><td class="sw">Naomba&hellip;<span class="say">na-OM-ba</span></td><td class="en">May I have&hellip; <em class="gl">(lit. I request)</em></td></tr>
+    <tr><td class="sw">Pole / Pole sana</td><td class="en">Sorry for your trouble <em class="gl">(sympathy)</em></td></tr>
+    <tr><td class="sw">Polepole</td><td class="en">Slowly, gently</td></tr>
+    <tr><td class="sw">Hakuna shida</td><td class="en">No problem <em class="gl">(more natural than</em> matata<em class="gl">)</em></td></tr>
+    <tr><td class="sw">Ndiyo / Hapana</td><td class="en">Yes / no</td></tr>
+    <tr><td class="sw">Sawa / Sawa sawa</td><td class="en">OK / all good</td></tr>
+    <tr><td class="sw">Sielewi / Sijui</td><td class="en">I don&rsquo;t understand / I don&rsquo;t know</td></tr>
+    <tr><td class="sw">Unasema Kiingereza?</td><td class="en">Do you speak English?</td></tr>
+    <tr><td class="sw">Jina langu ni&hellip;</td><td class="en">My name is&hellip;</td></tr>
+    <tr><td class="sw">Jina lako ni nani?</td><td class="en">What is your name?</td></tr>
+  </tbody></table>
+
+  <h3>Addressing people</h3>
+  <table class="ph"><tbody>
+    <tr><td class="sw">Bwana</td><td class="en">Sir, Mr</td></tr>
+    <tr><td class="sw">Mama</td><td class="en">Ma&rsquo;am &mdash; <em class="gl">respectful, any adult woman</em></td></tr>
+    <tr><td class="sw">Kaka / Dada</td><td class="en">Brother / sister <em class="gl">(peers)</em></td></tr>
+    <tr><td class="sw">Rafiki</td><td class="en">Friend</td></tr>
+  </tbody></table>
+
+  <h3>Numbers</h3>
+  <table class="num"><tbody>
+    <tr><td class="d">1</td><td class="w">moja</td><td class="d">6</td><td class="w">sita</td></tr>
+    <tr><td class="d">2</td><td class="w">mbili</td><td class="d">7</td><td class="w">saba</td></tr>
+    <tr><td class="d">3</td><td class="w">tatu</td><td class="d">8</td><td class="w">nane</td></tr>
+    <tr><td class="d">4</td><td class="w">nne</td><td class="d">9</td><td class="w">tisa</td></tr>
+    <tr><td class="d">5</td><td class="w">tano</td><td class="d">10</td><td class="w">kumi</td></tr>
+    <tr><td class="d">20</td><td class="w">ishirini</td><td class="d">100</td><td class="w">mia moja</td></tr>
+    <tr><td class="d">50</td><td class="w">hamsini</td><td class="d">1000</td><td class="w">elfu moja</td></tr>
+  </tbody></table>
+  <p style="font-size:8.2pt;color:var(--soft);margin-top:.3em;">Teens and tens combine with <em class="gl">na</em>: <em class="gl">kumi na moja</em> = eleven, <em class="gl">ishirini na tano</em> = twenty-five.</p>
+
+  <div class="panel">
+    <p class="h">Two words you will hear constantly</p>
+    <p><b class="sw">Safari</b> is simply the Swahili for <em class="gl">journey</em> &mdash; no drama attached. And <b class="sw">Twende!</b> means &ldquo;let&rsquo;s go&rdquo;; it is how every game drive begins.</p>
+  </div>
+
+</td>
+</tr></tbody></table>
+
+<!-- =====================  PAGE 2  ===================== -->
+<div class="pg2">
+<p class="pagehead">In the vehicle, around camp, and naming the animals <span class="r">Kiswahili</span></p>
+
+<table class="cols"><tbody><tr>
+<td class="L">
+
+  <h3>In the vehicle</h3>
+  <table class="ph"><tbody>
+    <tr><td class="sw">Twende!</td><td class="en">Let&rsquo;s go!</td></tr>
+    <tr><td class="sw">Simama, tafadhali</td><td class="en">Stop, please</td></tr>
+    <tr><td class="sw">Naomba tusimame</td><td class="en">Could we stop here</td></tr>
+    <tr><td class="sw">Polepole, tafadhali</td><td class="en">Slowly, please</td></tr>
+    <tr><td class="sw">Subiri kidogo</td><td class="en">Wait a moment</td></tr>
+    <tr><td class="sw">Naomba kupiga picha?</td><td class="en">May I take a photograph?</td></tr>
+    <tr><td class="sw">Hii ni nini?</td><td class="en">What is this?</td></tr>
+    <tr><td class="sw">Iko wapi?</td><td class="en">Where is it? <em class="gl">(</em>Yuko wapi?<em class="gl"> of a person)</em></td></tr>
+    <tr><td class="sw">Kushoto / Kulia</td><td class="en">Left / right</td></tr>
+    <tr><td class="sw">Mbele / Nyuma</td><td class="en">Ahead / behind</td></tr>
+    <tr><td class="sw">Jua / Kivuli</td><td class="en">Sun / shade</td></tr>
+    <tr><td class="sw">Ajabu!</td><td class="en">Extraordinary!</td></tr>
+  </tbody></table>
+
+  <h3>Around camp</h3>
+  <table class="ph"><tbody>
+    <tr><td class="sw">Choo kiko wapi?</td><td class="en">Where is the toilet?</td></tr>
+    <tr><td class="sw">Maji ya kunywa</td><td class="en">Drinking water</td></tr>
+    <tr><td class="sw">Maji ya moto</td><td class="en">Hot water</td></tr>
+    <tr><td class="sw">Chai / Kahawa</td><td class="en">Tea / coffee</td></tr>
+    <tr><td class="sw">Nimeshiba, asante</td><td class="en">I&rsquo;ve had plenty, thank you</td></tr>
+    <tr><td class="sw">Bei gani?</td><td class="en">What price? <em class="gl">(</em>ngapi<em class="gl"> = how many)</em></td></tr>
+    <tr><td class="sw">Asante kwa kila kitu</td><td class="en">Thank you for everything</td></tr>
+  </tbody></table>
+
+  <div class="watch">
+    <p class="h">When you hand over a tip</p>
+    <p>Say it, don&rsquo;t just pass it. <b class="sw">Asante sana kwa kila kitu</b> &mdash; with eye contact, and either two hands or the right hand with the left touching the forearm. The gesture registers more than the amount does.</p>
+  </div>
+
+</td>
+<td class="R">
+
+  <h3>Naming the animals</h3>
+  <table class="an"><tbody>
+    <tr class="hv"><td class="k">Simba</td><td>Lion</td></tr>
+    <tr><td class="k">Chui</td><td>Leopard</td></tr>
+    <tr><td class="k">Duma</td><td>Cheetah</td></tr>
+    <tr class="hv"><td class="k">Tembo <em class="gl">/ Ndovu</em></td><td>Elephant</td></tr>
+    <tr><td class="k">Kifaru</td><td>Rhinoceros</td></tr>
+    <tr><td class="k">Nyati <em class="gl">/ Mbogo</em></td><td>Buffalo</td></tr>
+    <tr class="hv"><td class="k">Twiga</td><td>Giraffe</td></tr>
+    <tr><td class="k">Kiboko</td><td>Hippopotamus</td></tr>
+    <tr><td class="k">Punda milia</td><td>Zebra <em class="gl">(striped donkey)</em></td></tr>
+    <tr><td class="k">Nyumbu</td><td>Wildebeest</td></tr>
+    <tr><td class="k">Swala <em class="gl">/ swala pala</em></td><td>Antelope, any <em class="gl">/ impala</em></td></tr>
+    <tr><td class="k">Kongoni</td><td>Hartebeest</td></tr>
+    <tr><td class="k">Fisi</td><td>Hyena</td></tr>
+    <tr><td class="k">Mbwa mwitu</td><td>Wild dog</td></tr>
+    <tr><td class="k">Ngiri</td><td>Warthog</td></tr>
+    <tr><td class="k">Nyani <em class="gl">/ tumbili</em></td><td>Baboon <em class="gl">/ vervet</em></td></tr>
+    <tr><td class="k">Mamba</td><td>Crocodile</td></tr>
+    <tr><td class="k">Ndege</td><td>Bird <em class="gl">(also: aircraft)</em></td></tr>
+  </tbody></table>
+
+  <h3>The country itself</h3>
+  <table class="ph"><tbody>
+    <tr><td class="sw">Mto / Ziwa</td><td class="en">River / lake</td></tr>
+    <tr><td class="sw">Mlima / Mvua</td><td class="en">Mountain / rain</td></tr>
+    <tr><td class="sw">Serengeti</td><td class="en">Said to be Maa for &ldquo;the land that runs on forever&rdquo;</td></tr>
+  </tbody></table>
+
+</td>
+</tr></tbody></table>
+
+<div class="band">
+  <p class="lab">Botswana &middot; Setswana</p>
+  <p class="note">Swahili is no use here &mdash; it is an East African language. Botswana speaks Setswana and English. Camp English is universal, but <em>rra</em> and <em>mma</em> cost nothing and are noticed. Setswana <em>g</em> is a throaty <em>kh</em>, as in <em>loch</em> &mdash; never an English <em>h</em>.</p>
+  <table class="cols"><tbody><tr>
+  <td class="L">
+    <table class="ph"><tbody>
+      <tr><td class="sw">Dumela rra / mma<span class="say">doo-MEH-la rah / mah</span></td><td class="en">Hello, sir / madam &mdash; <em class="gl">use the</em> rra<em class="gl">/</em>mma<em class="gl">, always</em></td></tr>
+      <tr><td class="sw">Dumelang</td><td class="en">Hello, all of you</td></tr>
+      <tr><td class="sw">Le kae?</td><td class="en">How are you? <em class="gl">(plural &mdash; the polite form)</em></td></tr>
+      <tr><td class="sw">Re teng</td><td class="en">We are here &mdash; <em class="gl">the reply</em></td></tr>
+      <tr><td class="sw">O tsogile?</td><td class="en">Have you woken? <em class="gl">(morning)</em></td></tr>
+    </tbody></table>
+  </td>
+  <td class="R">
+    <table class="ph"><tbody>
+      <tr><td class="sw">Ke a leboga<span class="say">keh ah leh-BOH-kha</span></td><td class="en">Thank you <em class="gl">(</em>&hellip;thata<em class="gl">: very much)</em></td></tr>
+      <tr><td class="sw">Go siame</td><td class="en">It&rsquo;s fine, all right</td></tr>
+      <tr><td class="sw">Ee / Nnyaa</td><td class="en">Yes / no</td></tr>
+      <tr><td class="sw">Tsamaya sentle</td><td class="en">Go well <em class="gl">(to the one leaving)</em></td></tr>
+      <tr><td class="sw">Sala sentle</td><td class="en">Stay well <em class="gl">(to the one staying)</em></td></tr>
+    </tbody></table>
+  </td>
+  </tr></tbody></table>
+  <p style="font-size:8.3pt;color:var(--soft);margin:.45em 0 .2em 0;"><b class="sw">Pula</b> is both the currency and the word for rain &mdash; in a country that is mostly Kalahari the two ideas are not separable, and it doubles as a toast. Animals: <em class="gl">tlou</em> elephant, <em class="gl">tau</em> lion, <em class="gl">thutlwa</em> giraffe, <em class="gl">kubu</em> hippo, <em class="gl">nkwe</em> leopard.</p>
+</div>
+
+<p style="font-size:8.3pt;color:var(--soft);margin:.7em 0 0 0;border-top:1px solid var(--rule);padding-top:.55em;break-inside:avoid;"><b class="sw">Also worth having, in Swahili:</b> <em class="gl">leo</em> today, <em class="gl">kesho</em> tomorrow, <em class="gl">asubuhi</em> morning, <em class="gl">jioni</em> evening, <em class="gl">mchana</em> afternoon, <em class="gl">usiku</em> night, <em class="gl">adhuhuri</em> noon, <em class="gl">sasa</em> now, <em class="gl">baadaye</em> later, <em class="gl">karibu na</em> near to, <em class="gl">mbali na</em> far from, <em class="gl">vumbi</em> dust, <em class="gl">nimechoka</em> I&rsquo;m tired.</p>
+</div>
+
+</body></html>
