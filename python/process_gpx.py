@@ -30,6 +30,9 @@ parser.add_argument('--map',
 parser.add_argument('--merge',
                     default="no",
                     help="Merge all gpx files in current directory")
+parser.add_argument('--time_delta',
+                    default=1.,
+                    help="# secs per step")
 
 args = parser.parse_args()
 
@@ -83,7 +86,13 @@ if args.merge == "yes":
     # Extract tracks from the GPX file and add them to KML
     for track in merged_gpx.tracks:
         for segment in track.segments:
-            kml_coords = [(point.longitude, point.latitude) for point in segment.points]
+            kept = []
+            last_time = None
+            for point in segment.points:
+                if last_time is None or (point.time - last_time) >= timedelta(seconds=args.time_delta):
+                    kept.append(point)
+                    last_time = point.time
+            kml_coords = [(point.longitude, point.latitude) for point in kept]
             kml.newlinestring(name=track.name, coords=kml_coords)
 
     # Save the KML file
