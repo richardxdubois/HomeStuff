@@ -1,0 +1,202 @@
+/* Africa 2026 — shared stylesheet
+   Approximates the look of the Egypt 2023 site (light grey background,
+   centered bold title/subtitle, two-column text+map layout, thumbnail row).
+   I don't have your actual Egypt CSS to match pixel-for-pixel — tweak freely,
+   this is meant as a starting skeleton, not a final answer. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #ececec;
+  color: #1a1a1a;
+  font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 24px 32px 48px;
+}
+
+h1.title {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+}
+
+p.subtitle {
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 18px;
+}
+
+/* small top nav under the subtitle */
+nav.sitenav {
+  text-align: center;
+  font-size: 13px;
+  margin-bottom: 22px;
+}
+nav.sitenav a {
+  color: #1a1a1a;
+  text-decoration: none;
+  margin: 0 10px;
+  border-bottom: 1px solid transparent;
+}
+nav.sitenav a:hover { border-bottom-color: #1a1a1a; }
+nav.sitenav a.current { font-weight: 700; }
+
+.map-note {
+  text-align: right;
+  font-size: 11px;
+  font-style: italic;
+  color: #777;
+  margin-bottom: 6px;
+}
+
+.layout {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.layout .text-col {
+  flex: 1 1 54%;
+}
+
+.layout .map-col {
+  flex: 1 1 46%;
+}
+
+.layout .map-col iframe,
+.map-placeholder {
+  width: 100%;
+  height: 480px;
+  border: 0;
+  display: block;
+}
+
+.map-placeholder {
+  background: #dfe7e2;
+  color: #6b6b6b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+.text-col p { margin: 0 0 14px; text-align: left; }
+
+.no-map .layout { display: block; }
+.no-map .text-col { max-width: 900px; }
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 34px 0 6px;
+}
+
+.section-note {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 12px;
+}
+
+hr.rule {
+  border: none;
+  border-top: 1px solid #bbb;
+  margin: 26px 0 14px;
+}
+
+p.thumb-hint {
+  font-size: 12px;
+  color: #777;
+  margin: 0 0 12px;
+}
+
+/* thumbnail / video grid */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tile {
+  width: 170px;
+  height: 128px;
+  position: relative;
+  overflow: hidden;
+  background: #c9c9c9;
+}
+
+.tile img.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tile.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 11px;
+  text-align: center;
+  padding: 6px;
+  border: 1px dashed #999;
+}
+
+/* video tile */
+.tile.video-tile {
+  background: #000;
+  cursor: pointer;
+}
+.tile.video-tile img.thumb { opacity: 0.85; }
+.tile.video-tile .play-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.tile.video-tile .play-badge svg {
+  width: 40px;
+  height: 40px;
+  opacity: 0.9;
+}
+.tile.video-tile iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.tile.video-tile .video-caption {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  font-size: 10px;
+  color: #fff;
+  background: rgba(0,0,0,.55);
+  padding: 2px 4px;
+  pointer-events: none;
+}
+
+footer.pagefoot {
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+  margin-top: 40px;
+}
+
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  .layout .map-col iframe, .map-placeholder { height: 320px; }
+}
