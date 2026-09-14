@@ -58,18 +58,21 @@ nav.sitenav a.current { font-weight: 700; }
   margin-bottom: 6px;
 }
 
-.layout {
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
-}
-
-.layout .text-col {
-  flex: 1 1 54%;
+/* Text wraps around the map rather than sitting in a rigid two-column
+   split: the map floats right, and the text column is normal block flow,
+   so its lines flow around the map and continue full-width once they pass
+   below it (classic float wrap, not flex/grid). The map must come first
+   in the markup for this to work. */
+.layout::after {
+  content: "";
+  display: block;
+  clear: both;
 }
 
 .layout .map-col {
-  flex: 1 1 46%;
+  float: right;
+  width: 44%;
+  margin: 0 0 16px 28px;
 }
 
 .layout .map-col iframe,
@@ -93,7 +96,6 @@ nav.sitenav a.current { font-weight: 700; }
 
 .text-col p { margin: 0 0 14px; text-align: left; }
 
-.no-map .layout { display: block; }
 .no-map .text-col { max-width: 900px; }
 
 .section-title {
@@ -189,6 +191,39 @@ p.thumb-hint {
   pointer-events: none;
 }
 
+/* generated per-photo pages (image + caption + Previous/Home/Next) */
+.photopage {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+  text-align: center;
+}
+
+.photonav {
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.photonav a {
+  color: #1a1a1a;
+  text-decoration: none;
+  margin: 0 8px;
+  border-bottom: 1px solid transparent;
+}
+.photonav a:hover { border-bottom-color: #1a1a1a; }
+
+.photopage img.full {
+  max-width: 100%;
+  max-height: 82vh;
+  display: block;
+  margin: 0 auto;
+}
+
+.photocaption {
+  font-size: 14px;
+  color: #333;
+  margin: 14px 0 6px;
+}
+
 footer.pagefoot {
   text-align: center;
   font-size: 12px;
@@ -197,6 +232,6 @@ footer.pagefoot {
 }
 
 @media (max-width: 900px) {
-  .layout { flex-direction: column; }
+  .layout .map-col { float: none; width: 100%; margin: 0 0 16px; }
   .layout .map-col iframe, .map-placeholder { height: 320px; }
 }
