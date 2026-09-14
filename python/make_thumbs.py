@@ -13,6 +13,18 @@ Workflow this is meant to slot into:
   4. Paste the printed <a class="tile">...</a> block into the page,
      inside a <div class="grid">.
 
+Photos are processed in capture-time order (EXIF DateTimeOriginal, falling
+back to file modified time), not filename order — so this works whether
+you rename on export or keep original camera filenames like IMG_5711.jpg,
+which won't sort chronologically once photos from different cameras or
+renumbered rolls get mixed into one folder.
+
+Each thumbnail links to a small generated photo page (in pages/) rather
+than straight to the full-size jpg — that page shows the image plus
+Previous / Home / Next links, so you can browse the whole batch without
+shuttling back to the gallery grid each time. --home tells it which page
+to treat as "Home" (default: index.html).
+
 What it does to each image:
   - full/<name>.jpg   — capped at --full-max px on the long side (default
                          2000), so multi-MB camera originals don't get
@@ -30,11 +42,11 @@ What it does to each image:
     order: IPTC Caption-Abstract, EXIF ImageDescription, XMP dc:description
     — Elements writes to all three) and uses it as that image's alt/title
     text, instead of the generic --label. Falls back to --label for any
-    photo with no caption.
-    IMPORTANT: Elements only embeds the caption in the file itself once
-    you've told it to — select the photo(s) and run File > Save Metadata
-    to Files before exporting, or the caption stays in the catalog
-    database only and this script won't see it.
+    photo with no caption. In practice Elements writes the caption into
+    the file's metadata as soon as you save it in the Organizer, so this
+    should just work without any extra export step — if a batch comes
+    through with zero captions found and you expected some, that's the
+    first thing worth double-checking, but it isn't the normal case.
 
 Usage:
   python3 make_thumbs.py /path/to/exported_folder --label lions
@@ -43,7 +55,9 @@ Usage:
 import argparse
 import html
 import re
+import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageOps, IptcImagePlugin
@@ -51,6 +65,40 @@ from PIL import Image, ImageOps, IptcImagePlugin
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".heic"}
 IPTC_CAPTION_KEY = (2, 120)  # Caption-Abstract
 EXIF_IMAGE_DESCRIPTION = 0x010E
+EXIF_IFD_TAG = 0x8769
+EXIF_DATETIME_ORIGINAL = 0x9003
+EXIF_DATETIME = 0x0132
+
+
+def capture_time(path):
+    """When the photo was actually taken, for sorting — since keeping
+    original camera filenames means alphabetical order no longer tracks
+    chronological order (different cameras, renumbered rolls, etc.).
+    Prefers EXIF DateTimeOriginal, falls back to EXIF DateTime, then to
+    the file's own modified time, then (only if truly nothing else is
+    available) pushes it to the end rather than erroring out."""
+    try:
+        img = Image.open(path)
+        exif = img.getexif()
+        dt = None
+        try:
+            exif_ifd = exif.get_ifd(EXIF_IFD_TAG)
+            dt = exif_ifd.get(EXIF_DATETIME_ORIGINAL)
+        except Exception:
+            pass
+        if not dt:
+            dt = exif.get(EXIF_DATETIME)
+        if dt:
+            if isinstance(dt, bytes):
+                dt = dt.decode("utf-8", "replace")
+            return datetime.strptime(dt.strip(), "%Y:%m:%d %H:%M:%S")
+    except Exception:
+        pass
+
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime)
+    except Exception:
+        return datetime.max
 
 
 def read_caption(path):
@@ -158,6 +206,71 @@ def make_thumb(img, out_path, tile_w, tile_h, quality):
     save_jpeg(resized, out_path, quality)
 
 
+def reset_dir(path):
+    """Wipe a directory this script owns (thumbs/, full/, or pages/) so a
+    re-run doesn't leave orphaned files behind for photos that were dropped
+    from the batch. Only ever called on those three specific subfolders,
+    never on --out itself, to keep the blast radius small."""
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def rel_up(web_root):
+    """'../' prefix needed to climb from <web_root>/pages/ back to whatever
+    directory web_root itself is anchored in — i.e. the folder the HTML
+    page that embeds these thumbnails lives in."""
+    depth = (len([s for s in web_root.split("/") if s]) if web_root else 0) + 1
+    return "../" * depth
+
+
+PHOTO_PAGE_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{title}</title>
+<link rel="stylesheet" href="{up}style.css">
+</head>
+<body>
+<div class="photopage">
+  <p class="photonav">
+    <a href="{prev}">&larr; Previous</a>
+    &middot;
+    <a href="{home}">Home</a>
+    &middot;
+    <a href="{next}">Next &rarr;</a>
+  </p>
+  <img class="full" src="../full/{img_name}" alt="{caption}">
+  <p class="photocaption">{caption}</p>
+  <p class="photonav">
+    <a href="{prev}">&larr; Previous</a>
+    &middot;
+    <a href="{home}">Home</a>
+    &middot;
+    <a href="{next}">Next &rarr;</a>
+  </p>
+</div>
+</body>
+</html>
+"""
+
+
+def write_photo_page(out_path, img_name, caption, prev_href, next_href, home_href, up):
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        PHOTO_PAGE_TEMPLATE.format(
+            title=caption or "photo",
+            up=up,
+            prev=prev_href,
+            next=next_href,
+            home=home_href,
+            img_name=img_name,
+            caption=caption,
+        ),
+        encoding="utf-8",
+    )
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source", help="Folder of exported photos")
@@ -168,6 +281,9 @@ def main():
                           "only the printed markup's href/src paths, independent of --out (which "
                           "controls where files are physically written). Default: '' (thumbs/full "
                           "assumed to sit right next to the HTML file).")
+    ap.add_argument("--home", default="index.html",
+                     help="Filename (relative to the site root) that the generated photo pages' "
+                          "'Home' link should point to, e.g. 'animals-birds.html'. Default: 'index.html'.")
     ap.add_argument("--tile-w", type=int, default=170, help="CSS tile width in px (default 170)")
     ap.add_argument("--tile-h", type=int, default=128, help="CSS tile height in px (default 128)")
     ap.add_argument("--scale", type=int, default=2, help="Thumbnail oversample factor for retina (default 2x)")
@@ -183,19 +299,30 @@ def main():
     out_root = Path(args.out).expanduser() if args.out else src_dir.parent
     thumbs_dir = out_root / "thumbs"
     full_dir = out_root / "full"
+    pages_dir = out_root / "pages"
+
+    for d in (thumbs_dir, full_dir, pages_dir):
+        reset_dir(d)
+    print("cleared existing thumbs/, full/, and pages/ before regenerating", file=sys.stderr)
 
     web_root = args.web_root.strip("/")
     web_prefix = f"{web_root}/" if web_root else ""
+    up = rel_up(web_root)
+    home_href = up + args.home
 
     tile_w, tile_h = args.tile_w, args.tile_h
     thumb_w, thumb_h = tile_w * args.scale, tile_h * args.scale
 
-    files = sorted(p for p in src_dir.iterdir() if p.suffix.lower() in IMG_EXTS)
+    files = sorted(
+        (p for p in src_dir.iterdir() if p.suffix.lower() in IMG_EXTS),
+        key=capture_time,
+    )
     if not files:
         sys.exit(f"No images found in {src_dir}")
 
-    markup_lines = ['<div class="grid">']
-    n_ok, n_fail, n_captioned = 0, 0, 0
+    # pass 1: resize/crop every image, collect per-image data
+    items = []  # (out_name, text_for_alt, caption_or_empty)
+    n_fail, n_captioned = 0, 0
 
     for p in files:
         out_name = p.stem + ".jpg"
@@ -208,24 +335,46 @@ def main():
             img = load_upright(p)
             make_full(img, full_dir / out_name, args.full_max, args.quality)
             make_thumb(img, thumbs_dir / out_name, thumb_w, thumb_h, args.quality)
-            markup_lines.append(
-                f'  <a class="tile" href="{web_prefix}full/{out_name}" title="{text}">'
-                f'<img class="thumb" src="{web_prefix}thumbs/{out_name}" alt="{text}"></a>'
-            )
-            n_ok += 1
+            items.append((out_name, text))
         except Exception as e:
             print(f"!! skipped {p.name}: {e}", file=sys.stderr)
             n_fail += 1
+
+    n_ok = len(items)
+
+    # pass 2: now that we know the final ordered list, write each photo
+    # page with correct Previous/Next links (wraps around at the ends)
+    markup_lines = ['<div class="grid">']
+    for i, (out_name, text) in enumerate(items):
+        page_name = Path(out_name).stem + ".html"
+        prev_page = Path(items[(i - 1) % n_ok][0]).stem + ".html"
+        next_page = Path(items[(i + 1) % n_ok][0]).stem + ".html"
+
+        write_photo_page(
+            pages_dir / page_name,
+            img_name=out_name,
+            caption=text,
+            prev_href=prev_page,
+            next_href=next_page,
+            home_href=home_href,
+            up=up,
+        )
+
+        markup_lines.append(
+            f'  <a class="tile" href="{web_prefix}pages/{page_name}" title="{text}">'
+            f'<img class="thumb" src="{web_prefix}thumbs/{out_name}" alt="{text}"></a>'
+        )
 
     markup_lines.append("</div>")
 
     print(f"\n{n_ok} images processed" + (f", {n_fail} skipped" if n_fail else ""), file=sys.stderr)
     print(f"{n_captioned} of {n_ok} had an embedded caption; the rest used --label '{args.label}'", file=sys.stderr)
     if n_ok and n_captioned == 0:
-        print("(0 captions found — if you expected some, check you ran File > Save Metadata", file=sys.stderr)
-        print(" to Files on these in Elements before exporting them.)", file=sys.stderr)
+        print("(0 captions found — if you expected some, worth a quick check that these", file=sys.stderr)
+        print(" particular photos actually had a Caption typed and saved in the Organizer.)", file=sys.stderr)
     print(f"thumbs/ -> {thumbs_dir}  ({thumb_w}x{thumb_h}px)", file=sys.stderr)
     print(f"full/   -> {full_dir}  (long side capped at {args.full_max}px)", file=sys.stderr)
+    print(f"pages/  -> {pages_dir}  (one photo page per image, with Previous/Home/Next)", file=sys.stderr)
     print("\n--- paste this into the page ---\n", file=sys.stderr)
     print("\n".join(markup_lines))
 
