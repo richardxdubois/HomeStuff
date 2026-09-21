@@ -233,14 +233,6 @@ PHOTO_PAGE_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <div class="photopage">
-  <p class="photonav">
-    <a href="{prev}">&larr; Previous</a>
-    &middot;
-    <a href="{home}">Home</a>
-    &middot;
-    <a href="{next}">Next &rarr;</a>
-  </p>
-  <img class="full" src="../full/{img_name}" alt="{caption}">
   <p class="photocaption">{caption}</p>
   <p class="photonav">
     <a href="{prev}">&larr; Previous</a>
@@ -249,6 +241,7 @@ PHOTO_PAGE_TEMPLATE = """<!DOCTYPE html>
     &middot;
     <a href="{next}">Next &rarr;</a>
   </p>
+  <img class="full" src="../full/{img_name}" alt="{caption}">
 </div>
 </body>
 </html>
